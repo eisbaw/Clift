@@ -1,0 +1,1 @@
+-- Hoare triple definitions: validHoare (partial) and totalHoare (total correctness)

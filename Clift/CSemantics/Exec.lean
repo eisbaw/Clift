@@ -1,0 +1,2 @@
+-- Big-step inductive execution semantics for CSimpl
+-- Following Simpl: non-termination = no derivation (partial correctness)

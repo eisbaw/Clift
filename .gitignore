@@ -1,0 +1,10 @@
+.build/
+.lake/
+lake-packages/
+*.olean
+*.ilean
+*.trace
+__pycache__/
+*.pyc
+.pytest_cache/
+result

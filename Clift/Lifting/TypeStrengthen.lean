@@ -1,0 +1,1 @@
+-- L3: Narrow monad to tightest type (pure/option/nondet) + corres proof

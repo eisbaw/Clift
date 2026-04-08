@@ -1,4 +1,4 @@
-# AutoCorres4: Lifting C into Lean 4 for Formal Verification
+# Clift: Lifting C into Lean 4 for Formal Verification
 
 ## Context
 
@@ -19,13 +19,13 @@ C source (.c)
     |  Shallow monadic embedding (raw state monad + failure)
     v
 [Stage 2: LocalVarExtract]  Lean 4 metaprogram + corres proof
-    |  Locals become function params/returns, not state fields
+    |  Locals become lambda-bound Lean variables, not state fields
     v
 [Stage 3: TypeStrengthen]   Lean 4 metaprogram + corres proof
-    |  Tightest monad per function (pure/option/state/full)
+    |  Tightest monad per function (pure/gets/option/nondet)
     v
 [Stage 4: HeapLift]         Lean 4 metaprogram + corres proof
-    |  Flat bytes -> typed split heaps (Burstall-Bornat)
+    |  Flat bytes -> typed split heaps (simplified Burstall-Bornat)
     v
 [Stage 5: WordAbstract]     Lean 4 metaprogram + corres proof
     |  BitVec n -> Int/Nat with range guards
@@ -40,15 +40,49 @@ Each stage produces:
 1. A transformed function definition
 2. A machine-checked `corres` lemma proving the transformation preserves all behaviors
 
+The stages are **sequential** — each stage's input is the previous stage's output. They cannot be developed in parallel (though their foundations can be).
+
 ## Key Design Decisions
 
-### C Front-End: Clang JSON (not a custom parser)
+### Decision 1: Refinement Direction — Backward Simulation
+
+Following seL4's `corres_underlying`, we use **backward simulation**: "for every concrete result, there exists a matching abstract result."
+
+```lean
+-- Backward simulation: concrete behaviors are contained in abstract behaviors.
+-- srel: state relation (pairs of abstract × concrete states)
+-- nf/nf': no-fail flags (when true, that side must not fail)
+-- rrel: return value relation
+-- G/G': preconditions on abstract/concrete state
+def corres
+    (srel : σ → σ' → Prop)      -- state relation
+    (nf : Bool) (nf' : Bool)     -- no-fail flags
+    (rrel : α → β → Prop)       -- return value relation
+    (G : σ → Prop) (G' : σ' → Prop)  -- guards (preconditions)
+    (m : CStateM σ α)           -- abstract
+    (m' : CStateM σ' β)         -- concrete
+    : Prop :=
+  ∀ s s', srel s s' → G s → G' s' →
+    -- if nf, abstract must not fail
+    (nf → m s ≠ .fail) →
+    -- for every concrete result, abstract has a matching one
+    (∀ r' t', m' s' = .ok (r', t') →
+      ∃ r t, m s = .ok (r, t) ∧ srel t t' ∧ rrel r r') ∧
+    -- if nf', concrete must not fail
+    (nf' → m' s' ≠ .fail)
+```
+
+**Why backward, not forward**: backward simulation says "the concrete cannot do anything the abstract cannot." This is what we want — the abstract spec is an *overapproximation* of the concrete. Properties proved about the abstract hold for the concrete. Forward simulation would require the abstract to match every concrete step, which is too strong when the abstract is nondeterministic.
+
+### Decision 2: C Front-End — Clang JSON
 
 `clang -Xclang -ast-dump=json` produces a structured AST with type annotations. A Python script reads this and emits `.lean` files containing `CSimpl` terms.
 
-Why clang over CompCert Clight parser: more practical (no OCaml dependency), handles full C preprocessing, stable JSON output.
+Why clang over CompCert Clight parser: more practical (no OCaml dependency), handles full C preprocessing.
 
-The importer is trusted (it's in the TCB) but NOT proof-critical — the Lean kernel checks the CSimpl terms it produces. If the importer mistranslates, proofs about the wrong program succeed, but do not apply to the real C. This is the same trust model as seL4's StrictC parser.
+**Trust model**: The importer IS in the TCB. If it mistranslates C to CSimpl, proofs are about the wrong program and do not apply to the real C. This is the same trust model as seL4's StrictC parser. Mitigation: extensive regression tests against known C semantics edge cases, and differential testing against CompCert's parser for the shared subset.
+
+**Clang JSON stability risk**: Not formally versioned. Mitigation: pin to a specific LLVM version via nix flake, regression tests on every update.
 
 Supported C subset (StrictC restrictions):
 - No floating point (phase 1)
@@ -58,87 +92,141 @@ Supported C subset (StrictC restrictions):
 - No variadic functions, VLAs
 - No pre/post increment in expressions
 
-### CSimpl: The Deeply Embedded Imperative Language
+### Decision 3: One Global State Record (Following seL4)
+
+Following seL4's C parser exactly: **one state record for ALL functions**, not per-function records. Local variables from all functions are merged into a single `LocalsRec`. Same-name, same-type locals share a field. Same-name, different-type locals get type-qualified names.
 
 ```lean
-inductive CSimpl (σ : Type) : Type where
+-- Base state: globals + raw heap
+structure Globals where
+  rawHeap : HeapRawState     -- byte-level memory + type descriptor
+  -- plus one field per non-addressed global variable
+
+-- Locals: ONE record for ALL functions in the .c file
+-- Generated per-program by the importer
+structure Locals where
+  a_unsigned : UInt32         -- local 'a' from gcd()
+  b_unsigned : UInt32         -- local 'b' from gcd()
+  t_unsigned : UInt32         -- local 't' from gcd()
+  -- ... all locals from all functions ...
+
+-- The full state — parametric, same type for all CSimpl commands
+structure CState where
+  globals : Globals
+  locals : Locals
+```
+
+Function calls use save/restore of caller's locals (via `DynCom`-style state capture), matching Simpl's approach. The `call` constructor captures the current state, sets up parameters, and restores on return.
+
+LocalVarExtract (L2) then eliminates the locals from the state, lifting them into Lean-level lambda-bound variables. After L2, the ugly global locals record is gone and functions look natural.
+
+### Decision 4: CSimpl — The Deeply Embedded Imperative Language
+
+```lean
+-- Deeply embedded imperative language, parametric in state type σ
+-- and procedure environment Γ (maps procedure names to bodies)
+inductive CSimpl (σ : Type) where
   | skip    : CSimpl σ
   | basic   : (σ → σ) → CSimpl σ
   | seq     : CSimpl σ → CSimpl σ → CSimpl σ
   | cond    : (σ → Bool) → CSimpl σ → CSimpl σ → CSimpl σ
   | while   : (σ → Bool) → CSimpl σ → CSimpl σ
-  | call    : FunName → CSimpl σ
+  | call    : ProcName → CSimpl σ
   | guard   : (σ → Prop) → CSimpl σ → CSimpl σ   -- UB guard
   | throw   : CSimpl σ
   | catch   : CSimpl σ → CSimpl σ → CSimpl σ
   | spec    : (σ → σ → Prop) → CSimpl σ           -- nondeterministic spec
+  | dynCom  : (σ → CSimpl σ) → CSimpl σ           -- state-dependent command (for call setup)
 ```
 
-Simpler than Isabelle's Simpl (no concurrency). State type `σ` is a record with globals, locals, and flat byte memory.
+### Decision 5: Big-Step Inductive Semantics (Following Simpl)
 
-Big-step semantics as an inductive relation `CSimpl.eval : CSimpl σ → σ → σ → Prop`.
-
-### Monadic Framework
+Following Simpl exactly: big-step semantics as an **inductive relation** (least fixed point). Non-terminating loops simply have no derivation — this naturally gives **partial correctness**.
 
 ```lean
-inductive CResult (α : Type) where
-  | ok   : α → CResult α
-  | fail : CError → CResult α    -- UB, overflow, null deref, etc.
+-- Execution outcomes
+inductive Outcome (σ : Type) where
+  | normal : σ → Outcome σ
+  | abrupt : σ → Outcome σ    -- break/continue/return
+  | fault  : Outcome σ         -- UB triggered
 
-def CStateM (σ α : Type) := σ → CResult (α × σ)
-
--- Hoare triples
-def validHoare (P : σ → Prop) (m : CStateM σ α) (Q : α → σ → Prop) : Prop :=
-  ∀ s₀, P s₀ → match m s₀ with
-    | .ok (a, s₁) => Q a s₁
-    | .fail _ => True
-
-def totalHoare (P : σ → Prop) (m : CStateM σ α) (Q : α → σ → Prop) : Prop :=
-  ∀ s₀, P s₀ → match m s₀ with
-    | .ok (a, s₁) => Q a s₁
-    | .fail _ => False
-
--- Refinement (correspondence) between stages
-def corres (abs : σ' → σ) (concrete : CStateM σ α) (abstract : CStateM σ' α) : Prop :=
-  ∀ s', match abstract s' with
-    | .ok (a', t') => concrete (abs s') = .ok (a', abs t')
-    | .fail e => concrete (abs s') = .fail e
+-- Big-step inductive semantics
+inductive Exec (Γ : ProcEnv σ) : CSimpl σ → σ → Outcome σ → Prop where
+  | skip      : Exec Γ .skip s (.normal s)
+  | basic     : Exec Γ (.basic f) s (.normal (f s))
+  | seqNormal : Exec Γ c₁ s (.normal t) → Exec Γ c₂ t u → Exec Γ (.seq c₁ c₂) s u
+  | seqAbrupt : Exec Γ c₁ s (.abrupt t) → Exec Γ (.seq c₁ c₂) s (.abrupt t)
+  | condTrue  : b s = true  → Exec Γ c₁ s t → Exec Γ (.cond b c₁ c₂) s t
+  | condFalse : b s = false → Exec Γ c₂ s t → Exec Γ (.cond b c₁ c₂) s t
+  | whileTrue : b s = true  → Exec Γ c s (.normal t) → Exec Γ (.while b c) t u →
+                Exec Γ (.while b c) s u
+  | whileFalse: b s = false → Exec Γ (.while b c) s (.normal s)
+  | guardOk   : p s → Exec Γ c s t → Exec Γ (.guard p c) s t
+  | guardFault: ¬ p s → Exec Γ (.guard p c) s .fault
+  -- ... throw, catch, call, dynCom rules
 ```
 
-After TypeStrengthen, functions get the tightest type:
-- `pure : α` — no state, no failure
-- `option : Option α` — may fail, no state
-- `reader : σ → α` — reads state, no mutation, no failure
-- `state : σ → α × σ` — stateful, no failure
-- `full : CStateM σ α` — stateful + may fail
+**Termination** is a separate inductive predicate (following Simpl's `terminates`), not fuel-based. Total correctness = partial correctness + termination.
 
-### Memory Model
+This is NOT computable — you cannot `#eval` an Exec derivation. Testing uses the CImporter's test suite against the C compiler, not Lean evaluation.
 
-Phase 1 (MVP): Flat byte array.
+### Decision 6: Monadic Framework
+
 ```lean
-structure RawMem where
-  bytes : Array UInt8
+-- The nondeterministic state monad with failure (seL4's nondet_monad)
+-- Results are a set of (return, state) pairs + a failure flag
+structure NondetM (σ α : Type) where
+  run : σ → { results : Set (α × σ) // failed : Bool }
 
-structure RawState where
-  mem : RawMem
-  globals : GlobalsRec  -- generated per-program record
-  locals : LocalsRec    -- generated per-function record
+-- Hoare triples (partial and total correctness)
+def validHoare (P : σ → Prop) (m : NondetM σ α) (Q : α → σ → Prop) : Prop :=
+  ∀ s₀, P s₀ → ¬(m.run s₀).failed ∧
+    ∀ (r, s₁) ∈ (m.run s₀).results, Q r s₁
+
+def totalHoare (P : σ → Prop) (m : NondetM σ α) (Q : α → σ → Prop) : Prop :=
+  validHoare P m Q  -- partial correctness
+  ∧ ∀ s₀, P s₀ → (m.run s₀).results.Nonempty  -- must terminate (produce ≥1 result)
 ```
 
-Phase 3 (HeapLift): Split typed heaps.
+### Decision 7: TypeStrengthen — 3 Monad Levels (not 5)
+
+Following seL4's AutoCorres which uses 4 (pure/gets/option/nondet), we start with **3** for the MVP:
+
+1. **`pure`** (precedence 100) — No state, no failure. Target: `α`
+2. **`option`** (precedence 60) — May fail, reads/writes state. Target: `σ → Option (α × σ)`
+3. **`nondet`** (precedence 0, default) — Full nondeterministic monad. Target: `NondetM σ α`
+
+Add `gets` (read-only state) later when the infrastructure is mature.
+
+### Decision 8: Memory Model
+
+**Phase 1 (MVP)**: Flat byte array + type descriptor.
 ```lean
-structure LiftedState where
-  heap_u32 : Fin maxAddr → UInt32
-  valid_u32 : Fin maxAddr → Bool
-  -- one pair per type used in the program
-  globals : GlobalsRec
+-- Byte-level heap with type tracking (following seL4's UMM)
+structure HeapRawState where
+  mem : Fin memSize → UInt8           -- byte-addressed memory
+  htd : Fin memSize → Option TypeTag  -- what type is stored here
+
+-- Pointer with type tag
+structure Ptr (α : Type) where
+  addr : Fin memSize
 ```
 
-### Undefined Behavior
+**Phase 3 (HeapLift)**: Simplified split heap (following AutoCorres's `TypHeapSimple`, NOT the full Tuch model). Each typed pointer maps to `Option α`:
 
-Modeled as `guard` nodes in CSimpl. The guard condition must be provable for the program to be correct. If UB occurs, the result is `CResult.fail .undefinedBehavior`. Total correctness proofs (totalHoare) prove absence of UB.
+```lean
+-- After HeapLift: simple_lift style (one type per address, no nested field pointers)
+def simpleLift (s : HeapRawState) (p : Ptr α) : Option α :=
+  if heapPtrValid s.htd p then some (hVal s.mem p) else none
+```
 
-This is sound: any property proved under "UB causes failure" holds for any particular compiler's treatment of that UB.
+**Restriction** (same as AutoCorres): nested struct field access via sub-pointers is NOT supported in the lifted heap. You access structs as whole values, not by taking pointers to individual fields.
+
+**Struct layout, padding, alignment**: Modeled via typeclass instances (`CType`, `MemType`) that encode size, alignment, and field offsets for each struct. Generated by the importer based on the target platform's ABI.
+
+### Decision 9: Separation Logic Predicates in Phase 3 (not Phase 5)
+
+Basic separation logic predicates (`mapsTo`, `sep`, frame rule) are needed to reason about pointers. Define them alongside HeapLift in Phase 3, not deferred to Phase 5. Phase 5 adds *automation* (`sep_auto` tactic), not the predicates themselves.
 
 ## Dependency Graph
 
@@ -146,50 +234,69 @@ This is sound: any property proved under "UB causes failure" holds for any parti
 Mathlib (BitVec, omega, Int, Nat)
          |
     MonadLib                    CSemantics
-    (CResult, CStateM,         (CSimpl, RawState,
-     Hoare triples, corres)     eval, memory model)
+    (NondetM, Hoare triples,    (CSimpl, Exec, CState,
+     corres, monad laws)         HeapRawState)
          |                          |
          +----------+---------------+
                     |
               CImporter (Python: clang JSON -> .lean CSimpl defs)
                     |
-         +----+----+----+----+
-         |    |    |    |    |
-       L1   L2   L3   L4   L5
-    Simpl  Local Type Heap  Word
-    Conv   Var   Str  Lift  Abs
-         |    |    |    |    |
-         +----+----+----+----+
+                    v
+              L1: SimplConv  (CSimpl -> NondetM, + corres proof)
                     |
-              UserProofLib
-           (c_vcg, c_step tactics)
+                    v
+              L2: LocalVarExtract  (lift locals to lambda-bound vars, + corres proof)
+                    |
+                    v
+              L3: TypeStrengthen  (narrow monad: pure/option/nondet, + corres proof)
+                    |
+                    v
+              L4: HeapLift  (raw bytes -> typed heaps + sep logic preds, + corres proof)
+                    |
+                    v
+              L5: WordAbstract  (BitVec -> Int/Nat + range guards, + corres proof)
+                    |
+                    v
+              UserProofLib (c_vcg, c_step, sep_auto tactics)
 ```
 
 ## Phased Build Plan
 
 ### Phase 0: Foundation (Weeks 1-4)
 
-**Goal**: MonadLib + CSemantics compile, hand-written test case works.
+**Goal**: MonadLib + CSemantics compile, hand-written test cases work, MetaM feasibility validated.
 
 Build:
-- `MonadLib.lean`: CResult, CStateM, Hoare triple defs, basic Hoare rules (seq, cond, while-invariant, frame), corres definition + transitivity
-- `CSemantics.lean`: CSimpl inductive, CSimpl.eval big-step relation, RawState with flat byte memory
+- `MonadLib`: NondetM, Hoare triple defs, basic Hoare rules (seq, cond, while-invariant, frame), `corres` definition (backward simulation) + transitivity
+- `CSemantics`: CSimpl inductive, Exec big-step inductive relation, HeapRawState, CState with globals + locals
 - Hand-write CSimpl for: `uint32_t max(uint32_t a, uint32_t b) { return a > b ? a : b; }`
 - Prove a Hoare triple about it directly
+- **MetaM feasibility test**: Write a trivial Lean 4 metaprogram that constructs a CSimpl term and proves something about it programmatically
 
-**No C importer yet.** Test by manually encoding CSimpl terms.
+**Exit criteria**:
+1. `theorem max_correct : validHoare (...) max_simpl (...)` — proven and kernel-checked
+2. MetaM test: metaprogram constructs a term and discharges a proof obligation
+3. Measure: proof term size for max_correct, kernel check time. Extrapolate to 100-line functions.
 
-**Exit criterion**: `theorem max_correct : totalHoare (fun s => True) max_simpl (fun r s => r = if a > b then a else b)` — proven and kernel-checked.
+### Phase 1: Vertical Slice (Weeks 5-14)
 
-### Phase 1: Vertical Slice (Weeks 5-12)
-
-**Goal**: Real `.c` file goes through entire pipeline (Stages 0-2), user proves property.
+**Goal**: Real `.c` file goes through pipeline (Stages 0-2), user proves property.
 
 Build:
-- `CImporter/import.py`: Parse clang JSON, emit .lean with CSimpl defs. Handle: integer types, local vars, if/else, while, return, arithmetic, comparisons.
-- `Lifting/SimplConv.lean`: MetaM program converting CSimpl -> L1 monadic form + corres proof
-- `Lifting/LocalVarExtract.lean`: MetaM program lifting locals out of state + corres proof
-- Skip TypeStrengthen, HeapLift, WordAbstract — users work at L2 with BitVec + raw state
+- `CImporter/import.py`: Parse clang JSON, emit .lean with CSimpl defs + state records. Handle: integer types, local vars, if/else, while, return, arithmetic, comparisons.
+- `Lifting/SimplConv.lean`: MetaM converting CSimpl -> L1 NondetM + corres proof
+- `Lifting/LocalVarExtract.lean`: MetaM lifting locals to lambda-bound vars + corres proof
+
+**CImporter interface contract** (the key boundary):
+- Input: clang JSON AST for one .c file
+- Output: one `.lean` file containing:
+  - `structure Globals` (per-program)
+  - `structure Locals` (all locals from all functions, merged)
+  - `structure CState` (globals + locals)
+  - `def <func>_body : CSimpl CState` for each function
+  - `def procEnv : ProcEnv CState` (maps names to bodies)
+
+**Do NOT start CImporter until CSimpl and CState design is frozen** (end of Phase 0).
 
 Target C:
 ```c
@@ -203,30 +310,45 @@ uint32_t gcd(uint32_t a, uint32_t b) {
 }
 ```
 
-**Exit criterion**: User writes `theorem gcd_divides : totalHoare P l2_gcd Q` in Lean 4, proves it, proof chains back to the actual C via composed corres lemmas.
+**Exit criteria**:
+1. CImporter: parse gcd.c, emit .lean, the .lean compiles
+2. SimplConv: L1 monadic form generated with corres proof
+3. LocalVarExtract: L2 form with locals as lambda params
+4. User proves `theorem gcd_correct : validHoare P l2_gcd Q`, proof chains to C
 
-### Phase 2: Clean Types (Weeks 13-20)
+### Phase 2: Clean Types (Weeks 15-24)
 
-**Goal**: TypeStrengthen + WordAbstract produce functions with clean Lean types.
+**Goal**: TypeStrengthen + WordAbstract produce clean Lean types.
 
 Build:
-- `Lifting/TypeStrengthen.lean`: Analyze failure paths, emit tightest monad + corres proof
+- `Lifting/TypeStrengthen.lean`: Analyze L2 functions for failure paths, emit tightest monad (pure/option/nondet) + corres proof
 - `Lifting/WordAbstract.lean`: BitVec -> Int/Nat with range guards + corres proof. Heavy use of Mathlib BitVec lemmas + omega.
-- `Tactics/CStep.lean`: c_step tactic (like Aeneas's progress) — unfold one monadic step, apply function spec
+- `Tactics/CStep.lean`: c_step tactic — unfold one monadic step, apply function spec
 
-**Exit criterion**: gcd lifts to `Nat -> Nat -> Nat`. User proofs use omega and Nat reasoning, not BitVec.
+**Exit criterion**: gcd lifts to `Nat → Nat → Nat` (pure). User proofs use omega and Nat reasoning, not BitVec.
 
-### Phase 3: Pointers + Structs (Weeks 21-30)
+### Phase 3: Pointers + Structs + Sep Logic Basics (Weeks 25-44)
 
-**Goal**: Programs with pointers and structs get typed heap access.
+**Goal**: Programs with pointers and structs get typed heap access with frame reasoning.
 
-Build:
-- Struct support in CImporter (field access, struct pointers)
-- Array indexing with bounds proofs
-- `Lifting/HeapLift.lean`: Split raw memory into per-type typed heaps + corres proof
-- Pointer validity predicates
+**This is the hardest phase. Budget 20 weeks, not 10.**
 
-Target C:
+Build (sub-phased):
+- **3a (weeks 25-30)**: Single-level pointers to scalars. `Ptr UInt32` read/write with validity proofs. No structs yet.
+- **3b (weeks 31-36)**: Struct support in CImporter (field access, struct pointers). `CType`/`MemType` typeclasses for layout. Struct padding/alignment modeled.
+- **3c (weeks 37-40)**: HeapLift — `simpleLift` from raw bytes to typed heaps + corres proof.
+- **3d (weeks 41-44)**: Basic separation logic predicates (`mapsTo`, `sep`, frame rule). No automation yet — manual proofs.
+
+Target C (3a — scalar pointers):
+```c
+void swap(uint32_t *a, uint32_t *b) {
+    uint32_t t = *a;
+    *a = *b;
+    *b = t;
+}
+```
+
+Target C (3c — structs + linked data):
 ```c
 struct node { int val; struct node *next; };
 int list_length(struct node *head) {
@@ -236,70 +358,50 @@ int list_length(struct node *head) {
 }
 ```
 
-**Exit criterion**: User verifies list_length returns length of abstract `List Nat`, reasoning about lists not bytes.
+**Exit criteria**:
+1. swap: prove `*a` and `*b` are exchanged, frame: other memory unchanged
+2. list_length: verify returns length of abstract `List Nat`
 
-### Phase 4: Scale + Automation (Weeks 31-40)
+### Phase 4: Automation (Weeks 45-54)
 
 Build:
-- `Tactics/CVcg.lean`: Full VCG that applies Hoare rules automatically, leaving only "interesting" obligations
-- AI proof search integration: `ai_prove` tactic that serializes goal, calls LLM, applies result
-- `sorry`-extraction tool: scan .lean files, package obligations as structured ProofTasks
-- Function pointers / dispatch tables
+- `Tactics/CVcg.lean`: Full VCG applying Hoare rules automatically
+- `Tactics/SepAuto.lean`: Separation logic automation (frame rule, points-to rewriting)
+- `corres_auto` tactic for correspondence proofs
+- AI proof search integration (details TBD after Phase 2 experience)
 - Test on real embedded C (~500-1000 LOC)
 
-### Phase 5: Separation Logic (Weeks 41+)
+### Phase 5: Scale (Weeks 55+)
 
-- Separation logic predicates over split heap
-- Frame rule, magic wand
-- `sep_auto` tactic
+- Function pointers / dispatch tables
+- Concurrency (interrupt handlers)
 - Scale to thousands of LOC
-
-## AI Integration Points
-
-**Principle**: AI never extends the trusted base. Every AI output is kernel-checked. Deterministic tactics first (grind, omega, decide, simp), AI fills gaps.
-
-### Where AI helps most (by impact):
-
-1. **Loop invariant generation** (highest value) — Given loop body + pre/postcondition, AI proposes invariant. Lean checks.
-2. **Correspondence proofs between stages** — Formulaic but tedious. AI drafts tactic scripts following patterns.
-3. **Data structure invariant generation** — Given struct + operations, AI proposes well-formedness predicate.
-4. **Specification drafting** — Given C function + types, AI drafts theorem statement. Human approves.
-5. **Overflow guard discharge** — AI + omega close arithmetic obligations.
-
-### Tactic priority stack (for any obligation):
-
-1. `decide` (decidable finite props)
-2. `omega` (linear integer arithmetic)
-3. `simp [lemma_set]` (rewriting)
-4. `grind` (congruence closure + E-matching + arithmetic, 5s timeout)
-5. `corres_auto` (custom: unfold + simulation lemmas)
-6. `Aesop` (goal-directed search)
-7. `ai_prove` (LLM oracle, N retries)
-8. `sorry` with structured error report for human
-
-### Reward signal for AI training:
-
-- Kernel accepts proof -> reward 1.0
-- Tactic reduces goal count -> reward 0.3-0.7
-- Tactic type-errors -> reward -0.1
-- Build a RAG index over proven lemmas, retrieve similar proofs in-context
+- Performance optimization (incremental re-verification)
 
 ## Risks
 
-1. **Proof term size**: AutoCorres in Isabelle generates large terms. Lean 4 kernel may be slower. Mitigation: measure in Phase 0, use native_decide where possible.
-2. **C semantics fidelity**: Getting integer promotion, implicit conversions, struct layout right is tedious and error-prone. Mitigation: start with uint32_t only, expand incrementally. Follow CompCert's well-studied semantics.
-3. **grind coverage unknown**: We don't know what % of obligations grind handles. Mitigation: benchmark in Phase 1 with representative goals.
-4. **Metaprogramming complexity**: Each lifting stage is hundreds of lines of MetaM. Lean 4 metaprogramming docs are sparse. Mitigation: study Aeneas's tactic code as template.
-5. **Clang JSON stability**: Not formally versioned. Mitigation: pin LLVM version, regression tests.
+1. **Proof term size**: AutoCorres in Isabelle generates large terms. Lean 4 kernel may be slower. Mitigation: measure in Phase 0, use native_decide where possible. Hard exit: if max_correct takes >5s to check, redesign proof strategy.
+2. **C semantics fidelity**: Integer promotion, implicit conversions, struct layout. Mitigation: start with uint32_t only, expand incrementally. Follow CompCert Clight as reference.
+3. **grind coverage unknown**: Mitigation: benchmark in Phase 0 with representative goals.
+4. **MetaM complexity**: Lean 4 metaprogramming docs sparse. Mitigation: Phase 0 feasibility test. Study Aeneas tactic code as template.
+5. **Clang JSON stability**: Mitigation: pin LLVM via nix flake, regression tests.
+6. **Lean 4 / Mathlib version churn**: 40+ week project will see upstream breakage. Mitigation: pin `lean-toolchain` + exact Mathlib commit in `lakefile.lean`. Update deliberately, not reactively.
+7. **Phase 3 memory model correctness**: Silent semantic mismatch between our heap model and what gcc actually does for struct layout/padding would invalidate all pointer proofs. Mitigation: differential testing of struct sizes/offsets against gcc output.
+8. **Clang AST trust gap**: If clang's JSON AST misrepresents C semantics (e.g., wrong integer promotion in AST), the entire pipeline is silently wrong. Mitigation: test edge cases (integer promotion, sign extension, implicit conversions) against known C standards behavior.
 
 ## What We Reuse
 
-- **Aeneas patterns**: CResult type, progress/step tactic pattern, scalar modeling
+- **Aeneas patterns**: Result type, progress/step tactic, scalar modeling
 - **Mathlib**: BitVec lemmas, omega, algebraic structures
 - **grind**: Primary workhorse for "boring" proof obligations
 - **lean-mlir/SSA**: Denotational semantics style, peephole rewrite patterns
-- **CompCert Clight semantics**: As reference (not ported, but followed) for what each C construct means
+- **CompCert Clight semantics**: As reference for what each C construct means
+- **seL4 l4v source**: Direct reference for corres, Exec, TypeStrengthen design
+
+## AI Integration
+
+**Principle**: AI never extends the trusted base. Every AI output is kernel-checked. Deterministic tactics first (grind, omega, decide, simp), AI fills gaps. Details deferred to Phase 4 — get the deterministic pipeline working first.
 
 ## Verification of the Plan Itself
 
-After Phase 1, we have a concrete test: take `gcd.c`, run the pipeline, prove gcd_divides in Lean 4, and verify the proof chains all the way back to the C semantics. If this works end-to-end, the architecture is validated. If it doesn't, we learn what breaks before investing in Phases 2-5.
+After Phase 1, we have a concrete test: take `gcd.c`, run the pipeline, prove gcd_correct in Lean 4, verify the proof chains back to C semantics. If this works end-to-end, the architecture is validated. If it doesn't, we learn what breaks before investing in Phases 2-5.

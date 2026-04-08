@@ -1,0 +1,1 @@
+-- Typed split heap definitions (one heap per pointer type)

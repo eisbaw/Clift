@@ -1,0 +1,1 @@
+-- simpleLift: typed access to raw heap (following AutoCorres TypHeapSimple)

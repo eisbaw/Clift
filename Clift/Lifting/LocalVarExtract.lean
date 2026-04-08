@@ -1,0 +1,1 @@
+-- L2: Lift locals from state record into lambda-bound Lean variables + corres proof

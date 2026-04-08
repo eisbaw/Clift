@@ -1,0 +1,1 @@
+-- Basic separation logic predicates: mapsTo, sep (separating conjunction), frame rule

@@ -1,4 +1,4 @@
-# AutoCorres4 Project Guidelines
+# Clift Project Guidelines
 
 1. **Read `plan.md`** at the start of every session for full project context and architecture.
 2. **External references** (papers, theses, articles, specs) go under `ext/` folder.

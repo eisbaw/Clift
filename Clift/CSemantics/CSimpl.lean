@@ -1,0 +1,2 @@
+-- CSimpl: Deeply embedded imperative language for C
+-- Based on Schirmer's Simpl, simplified for sequential C

@@ -1,0 +1,1 @@
+-- c_vcg: verification condition generator (applies Hoare rules automatically)

@@ -1,0 +1,1 @@
+-- Execution outcomes: normal, abrupt (break/return), fault (UB)

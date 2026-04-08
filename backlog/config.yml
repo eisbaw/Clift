@@ -1,4 +1,4 @@
-project_name: "AutoCorres4"
+project_name: "Clift"
 default_status: "To Do"
 statuses: ["To Do", "In Progress", "Done"]
 labels: []
