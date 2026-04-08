@@ -13,7 +13,7 @@ require mathlib from git
 -- Core library: monadic foundations + C semantics + lifting + tactics
 @[default_target]
 lean_lib Clift where
-  srcDir := "Clift"
+  srcDir := "."
 
 -- Generated CSimpl definitions (output of CImporter, version controlled)
 lean_lib Generated where
