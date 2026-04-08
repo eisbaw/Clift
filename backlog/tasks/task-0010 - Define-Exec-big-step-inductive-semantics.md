@@ -1,9 +1,11 @@
 ---
 id: TASK-0010
 title: Define Exec big-step inductive semantics
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@mped'
 created_date: '2026-04-08 21:34'
+updated_date: '2026-04-08 22:50'
 labels:
   - phase-0
   - csemantics
@@ -24,9 +26,41 @@ Define big-step inductive execution relation following Simpl Semantic.thy. Induc
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Exec inductive relation with rules for all 11 CSimpl constructors
-- [ ] #2 While rules: whileTrue and whileFalse
-- [ ] #3 Guard rules: guardOk and guardFault
-- [ ] #4 Call rule: procedure lookup and body execution
-- [ ] #5 terminates predicate as separate inductive
+- [x] #1 Exec inductive relation with rules for all 11 CSimpl constructors
+- [x] #2 While rules: whileTrue and whileFalse
+- [x] #3 Guard rules: guardOk and guardFault
+- [x] #4 Call rule: procedure lookup and body execution
+- [x] #5 terminates predicate as separate inductive
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented Exec with 22 rules covering all 11 CSimpl constructors:
+- skip (1 rule), basic (1), seq (3: normal/abrupt/fault), cond (2: true/false)
+- while (4: true/false/abrupt/fault), call (2: defined/undefined)
+- guard (2: ok/fault), throw (1), catch (3: normal/abrupt/fault)
+- spec (2: normal/stuck), dynCom (1)
+
+Terminates predicate has 16 rules mirroring the Exec structure.
+
+Key design decisions:
+- Fault propagation: seq, while, catch all propagate faults (faults are uncatchable)
+- Call undefined = fault (matches Simpl)
+- Spec stuck = fault (no related state means UB)
+- Terminates for while requires body terminates AND recursive termination for all normal outcomes
+
+All compiles, zero sorry.
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Defined big-step inductive execution semantics in Clift/CSemantics/Exec.lean.
+
+22 Exec rules covering all 11 CSimpl constructors with proper fault propagation.
+16 Terminates rules as a separate inductive predicate.
+
+Faithful to Simpl: non-termination = no derivation, faults propagate through seq/catch/while.
+All kernel-checked, zero sorry.
+<!-- SECTION:FINAL_SUMMARY:END -->

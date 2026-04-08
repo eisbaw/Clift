@@ -1,9 +1,11 @@
 ---
 id: TASK-0008
 title: Define corres (backward simulation) relation
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@mped'
 created_date: '2026-04-08 21:34'
+updated_date: '2026-04-08 22:44'
 labels:
   - phase-0
   - monadlib
@@ -23,8 +25,33 @@ Define the correspondence/refinement relation following seL4's corres_underlying
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 corres definition matches plan.md Decision 1 exactly
-- [ ] #2 Backward simulation direction verified: concrete results imply abstract results
-- [ ] #3 State relation, no-fail flags, return relation, guards all present
-- [ ] #4 Sanity test: corres Id true true Eq True True (pure x) (pure x) proven trivially
+- [x] #1 corres definition matches plan.md Decision 1 exactly
+- [x] #2 Backward simulation direction verified: concrete results imply abstract results
+- [x] #3 State relation, no-fail flags, return relation, guards all present
+- [x] #4 Sanity test: corres Id true true Eq True True (pure x) (pure x) proven trivially
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+corres definition matches plan.md Decision 1 exactly.
+Backward simulation: concrete results imply abstract results.
+Sanity test pure_pure_eq proves corres for identical pure computations.
+Also proved weakening lemmas (weaken_nf, weaken_nf').
+No sorry in any proof.
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Defined corres backward simulation relation in Clift/MonadLib/Corres.lean.
+
+The definition takes: state relation srel, no-fail flags nf/nf', return relation rrel, guards G/G', abstract and concrete NondetM computations.
+
+Proved:
+- pure_pure: corres holds for pure computations with related values
+- pure_pure_eq: sanity test with identity relations
+- weaken_nf/weaken_nf': no-fail flag weakening
+
+All proofs kernel-checked, zero sorry.
+<!-- SECTION:FINAL_SUMMARY:END -->
