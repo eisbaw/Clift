@@ -23,4 +23,4 @@ lean_lib Generated where
 -- User proof examples
 lean_lib Examples where
   srcDir := "Examples"
-  roots := #[`MaxProof, `MetaMTest, `Benchmark]
+  roots := #[`MaxProof, `MetaMTest, `Benchmark, `GcdProof]
