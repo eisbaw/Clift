@@ -1,9 +1,11 @@
 ---
 id: TASK-0018
 title: 'CImporter: emit Globals, Locals, CState Lean structures'
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@mped'
 created_date: '2026-04-08 21:35'
+updated_date: '2026-04-08 23:18'
 labels:
   - phase-1
   - cimporter
@@ -22,10 +24,32 @@ Implement lean_emitter.py: generate the Lean 4 state record structures. Globals 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Emits structure Globals with rawHeap field
-- [ ] #2 Emits structure Locals merging all functions' locals
-- [ ] #3 Same-name, same-type locals share one field
-- [ ] #4 Same-name, different-type locals get type-qualified names (e.g. x_unsigned)
-- [ ] #5 Emits structure CState with globals and locals fields
-- [ ] #6 Generated .lean compiles with import Clift.CSemantics
+- [x] #1 Emits structure Globals with rawHeap field
+- [x] #2 Emits structure Locals merging all functions' locals
+- [x] #3 Same-name, same-type locals share one field
+- [x] #4 Same-name, different-type locals get type-qualified names (e.g. x_unsigned)
+- [x] #5 Emits structure CState with globals and locals fields
+- [x] #6 Generated .lean compiles with import Clift.CSemantics
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+State structures implemented in lean_emitter.py:
+- Reuses library Globals (has rawHeap) rather than redefining
+- Emits per-program Locals structure with merged fields
+- abbrev ProgramState := CState Locals uses library generic CState
+- Namespace per module avoids name conflicts
+- Type qualification for same-name different-type vars implemented
+- Both Max.lean and Gcd.lean compile successfully
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Lean state structure emission implemented.
+
+Design: reuse library Globals + CState, generate only Locals per program.
+abbrev ProgramState := CState Locals provides the full state type.
+Namespaced to avoid conflicts between generated modules.
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -18,6 +18,7 @@ lean_lib Clift where
 -- Generated CSimpl definitions (output of CImporter, version controlled)
 lean_lib Generated where
   srcDir := "Generated"
+  roots := #[`Max, `Gcd]
 
 -- User proof examples
 lean_lib Examples where

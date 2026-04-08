@@ -14,7 +14,7 @@
         devShells.default = pkgs.mkShell {
           buildInputs = [
             pkgs.elan              # Lean version manager (reads lean-toolchain)
-            pkgs.python3           # CImporter
+            (pkgs.python3.withPackages (ps: [ ps.pytest ]))  # CImporter + testing
             pkgs.clang_17          # Pinned clang for JSON AST dump
             pkgs.just              # Task runner
             pkgs.jq                # Inspect clang JSON output

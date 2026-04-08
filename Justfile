@@ -16,7 +16,7 @@ setup:
 # Usage: just import test/c_sources/gcd.c Gcd
 import FILE NAME:
     mkdir -p test/clang_json Generated
-    clang -Xclang -ast-dump=json -fsyntax-only {{FILE}} > test/clang_json/{{NAME}}.json
+    clang -Xclang -ast-dump=json -fsyntax-only {{FILE}} 2>/dev/null > test/clang_json/{{NAME}}.json
     python3 CImporter/import.py test/clang_json/{{NAME}}.json -o Generated/{{NAME}}.lean
 
 # Re-import all known C sources
