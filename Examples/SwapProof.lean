@@ -11,7 +11,7 @@ import Clift.MonadLib.HoareRules
 import Examples.GcdCorrect  -- for L1corres_cHoare_bridge
 
 set_option maxHeartbeats 12800000
-set_option maxRecDepth 4096
+set_option maxRecDepth 16384
 
 open Swap
 
@@ -53,19 +53,20 @@ theorem l1_swap_body_corres :
         exact L1corres_basic _ _
   · exact L1corres_skip _
 
-/-! # validHoare: direct computation proof
+/-! # validHoare for swap
 
-    Known blocker (task-0062): Lean 4's {s with ...} desugars to
-    `have __src := s.field` in some contexts and `let __src := s.field`
-    in others. These are NOT definitionally equal for non-Prop types.
-    This prevents composing L1 result lemmas with theorem statements.
+    Known blocker: Lean 4 kernel deep recursion on composed L1 Hoare rules.
+    The proof is mathematically trivial (deterministic computation trace) but
+    the compositional Hoare rule approach generates proof terms 7+ levels deep,
+    exceeding the kernel's recursion limit. Additionally, structure update
+    desugaring ({s with ...}) introduces have/let bindings that complicate
+    definitional equality checking.
 
-    The l1_swap_validHoare proof is deferred to Phase 4 where a VCG
-    tactic will normalize the have/let forms before applying rules.
+    This requires a MetaM-level VCG tactic (task-0046) that constructs FLAT
+    proof terms by directly building set membership witnesses.
 
-    The sep-logic level proof (swap_sep_correct in SepLogic.lean and
-    swap_heapLift_corres in SwapHeapLift.lean) is complete and sorry-free,
-    demonstrating that the HeapLift layer works correctly. -/
+    The sep-logic proof (SwapHeapLift.lean) is complete and sorry-free,
+    demonstrating the pipeline works at the HeapLift level. -/
 
 theorem l1_swap_validHoare (va vb : UInt32) :
     validHoare
