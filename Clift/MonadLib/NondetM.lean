@@ -8,7 +8,7 @@
 --
 -- Reference: ext/AutoCorres2/lib/Spec_Monad.thy, ext/AutoCorres2/L1Defs.thy
 
-import Mathlib.Data.Set.Basic
+import Clift.Util.SetBasic
 
 /-! # Error types for C verification -/
 
@@ -67,7 +67,7 @@ def pure (a : α) : NondetM σ α :=
 def bind (m : NondetM σ α) (f : α → NondetM σ β) : NondetM σ β :=
   fun s =>
     let r := m s
-    { results := {p : β × σ | ∃ a s', (a, s') ∈ r.results ∧ p ∈ (f a s').results}
+    { results := fun p => ∃ a s', (a, s') ∈ r.results ∧ p ∈ (f a s').results
       failed  := r.failed ∨ ∃ a s', (a, s') ∈ r.results ∧ (f a s').failed }
 
 /-- Fail: computation that always fails with no successful results. -/
@@ -95,7 +95,7 @@ def guard (p : σ → Prop) [DecidablePred p] : NondetM σ Unit :=
 /-- Select: nondeterministically choose a value from a set.
     Never fails (even on empty set -- just produces no results). -/
 def select (S : Set α) : NondetM σ α :=
-  fun s => { results := {p | p.1 ∈ S ∧ p.2 = s}, failed := False }
+  fun s => { results := fun p => p.1 ∈ S ∧ p.2 = s, failed := False }
 
 /-- Condition: branch on a boolean predicate over state. -/
 def condition (c : σ → Bool) (t e : NondetM σ α) : NondetM σ α :=
@@ -115,7 +115,7 @@ instance : Monad (NondetM σ) where
 
 @[simp] theorem bind_run (m : NondetM σ α) (f : α → NondetM σ β) (s : σ) :
     (m >>= f) s =
-      { results := {p : β × σ | ∃ a s', (a, s') ∈ (m s).results ∧ p ∈ (f a s').results}
+      { results := fun p => ∃ a s', (a, s') ∈ (m s).results ∧ p ∈ (f a s').results
         failed  := (m s).failed ∨ ∃ a s', (a, s') ∈ (m s).results ∧ (f a s').failed } :=
   rfl
 
@@ -207,7 +207,7 @@ inductive WhileFail (c : σ → Bool) (body : NondetM σ Unit) : σ → Prop whe
     Defined using inductive predicates for results and failure. -/
 def whileLoop (c : σ → Bool) (body : NondetM σ Unit) : NondetM σ Unit :=
   fun s =>
-    { results := {p : Unit × σ | WhileResult c body s p.2}
+    { results := fun p => WhileResult c body s p.2
       failed := WhileFail c body s }
 
 @[simp] theorem skip_run (s : σ) :

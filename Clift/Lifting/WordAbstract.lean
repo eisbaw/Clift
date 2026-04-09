@@ -12,6 +12,7 @@
 -- For Phase 2: manual/definitional approach. MetaM automation deferred.
 
 import Clift.MonadLib
+import Clift.Util.UInt32Ext
 
 set_option maxHeartbeats 800000
 

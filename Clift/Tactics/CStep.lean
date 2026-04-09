@@ -47,7 +47,7 @@ macro_rules
     | apply hoare_bind
     | apply hoare_cond
     | apply hoare_while
-    | apply hoare_consequence <;> [skip; skip; skip]
+    | apply hoare_consequence
     | fail "c_step: could not find applicable Hoare rule"
     )
 

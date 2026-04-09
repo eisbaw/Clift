@@ -35,7 +35,7 @@ theorem gcd_l3_zero (a : UInt32) : gcd_l3 a 0 = a := by
 
 theorem gcd_l3_rec (a b : UInt32) (hb : b ≠ 0) :
     gcd_l3 a b = gcd_l3 b (a % b) := by
-  conv_lhs => unfold gcd_l3
+  conv => lhs; unfold gcd_l3
   simp [hb]
 
 /-! # L1 while body helpers -/
@@ -128,7 +128,7 @@ theorem l1_gcd_body_is_pure (s : ProgramState) :
     ∧ s'.locals.ret__val = gcd_l3 s.locals.a s.locals.b
     ∧ s'.globals = s.globals := by
   obtain ⟨s_loop, h_while, h_a_gcd, h_globals⟩ :=
-    l1_gcd_while_computes_gcd_l3 s.locals.b.toNat s (le_refl _)
+    l1_gcd_while_computes_gcd_l3 s.locals.b.toNat s (Nat.le_refl _)
   let s_ret := { s_loop with locals := { s_loop.locals with ret__val := s_loop.locals.a } }
   refine ⟨s_ret, ?_, ?_, ?_⟩
   · unfold l1_gcd_body

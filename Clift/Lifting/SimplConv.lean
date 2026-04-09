@@ -38,8 +38,8 @@ def guard (p : σ → Prop) [DecidablePred p] : L1Monad σ :=
 def seq (m₁ m₂ : L1Monad σ) : L1Monad σ :=
   fun s =>
     let r₁ := m₁ s
-    { results := {p | ∃ s', (Except.ok (), s') ∈ r₁.results ∧ p ∈ (m₂ s').results} ∪
-                 {p | (Except.error (), p.2) ∈ r₁.results ∧ p.1 = Except.error ()}
+    { results := (fun p => ∃ s', (Except.ok (), s') ∈ r₁.results ∧ p ∈ (m₂ s').results) ∪
+                 (fun p => (Except.error (), p.2) ∈ r₁.results ∧ p.1 = Except.error ())
       failed := r₁.failed ∨ ∃ s', (Except.ok (), s') ∈ r₁.results ∧ (m₂ s').failed }
 
 def condition (c : σ → Bool) (t e : L1Monad σ) : L1Monad σ :=
@@ -48,8 +48,8 @@ def condition (c : σ → Bool) (t e : L1Monad σ) : L1Monad σ :=
 def «catch» (body handler : L1Monad σ) : L1Monad σ :=
   fun s =>
     let r := body s
-    { results := {p | (Except.ok (), p.2) ∈ r.results ∧ p.1 = Except.ok ()} ∪
-                 {p | ∃ s', (Except.error (), s') ∈ r.results ∧ p ∈ (handler s').results}
+    { results := (fun p => (Except.ok (), p.2) ∈ r.results ∧ p.1 = Except.ok ()) ∪
+                 (fun p => ∃ s', (Except.error (), s') ∈ r.results ∧ p ∈ (handler s').results)
       failed := r.failed ∨ ∃ s', (Except.error (), s') ∈ r.results ∧ (handler s').failed }
 
 inductive WhileResult (c : σ → Bool) (body : L1Monad σ) : σ → Except Unit Unit × σ → Prop where
@@ -73,12 +73,12 @@ inductive WhileFail (c : σ → Bool) (body : L1Monad σ) : σ → Prop where
 
 def «while» (c : σ → Bool) (body : L1Monad σ) : L1Monad σ :=
   fun s =>
-    { results := {p | WhileResult c body s p}
+    { results := fun p => WhileResult c body s p
       failed := WhileFail c body s }
 
 def spec (rel : σ → σ → Prop) : L1Monad σ :=
   fun s =>
-    { results := {p | ∃ t, rel s t ∧ p = (Except.ok (), t)}
+    { results := fun p => ∃ t, rel s t ∧ p = (Except.ok (), t)
       failed := ¬ ∃ t, rel s t }
 
 def fail : L1Monad σ :=
@@ -286,12 +286,13 @@ theorem L1corres_guard {σ : Type} (Γ : ProcEnv σ)
   -- If ¬p s, the guard fails, making seq fail. But h_nf says seq doesn't fail.
   -- Therefore p s must hold.
   have hp : p s := by
-    by_contra h_np
-    apply h_nf
-    show (L1.seq (L1.guard p) m s).failed
-    simp only [L1.seq, L1.guard]
-    left
-    simp [h_np]
+    by_cases h_ps : p s
+    · exact h_ps
+    · exfalso; apply h_nf
+      show (L1.seq (L1.guard p) m s).failed
+      simp only [L1.seq, L1.guard]
+      left
+      simp [h_ps]
   -- With p s, the guard produces {(ok, s)} with failed = False.
   -- The seq then effectively passes through to m at s.
   have h_nf_m : ¬(m s).failed := by
@@ -303,7 +304,6 @@ theorem L1corres_guard {σ : Type} (Γ : ProcEnv σ)
     show (Except.ok (), s) ∈ (L1.guard p s).results
     unfold L1.guard
     simp [hp]
-    rfl
   obtain ⟨hm_ok, hm_err, hm_fault⟩ := hm s h_nf_m
   -- When p s holds, L1.guard p at s produces {(ok, s)} with failed = False.
   -- So L1.seq (L1.guard p) m at s has same results as m at s (for the first set)

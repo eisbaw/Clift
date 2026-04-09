@@ -86,9 +86,8 @@ theorem L3corres_pure_implies_corres {σ α : Type} {m : NondetM σ α} {x : α}
   refine ⟨?_, ?_, ?_⟩
   · intro _; simp [tsLiftPure, NondetM.pure]
   · intro r' t' h_mem
-    simp [tsLiftPure, NondetM.pure] at h_mem
-    obtain ⟨rfl, rfl⟩ := h_mem
-    exact ⟨x, s, rfl, rfl, rfl⟩
+    have ⟨rfl, rfl⟩ := Prod.mk.inj (h_mem : (r', t') = (x, s))
+    exact ⟨r', t', rfl, rfl, rfl⟩
   · intro _; simp [tsLiftPure, NondetM.pure]
 
 /-- L3corres_option implies corres. nf=false since option can fail. -/

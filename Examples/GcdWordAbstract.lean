@@ -31,7 +31,7 @@ theorem gcd_nat_zero (a : Nat) : gcd_nat a 0 = a := by
 
 theorem gcd_nat_rec (a b : Nat) (hb : b ≠ 0) :
     gcd_nat a b = gcd_nat b (a % b) := by
-  conv_lhs => unfold gcd_nat
+  conv => lhs; unfold gcd_nat
   simp [hb]
 
 /-! # WAcorres: gcd_l3 corresponds to gcd_nat
@@ -48,7 +48,7 @@ theorem gcd_l3_wa_corres (a b : UInt32) :
   -- Strong induction on b.toNat
   suffices h : ∀ (n : Nat) (a b : UInt32), b.toNat ≤ n →
       wordToNat (gcd_l3 a b) = gcd_nat (wordToNat a) (wordToNat b) from
-    h b.toNat a b (le_refl _)
+    h b.toNat a b (Nat.le_refl _)
   intro n
   induction n with
   | zero =>

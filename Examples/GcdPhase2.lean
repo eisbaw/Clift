@@ -82,7 +82,7 @@ private theorem gcd_while_universal (n : Nat) :
     | done _ hc =>
       -- hc : decide (s.locals.b ≠ 0) = false, so s.locals.b = 0
       have hb0 : s.locals.b = 0 := by
-        simp [decide_eq_false_iff_not, not_not] at hc; exact hc
+        simp [decide_eq_false_iff_not, Decidable.not_not] at hc; exact hc
       exact ⟨fun _ => ⟨by rw [hb0, gcd_l3_zero], rfl⟩, fun h => by cases h⟩
     | step _ t _ hc h_body h_rest =>
       -- hc : decide (s.locals.b ≠ 0) = true, so s.locals.b ≠ 0
@@ -146,7 +146,7 @@ theorem l1_gcd_body_validHoare (a₀ b₀ : UInt32) :
           have h_sb := (Prod.mk.inj h_basic).2
           -- s₁ = s_e = s_b = {s_w with ret__val := s_w.a}
           obtain ⟨h_while_ok, _⟩ := gcd_while_universal s₀.locals.b.toNat s₀
-            (Except.ok (), s_w) (le_refl _) h_while
+            (Except.ok (), s_w) (Nat.le_refl _) h_while
           obtain ⟨h_a, _⟩ := h_while_ok rfl
           show wordToNat s₁.locals.ret__val =
             gcd_nat (wordToNat s₀.locals.a) (wordToNat s₀.locals.b)
@@ -154,7 +154,7 @@ theorem l1_gcd_body_validHoare (a₀ b₀ : UInt32) :
         · exfalso; exact absurd h_pass2.1 (by intro h; cases h)
       · exfalso
         exact (gcd_while_universal s₀.locals.b.toNat s₀
-          (Except.error (), s_e) (le_refl _) h_pass.1).2 rfl
+          (Except.error (), s_e) (Nat.le_refl _) h_pass.1).2 rfl
 
 /-! # C-level end-to-end theorem -/
 

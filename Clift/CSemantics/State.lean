@@ -8,7 +8,7 @@
 -- Reference: ext/AutoCorres2/TypHeapSimple.thy
 
 import Clift.CSemantics.TypeTag
-import Mathlib.Data.Fin.Basic
+import Clift.Util.UInt32Ext
 
 set_option maxHeartbeats 800000
 
