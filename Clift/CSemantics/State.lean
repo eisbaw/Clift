@@ -155,6 +155,12 @@ def heapPtrValid {α : Type} [inst : CType α] (h : HeapRawState) (p : Ptr α) :
   p.addr.val ≠ 0 ∧
   p.addr.val + inst.size ≤ memSize
 
+/-- heapPtrValid is decidable (all components are decidable). -/
+instance {α : Type} [inst : CType α] (h : HeapRawState) (p : Ptr α) :
+    Decidable (heapPtrValid h p) := by
+  unfold heapPtrValid
+  exact instDecidableAnd
+
 /-- heapPtrValid implies the address range fits in memory. -/
 theorem heapPtrValid_bound {α : Type} [inst : CType α] {h : HeapRawState} {p : Ptr α}
     (hv : heapPtrValid h p) : p.addr.val + inst.size ≤ memSize :=
@@ -306,6 +312,32 @@ theorem hVal_heapUpdate_disjoint {α β : Type} [instA : MemType α] [instB : Me
   simp only [hVal_eq_hVal' _ _ h_bound_q, hVal', heapUpdate']
   rw [readMemSlice'_writeMemSlice_disjoint]
   exact h_disj
+
+/-! # heapUpdate preserves htd and heapPtrValid -/
+
+/-- heapUpdate only changes mem, not htd. -/
+theorem heapUpdate_htd {α : Type} [inst : MemType α]
+    (h : HeapRawState) (p : Ptr α) (v : α) :
+    (heapUpdate h p v).htd = h.htd := by
+  simp only [heapUpdate]
+  split <;> simp [heapUpdate']
+
+/-- heapUpdate preserves heapPtrValid for any pointer (same or different type). -/
+theorem heapUpdate_preserves_heapPtrValid {α β : Type} [instA : MemType α] [instB : CType β]
+    (h : HeapRawState) (p : Ptr α) (v : α) (q : Ptr β)
+    (hv : heapPtrValid h q) :
+    heapPtrValid (heapUpdate h p v) q := by
+  unfold heapPtrValid at *
+  rw [heapUpdate_htd]
+  exact hv
+
+/-! # ptrDisjoint symmetry -/
+
+theorem ptrDisjoint_symm {α β : Type} [instA : CType α] [instB : CType β]
+    {p : Ptr α} {q : Ptr β} (h : ptrDisjoint p q) :
+    ptrDisjoint q p := by
+  unfold ptrDisjoint at *
+  omega
 
 /-! # Global state infrastructure -/
 
