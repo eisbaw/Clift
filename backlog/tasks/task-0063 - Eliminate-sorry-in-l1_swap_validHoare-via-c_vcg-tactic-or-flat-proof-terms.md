@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-04-09 16:52'
-updated_date: '2026-04-09 22:10'
+updated_date: '2026-04-09 22:11'
 labels:
   - phase-4
   - sorry
@@ -48,4 +48,6 @@ Result: L1corres proof works, but validHoare proof still hits kernel depth limit
 Root cause: ANY proof step that requires the kernel to reduce structure projections through composed functions (e.g., (swap_f1 s).globals) triggers deep recursion.
 This is fundamental to Lean 4 kernel limits, not a proof strategy issue.
 The sorry remains; workaround is the HeapLift-level proof (SwapHeapLift.lean).
+
+Blocked by Lean 4 kernel depth limitation. SwapHeapLift.lean provides sorry-free proof at HeapLift level. L1-level proof needs MetaM VCG (task-0071) or upstream kernel fix (task-0076).
 <!-- SECTION:NOTES:END -->

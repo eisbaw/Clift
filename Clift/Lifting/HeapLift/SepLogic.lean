@@ -14,6 +14,7 @@
 -- predicates are independent of the split heap abstraction.
 
 import Clift.Lifting.HeapLift.SimpleLift
+import Clift.MonadLib.Hoare
 
 /-! # HeapPred: predicates over heap states -/
 
@@ -147,6 +148,67 @@ theorem mapsTo_frame_swap {α β γ : Type} [MemType α] [MemType β] [MemType �
   apply mapsTo_frame_update
   · exact mapsTo_frame_update h pa va pr vr h_mt h_disj_a
   · exact h_disj_b
+
+/-! # General frame rule for validHoare with separation
+
+    The true separation logic frame rule says: if {P} m {Q} and m is
+    "local" (only touches resources described by P), then
+    {P * R} m {Q * R} for any R about disjoint resources.
+
+    In our setting, NondetM computations don't have a built-in locality
+    notion. We state the frame rule with an explicit locality hypothesis:
+    the computation preserves any mapsTo assertion about a disjoint pointer.
+
+    This is the standard approach when separation logic is layered on top
+    of a state monad without substructural typing. -/
+
+/-- Frame rule for validHoare with mapsTo separation.
+    If a computation satisfies {P} m {Q} and preserves any disjoint pointer's
+    mapsTo assertion (the locality hypothesis), then we can frame in
+    additional mapsTo facts.
+
+    The `h_local` hypothesis says: if pointer `q` is valid and disjoint from
+    the computation's footprint, then the computation preserves `mapsTo q vq`.
+    This must be proven for each specific computation (e.g., for heap updates,
+    it follows from `mapsTo_frame_update`).
+
+    This bridges the gap between our raw-heap frame lemmas and Hoare-level
+    reasoning. -/
+theorem validHoare_frame_mapsTo {α β : Type} [MemType β]
+    {P : HeapRawState → Prop} {Q : α → HeapRawState → Prop}
+    {m : NondetM HeapRawState α}
+    {q : Ptr β} {vq : β}
+    (h_spec : validHoare P m Q)
+    (h_local : ∀ s₀, P s₀ → mapsTo q vq s₀ →
+      ∀ r s₁, (r, s₁) ∈ (m s₀).results → mapsTo q vq s₁) :
+    validHoare (fun s => P s ∧ mapsTo q vq s) m
+               (fun r s => Q r s ∧ mapsTo q vq s) := by
+  intro s₀ ⟨h_P, h_mt⟩
+  have ⟨h_nf, h_post⟩ := h_spec s₀ h_P
+  exact ⟨h_nf, fun r s₁ h_mem =>
+    ⟨h_post r s₁ h_mem, h_local s₀ h_P h_mt r s₁ h_mem⟩⟩
+
+/-- Iterated frame rule: frame in two disjoint mapsTo assertions. -/
+theorem validHoare_frame_sepMapsTo {α β γ : Type} [CType β] [MemType β] [CType γ] [MemType γ]
+    {P : HeapRawState → Prop} {Q : α → HeapRawState → Prop}
+    {m : NondetM HeapRawState α}
+    {q : Ptr β} {vq : β} {r : Ptr γ} {vr : γ}
+    (h_spec : validHoare P m Q)
+    (h_local_q : ∀ s₀, P s₀ → mapsTo q vq s₀ → mapsTo r vr s₀ →
+      ∀ rv s₁, (rv, s₁) ∈ (m s₀).results → mapsTo q vq s₁)
+    (h_local_r : ∀ s₀, P s₀ → mapsTo q vq s₀ → mapsTo r vr s₀ →
+      ∀ rv s₁, (rv, s₁) ∈ (m s₀).results → mapsTo r vr s₁)
+    (h_disj : ptrDisjoint q r) :
+    validHoare (fun s => P s ∧ sepMapsTo q vq r vr s) m
+               (fun rv s => Q rv s ∧ sepMapsTo q vq r vr s) := by
+  intro s₀ ⟨h_P, h_sep⟩
+  have ⟨h_mt_q, h_mt_r, _⟩ := h_sep
+  have ⟨h_nf, h_post⟩ := h_spec s₀ h_P
+  exact ⟨h_nf, fun rv s₁ h_mem =>
+    ⟨h_post rv s₁ h_mem,
+     h_local_q s₀ h_P h_mt_q h_mt_r rv s₁ h_mem,
+     h_local_r s₀ h_P h_mt_q h_mt_r rv s₁ h_mem,
+     h_disj⟩⟩
 
 /-! # Swap correctness at the simpleLift level -/
 

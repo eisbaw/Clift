@@ -16,6 +16,12 @@
     Note: `fault` carries no state — once UB occurs, the state is meaningless.
     This matches Simpl's treatment of Fault states.
 
+    Design: Simpl has a fourth outcome `Stuck` (semantically undefined,
+    e.g. missing procedure body). We merge Stuck into `fault` because:
+    (a) both represent undefined behavior in C, (b) our ProcEnv is total
+    (no missing bodies), (c) fewer cases in every proof.
+    See ADR-005 (backlog/docs/adr-005-stuck-merged-into-fault.md).
+
     The abrupt outcome is used for C's non-local control flow:
     - `throw` produces abrupt
     - `catch` handles abrupt by running the handler

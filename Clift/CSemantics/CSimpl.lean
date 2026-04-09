@@ -37,6 +37,11 @@ abbrev ProcName := String
     This allows guards to express undecidable conditions in the semantics.
     In practice, generated guards from the importer will be decidable.
 
+    Note on `guard` fault-set: Simpl's Guard takes a fault-set parameter `f`
+    to classify which guard failed. Ours omits this — all faults are
+    indistinguishable. This simplifies proofs and is sufficient while we
+    prove total fault-freedom. See ADR-006 (backlog/docs/adr-006-guard-fault-set-deferred.md).
+
     Note on `spec`: models nondeterministic choice constrained by a relation.
     If no related state exists, this is equivalent to a fault.
     Used to model C operations whose result is implementation-defined.

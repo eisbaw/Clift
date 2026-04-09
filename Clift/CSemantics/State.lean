@@ -146,6 +146,24 @@ theorem UInt32.fromBytes_toBytes' (v : UInt32) :
         + v.toNat / 16777216 % 256 * 16777216 = v.toNat
   exact hd
 
+/-- UInt32 surjection: toBytes' (fromBytes' f) = f.
+    Every 4-byte sequence round-trips through the UInt32 encoding.
+
+    KERNEL DEPTH LIMITATION: This property is mathematically true
+    (it's pure Nat div/mod arithmetic) but the proof term hits
+    `(kernel) deep recursion detected` because the UInt32 wrapper
+    chain (UInt32 -> BitVec -> Fin -> Nat) creates too-deep terms.
+    The proof strategy works for UInt8 and UInt16 but fails at 4+ bytes.
+
+    The Nat-level arithmetic is:
+    let n := b0 + b1*256 + b2*65536 + b3*16777216
+    n % 256 = b0, n/256%256 = b1, n/65536%256 = b2, n/16777216%256 = b3
+    which omega trivially proves. The kernel can't check the proof term
+    that connects this to the UInt32 wrapper. -/
+-- theorem UInt32.toBytes_fromBytes' (f : Fin 4 → UInt8) :
+--     UInt32.toBytes' (UInt32.fromBytes' f) = f
+-- Blocked by kernel depth limit. See note above.
+
 instance : MemType UInt32 where
   size := 4
   align := 4
@@ -166,6 +184,15 @@ def UInt8.toBytes' (v : UInt8) : Fin 1 → UInt8 := fun _ => v
 theorem UInt8.fromBytes_toBytes' (v : UInt8) :
     UInt8.fromBytes' (UInt8.toBytes' v) = v := by
   simp [UInt8.fromBytes', UInt8.toBytes']
+
+/-- UInt8 surjection: toBytes' (fromBytes' f) = f.
+    Every 1-byte sequence round-trips through the UInt8 encoding. -/
+theorem UInt8.toBytes_fromBytes' (f : Fin 1 → UInt8) :
+    UInt8.toBytes' (UInt8.fromBytes' f) = f := by
+  funext ⟨i, hi⟩
+  have : i = 0 := by omega
+  subst this
+  simp [UInt8.toBytes', UInt8.fromBytes']
 
 instance : MemType UInt8 where
   size := 1
@@ -211,6 +238,24 @@ theorem UInt16.fromBytes_toBytes' (v : UInt16) :
     UInt16.ext h
   show v.toNat % 256 + v.toNat / 256 % 256 * 256 = v.toNat
   exact byte_decompose16 v.toNat hv
+
+/-- UInt16 surjection: toBytes' (fromBytes' f) = f.
+    Every 2-byte sequence round-trips through the UInt16 encoding. -/
+theorem UInt16.toBytes_fromBytes' (f : Fin 2 → UInt8) :
+    UInt16.toBytes' (UInt16.fromBytes' f) = f := by
+  have hb0 : (f ⟨0, by omega⟩).toNat < 256 := (f ⟨0, by omega⟩).toBitVec.isLt
+  have hb1 : (f ⟨1, by omega⟩).toNat < 256 := (f ⟨1, by omega⟩).toBitVec.isLt
+  funext ⟨i, hi⟩
+  apply UInt8.ext
+  match i, hi with
+  | 0, _ =>
+    show ((f ⟨0, by omega⟩).toNat + (f ⟨1, by omega⟩).toNat * 256) % 256
+      = (f ⟨0, by omega⟩).toNat
+    omega
+  | 1, _ =>
+    show ((f ⟨0, by omega⟩).toNat + (f ⟨1, by omega⟩).toNat * 256) / 256 % 256
+      = (f ⟨1, by omega⟩).toNat
+    omega
 
 instance : MemType UInt16 where
   size := 2
@@ -308,6 +353,16 @@ theorem UInt64.fromBytes_toBytes' (v : UInt64) :
     + v.toNat / 72057594037927936 % 256 * 72057594037927936 = v.toNat
   exact byte_decompose64 v.toNat hv
 
+/-- UInt64 surjection: toBytes' (fromBytes' f) = f.
+    Every 8-byte sequence round-trips through the UInt64 encoding.
+
+    KERNEL DEPTH LIMITATION: Same as UInt32 — the property is
+    mathematically true but the proof term hits kernel deep recursion.
+    See UInt32.toBytes_fromBytes' comment for details. -/
+-- theorem UInt64.toBytes_fromBytes' (f : Fin 8 → UInt8) :
+--     UInt64.toBytes' (UInt64.fromBytes' f) = f
+-- Blocked by kernel depth limit.
+
 instance : MemType UInt64 where
   size := 8
   align := 8
@@ -321,7 +376,15 @@ instance : MemType UInt64 where
 
 Pointers are stored as 8-byte little-endian addresses.
 We encode Ptr α as a UInt64 (the address), using the same
-byte layout as UInt64. -/
+byte layout as UInt64.
+
+Note: Ptr does NOT satisfy the surjection property
+`toBytes' (fromBytes' f) = f`. The issue is that `fromBytes'`
+applies `% memSize` (truncation to 32-bit address space), so
+an 8-byte sequence encoding an address >= 2^32 will decode to
+a different address and re-encode to different bytes.
+This is acceptable because `heapPtrValid` ensures all valid
+pointers have addresses < memSize. See ADR-004. -/
 
 /-- Read a Ptr from 8 bytes (little-endian address). -/
 def Ptr.fromBytes' {α : Type} (f : Fin 8 → UInt8) : Ptr α :=

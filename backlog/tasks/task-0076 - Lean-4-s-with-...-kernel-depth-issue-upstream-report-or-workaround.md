@@ -1,10 +1,11 @@
 ---
 id: TASK-0076
 title: 'Lean 4 { s with ... } kernel depth issue: upstream report or workaround'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@mped'
 created_date: '2026-04-09 19:34'
-updated_date: '2026-04-09 22:10'
+updated_date: '2026-04-09 22:11'
 labels:
   - phase-5
   - lean4-bug
@@ -37,4 +38,6 @@ Confirmed the kernel depth issue with concrete evidence:
 - The validHoare proof fails because it requires reasoning about state after transformation
 - Workaround: HeapLift-level proofs work (SwapHeapLift.lean is sorry-free)
 - Fix needed: MetaM VCG (task-0071) that builds flat proof terms without structure projections
+
+Issue documented: Lean 4 kernel deep recursion on nested structure projections through composed functions. Affects any proof composing 7+ state transformations with CState/Globals. Minimal reproducer needed. Workaround exists: SwapHeapLift.lean proofs bypass the issue.
 <!-- SECTION:NOTES:END -->
