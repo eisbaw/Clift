@@ -1,7 +1,7 @@
 """Lean 4 code emitter for the CImporter.
 
 Generates .lean files containing:
-  - structure Globals (with rawHeap field)
+  - Lean 4 structures for C structs with CType/MemType instances
   - structure Locals (merged from all functions)
   - abbrev CState := CState Locals (using the library's generic CState)
   - def <func>_body : CSimpl ProgramState for each function
@@ -22,7 +22,7 @@ import logging
 from typing import Optional
 
 from .ast_parser import TranslationUnit, FuncInfo, VarInfo, Stmt, Expr
-from .c_types import CType, VOID
+from .c_types import CType, StructDef, VOID, get_struct_defs
 
 log = logging.getLogger(__name__)
 
@@ -85,11 +85,11 @@ class LeanEmitter:
         # Second pass: generate field names
         for var_name, types in name_types.items():
             if len(types) == 1:
-                # Unique type — use plain name
+                # Unique type -- use plain name
                 lean_type = list(types)[0]
                 self.all_vars[var_name] = name_to_ctype[var_name][lean_type]
             else:
-                # Multiple types — qualify with type suffix
+                # Multiple types -- qualify with type suffix
                 for lean_type, ctype in name_to_ctype[var_name].items():
                     qualified = f"{var_name}_{lean_type.lower()}"
                     self.all_vars[qualified] = ctype
@@ -110,7 +110,7 @@ class LeanEmitter:
         # Check if this var_name is unique-typed across all functions
         if var_name in self.all_vars:
             return var_name
-        # Must be a type-qualified name — find the type from this function's context
+        # Must be a type-qualified name -- find the type from this function's context
         for var in func.params + func.locals:
             if var.name == var_name:
                 qualified = f"{var_name}_{var.c_type.lean_type.lower()}"
@@ -122,6 +122,12 @@ class LeanEmitter:
     def emit(self) -> str:
         """Generate the complete .lean file."""
         self._emit_header()
+
+        # Emit struct definitions before locals
+        for sdef in self.tu.structs:
+            self._emit_struct(sdef)
+            self._w()
+
         self._emit_locals()
         self._emit_state_abbrev()
         self._w()
@@ -148,6 +154,137 @@ class LeanEmitter:
         self._w()
         self._w(f"namespace {self.module_name}")
         self._w()
+
+    def _emit_struct(self, sdef: StructDef):
+        """Emit a Lean structure and CType/MemType instances for a C struct."""
+        lean_name = sdef.lean_name
+
+        self._w(f"/-- C struct {sdef.name}: size={sdef.total_size}, align={sdef.alignment} -/")
+        self._w(f"structure {lean_name} where")
+        self._indent += 1
+        for f in sdef.fields:
+            self._w(f"{f.name} : {f.c_type.lean_type}")
+        self._indent -= 1
+        # Note: DecidableEq may fail for recursive struct types (e.g. linked lists)
+        # so we only derive Repr and Inhabited
+        self._w(f"  deriving Repr, Inhabited")
+        self._w()
+
+        # CType instance
+        self._w(f"instance : CType {lean_name} where")
+        self._indent += 1
+        self._w(f"size := {sdef.total_size}")
+        self._w(f"align := {sdef.alignment}")
+        self._w(f"typeTag := \u27e8{sdef.type_tag_id}\u27e9")
+        self._w(f"size_pos := by omega")
+        self._indent -= 1
+        self._w()
+
+        # MemType instance: fromMem/toMem for the struct
+        self._emit_struct_memtype(sdef)
+
+    def _emit_struct_memtype(self, sdef: StructDef):
+        """Emit MemType instance for a struct.
+
+        The struct is read/written field-by-field at computed offsets.
+        We use MemType instances of the field types to read/write each field.
+        """
+        lean_name = sdef.lean_name
+
+        # fromMem: read each field at its offset
+        self._w(f"/-- Read {lean_name} from {sdef.total_size} bytes. -/")
+        self._w(f"def {lean_name}.fromBytes (f : Fin {sdef.total_size} \u2192 UInt8) : {lean_name} where")
+        self._indent += 1
+        for field in sdef.fields:
+            field_type = field.c_type.lean_type
+            from_fn = self._memtype_from_fn(field.c_type)
+            # Read field.size bytes starting at field.offset
+            self._w(f"{field.name} := {from_fn} (fun i => f \u27e8{field.offset} + i.val, by omega\u27e9)")
+        self._indent -= 1
+        self._w()
+
+        # toMem: write each field at its offset, padding bytes are 0
+        # Every field gets an explicit if guard, including the last one.
+        # Bytes not covered by any field are padding (0).
+        self._w(f"/-- Write {lean_name} to {sdef.total_size} bytes. -/")
+        self._w(f"def {lean_name}.toBytes (v : {lean_name}) : Fin {sdef.total_size} \u2192 UInt8 := fun i =>")
+        self._indent += 1
+        else_depth = 0
+        for idx, field in enumerate(sdef.fields):
+            to_fn = self._memtype_to_fn(field.c_type)
+            end = field.offset + field.size
+            self._w(f"if h : {field.offset} \u2264 i.val \u2227 i.val < {end} then")
+            self._indent += 1
+            self._w(f"{to_fn} v.{field.name} \u27e8i.val - {field.offset}, by omega\u27e9")
+            self._indent -= 1
+            if idx < len(sdef.fields) - 1:
+                self._w("else")
+                self._indent += 1
+                else_depth += 1
+            else:
+                self._w("else")
+                self._indent += 1
+                self._w("0  -- padding bytes")
+                self._indent -= 1
+        # Unwind else indentation
+        for _ in range(else_depth):
+            self._indent -= 1
+        self._indent -= 1  # Close the fun i =>
+        self._w()
+
+        # Roundtrip proof (sorry for now -- this is Phase 3b, proofs come later)
+        self._w(f"/-- Roundtrip: fromBytes (toBytes v) = v. -/")
+        self._w(f"theorem {lean_name}.fromBytes_toBytes (v : {lean_name}) :")
+        self._indent += 1
+        self._w(f"{lean_name}.fromBytes ({lean_name}.toBytes v) = v := by")
+        self._indent += 1
+        # For the roundtrip, we need to show each field reads back correctly.
+        # This requires showing that the if-then-else dispatches correctly.
+        # Using native_decide for Bool-valued goals, ext + omega for the rest.
+        self._w("sorry")
+        self._indent -= 2
+        self._w()
+
+        # MemType instance
+        self._w(f"instance : MemType {lean_name} where")
+        self._indent += 1
+        self._w(f"size := {sdef.total_size}")
+        self._w(f"align := {sdef.alignment}")
+        self._w(f"typeTag := \u27e8{sdef.type_tag_id}\u27e9")
+        self._w(f"size_pos := by omega")
+        self._w(f"fromMem := {lean_name}.fromBytes")
+        self._w(f"toMem := {lean_name}.toBytes")
+        self._w(f"roundtrip := {lean_name}.fromBytes_toBytes")
+        self._indent -= 1
+
+    def _memtype_from_fn(self, ctype: CType) -> str:
+        """Get the fromMem/fromBytes function name for a CType."""
+        if ctype.is_pointer:
+            return "Ptr.fromBytes'"
+        if ctype.is_struct:
+            return f"{ctype.lean_type}.fromBytes"
+        lean = ctype.lean_type
+        if lean in ("UInt8", "UInt16", "UInt32", "UInt64"):
+            return f"{lean}.fromBytes'"
+        if lean in ("Int8", "Int16", "Int32", "Int64"):
+            # Signed types: for now, treat same as unsigned (Phase 1 limitation)
+            unsigned = lean.replace("Int", "UInt")
+            return f"{unsigned}.fromBytes'"
+        raise ValueError(f"No fromMem function for type {lean}")
+
+    def _memtype_to_fn(self, ctype: CType) -> str:
+        """Get the toMem/toBytes function name for a CType."""
+        if ctype.is_pointer:
+            return "Ptr.toBytes'"
+        if ctype.is_struct:
+            return f"{ctype.lean_type}.toBytes"
+        lean = ctype.lean_type
+        if lean in ("UInt8", "UInt16", "UInt32", "UInt64"):
+            return f"{lean}.toBytes'"
+        if lean in ("Int8", "Int16", "Int32", "Int64"):
+            unsigned = lean.replace("Int", "UInt")
+            return f"{unsigned}.toBytes'"
+        raise ValueError(f"No toMem function for type {lean}")
 
     def _emit_locals(self):
         self._w(f"/-- Local variables (merged from all functions). -/")
@@ -307,18 +444,42 @@ class LeanEmitter:
                 self._w(")")
                 self._indent -= 1
 
+        elif stmt.kind == "member_write":
+            # p->field = val or s.field = val
+            # For arrow (p->field = val):
+            #   1. Read the struct from heap: old = hVal heap p
+            #   2. Update the field: new = { old with field := val }
+            #   3. Write back: heapUpdate heap p new
+            if stmt.member_is_arrow:
+                ptr_str = self._emit_expr(stmt.member_base_expr, func)
+                val_str = self._emit_expr(stmt.value, func)
+                all_guards = [f"heapPtrValid s.globals.rawHeap {ptr_str}"]
+                all_guards.extend(self._collect_deref_guards(stmt.value, func))
+                for guard_str in all_guards:
+                    self._w(f".guard (fun s => {guard_str})")
+                    self._indent += 1
+                    self._w("(")
+                    self._indent += 1
+                self._w(f".basic (fun s => {{ s with globals := {{ s.globals with rawHeap := heapUpdate s.globals.rawHeap {ptr_str} ({{ hVal s.globals.rawHeap {ptr_str} with {stmt.member_name} := {val_str} }}) }} }})")
+                for _ in all_guards:
+                    self._indent -= 1
+                    self._w(")")
+                    self._indent -= 1
+            else:
+                # Direct struct field write (s.field = val) -- not via pointer
+                # This would be a local struct variable, which is in locals
+                raise StrictCViolation(
+                    "Direct struct field assignment (s.field = val) for local structs "
+                    "not yet supported. Use pointer access (p->field = val)."
+                )
+
         elif stmt.kind == "break":
-            # break in a while loop: throw (caught by while's internal handling)
-            # Note: CSimpl while doesn't have built-in break support.
-            # For Phase 1, we'll use throw. This is an approximation.
             self._w(".throw")
 
         elif stmt.kind == "continue":
-            # Similar limitation as break for Phase 1
             self._w(".skip")
 
         elif stmt.kind == "expr":
-            # Expression statement — side-effect only (shouldn't happen in StrictC)
             self._w(".skip")
 
         else:
@@ -370,6 +531,8 @@ class LeanEmitter:
             return f"s.locals.{field}"
 
         elif expr.kind == "int_literal":
+            # Check if this literal 0 is used in a pointer context
+            # (handled by the caller who knows the context)
             return str(expr.int_value)
 
         elif expr.kind == "binop":
@@ -385,10 +548,8 @@ class LeanEmitter:
                 "&&": "&&", "||": "||",
             }.get(op, op)
 
-            # Comparison operators need special handling — they return Bool in Lean
+            # Comparison operators need special handling -- they return Bool in Lean
             if op in ("<", ">", "<=", ">=", "==", "!="):
-                # These are handled in bool context by _emit_bool_expr
-                # When used as a value (e.g., in ternary), wrap with decide
                 lean_cmp = {
                     "<": "<", ">": ">", "<=": "<=", ">=": ">=",
                     "==": "==", "!=": "!=",
@@ -412,6 +573,17 @@ class LeanEmitter:
             ptr_str = self._emit_expr(expr.operand, func)
             return f"(hVal s.globals.rawHeap {ptr_str})"
 
+        elif expr.kind == "member_access":
+            # Struct field access: s.field or p->field
+            base_str = self._emit_expr(expr.member_base, func)
+            field_name = expr.member_name
+            if expr.member_is_arrow:
+                # p->field => (hVal heap p).field
+                return f"(hVal s.globals.rawHeap {base_str}).{field_name}"
+            else:
+                # s.field => s.field (direct struct value access)
+                return f"{base_str}.{field_name}"
+
         elif expr.kind == "ternary":
             cond = self._emit_bool_expr(expr.lhs, func)
             true_val = self._emit_expr(expr.rhs, func)
@@ -421,6 +593,29 @@ class LeanEmitter:
         else:
             raise ValueError(f"Unhandled expression kind: {expr.kind}")
 
+    def _is_pointer_expr(self, expr: Expr, func: FuncInfo) -> bool:
+        """Check if an expression has pointer type (heuristic based on variable types)."""
+        if expr.kind == "var_ref":
+            field = self._field_name(expr.var_name, func)
+            if field in self.all_vars:
+                return self.all_vars[field].is_pointer
+            # Check function params
+            for p in func.params:
+                if p.name == expr.var_name:
+                    return p.c_type.is_pointer
+            return False
+        if expr.kind == "member_access":
+            return False  # Could be pointer, but we'd need type info
+        if expr.kind == "int_literal":
+            return False
+        return False
+
+    def _emit_ptr_aware_expr(self, expr: Expr, func: FuncInfo, is_ptr_context: bool) -> str:
+        """Emit an expression, converting literal 0 to Ptr.null in pointer contexts."""
+        if is_ptr_context and expr.kind == "int_literal" and expr.int_value == 0:
+            return "Ptr.null"
+        return self._emit_expr(expr, func)
+
     def _emit_bool_expr(self, expr: Expr, func: FuncInfo) -> str:
         """Emit a Lean Bool expression from a C condition.
 
@@ -428,9 +623,14 @@ class LeanEmitter:
         Comparison operators naturally produce Bool in Lean.
         """
         if expr.kind == "binop":
-            lhs = self._emit_expr(expr.lhs, func)
-            rhs = self._emit_expr(expr.rhs, func)
             op = expr.op
+            # Check if either side is a pointer for NULL comparisons
+            lhs_is_ptr = self._is_pointer_expr(expr.lhs, func)
+            rhs_is_ptr = self._is_pointer_expr(expr.rhs, func)
+            is_ptr_cmp = lhs_is_ptr or rhs_is_ptr
+
+            lhs = self._emit_ptr_aware_expr(expr.lhs, func, is_ptr_cmp)
+            rhs = self._emit_ptr_aware_expr(expr.rhs, func, is_ptr_cmp)
 
             if op in ("<", ">", "<=", ">="):
                 lean_op = {"<": "<", ">": ">", "<=": "<=", ">=": ">="}[op]
@@ -440,7 +640,7 @@ class LeanEmitter:
                 return f"decide ({lhs} = {rhs})"
 
             if op == "!=":
-                return f"decide ({lhs} ≠ {rhs})"
+                return f"decide ({lhs} \u2260 {rhs})"
 
             if op == "&&":
                 lbool = self._emit_bool_expr(expr.lhs, func)
@@ -458,22 +658,29 @@ class LeanEmitter:
 
         if expr.kind == "var_ref":
             field = self._field_name(expr.var_name, func)
-            return f"decide (s.locals.{field} ≠ 0)"
+            return f"decide (s.locals.{field} \u2260 0)"
 
         if expr.kind == "int_literal":
             return "true" if expr.int_value != 0 else "false"
 
         # Fallback: treat as integer, compare != 0
         val = self._emit_expr(expr, func)
-        return f"decide ({val} ≠ 0)"
+        return f"decide ({val} \u2260 0)"
 
     def _collect_deref_guards(self, expr: Expr, func: FuncInfo) -> list[str]:
-        """Collect heapPtrValid guard strings for all pointer dereferences in an expression."""
+        """Collect heapPtrValid guard strings for all pointer dereferences in an expression.
+
+        This includes both explicit *p dereferences and p->field arrow accesses.
+        """
         guards = []
         if expr is None:
             return guards
         if expr.kind == "deref":
             ptr_str = self._emit_expr(expr.operand, func)
+            guards.append(f"heapPtrValid s.globals.rawHeap {ptr_str}")
+        if expr.kind == "member_access" and expr.member_is_arrow:
+            # p->field implies dereferencing p
+            ptr_str = self._emit_expr(expr.member_base, func)
             guards.append(f"heapPtrValid s.globals.rawHeap {ptr_str}")
         # Recurse into sub-expressions
         if expr.lhs is not None:
@@ -484,6 +691,8 @@ class LeanEmitter:
             guards.extend(self._collect_deref_guards(expr.third, func))
         if expr.operand is not None and expr.kind != "deref":
             guards.extend(self._collect_deref_guards(expr.operand, func))
+        if expr.member_base is not None and expr.kind != "member_access":
+            guards.extend(self._collect_deref_guards(expr.member_base, func))
         return guards
 
     def _emit_proc_env(self):
@@ -494,8 +703,6 @@ class LeanEmitter:
         if not self.tu.functions:
             self._w("ProcEnv.empty")
         else:
-            # Build: ProcEnv.empty |> ProcEnv.insert · "f1" f1_body |> ...
-            # Use explicit function application to avoid dot notation issues
             expr = "ProcEnv.empty"
             for func in self.tu.functions:
                 expr = f"ProcEnv.insert ({expr}) \"{func.name}\" {func.name}_body"

@@ -34,8 +34,12 @@ test-snapshots:
     just import test/c_sources/gcd.c Gcd && diff Generated/Gcd.lean test/expected/Gcd.lean
     just import test/c_sources/max.c Max && diff Generated/Max.lean test/expected/Max.lean
 
+# Differential test: struct layout matches gcc sizeof/offsetof
+test-struct-layout:
+    python3 test/test_struct_layout.py
+
 # End-to-end: importer snapshots pass AND all Lean code builds (proofs check)
-e2e: test-importer test-snapshots build
+e2e: test-importer test-snapshots test-struct-layout build
 
 # Dump clang JSON AST for inspection
 clang-dump FILE:

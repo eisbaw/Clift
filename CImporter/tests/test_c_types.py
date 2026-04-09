@@ -9,10 +9,14 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 from CImporter.c_types import (
     parse_clang_type, return_type_from_qual, UnsupportedTypeError,
     UINT8, UINT16, UINT32, UINT64, INT8, INT16, INT32, INT64, VOID, BOOL,
+    clear_struct_defs,
 )
 
 
 class TestParseClangType:
+    def setup_method(self):
+        clear_struct_defs()
+
     def test_unsigned_int_desugared(self):
         node = {"desugaredQualType": "unsigned int", "qualType": "uint32_t"}
         assert parse_clang_type(node) == UINT32
@@ -61,13 +65,23 @@ class TestParseClangType:
         assert t.pointee.lean_type == "UInt32"
         assert t.lean_type == "Ptr UInt32"
 
-    def test_pointer_to_unsupported_rejected(self):
-        with pytest.raises(UnsupportedTypeError, match="Pointer to unsupported"):
-            parse_clang_type({"qualType": "struct foo *", "desugaredQualType": "struct foo *"})
+    def test_struct_pointer_forward_ref(self):
+        """Phase 3b: pointer to unknown struct creates forward reference."""
+        t = parse_clang_type({"qualType": "struct foo *", "desugaredQualType": "struct foo *"})
+        assert t.is_pointer
+        assert t.pointee.is_struct
+        assert t.pointee.struct_name == "foo"
 
-    def test_unknown_rejected(self):
+    def test_unknown_struct_creates_forward_ref(self):
+        """Phase 3b: unknown struct creates forward reference CType."""
+        t = parse_clang_type({"qualType": "struct foo"})
+        assert t.is_struct
+        assert t.struct_name == "foo"
+
+    def test_unknown_non_struct_rejected(self):
+        """Non-struct unknown types are still rejected."""
         with pytest.raises(UnsupportedTypeError, match="Unknown C type"):
-            parse_clang_type({"qualType": "struct foo"})
+            parse_clang_type({"qualType": "some_typedef"})
 
 
 class TestReturnType:
@@ -86,7 +100,8 @@ class TestLeanType:
         assert UINT32.lean_type == "UInt32"
 
     def test_int64_lean(self):
-        assert INT64.lean_type == "Int64"
+        """Phase 3b: signed types map to unsigned Lean types for memory layout."""
+        assert INT64.lean_type == "UInt64"
 
     def test_void_lean(self):
         assert VOID.lean_type == "Unit"

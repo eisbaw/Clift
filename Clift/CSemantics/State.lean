@@ -8,7 +8,10 @@
 -- Reference: ext/AutoCorres2/TypHeapSimple.thy
 
 import Clift.CSemantics.TypeTag
+import Clift.Util.UInt8Ext
+import Clift.Util.UInt16Ext
 import Clift.Util.UInt32Ext
+import Clift.Util.UInt64Ext
 
 set_option maxHeartbeats 800000
 
@@ -31,7 +34,15 @@ structure HeapRawState where
 /-- Pointer with phantom type tag. -/
 structure Ptr (α : Type) where
   addr : Fin memSize
-  deriving DecidableEq, Repr
+  deriving Repr
+
+/-- DecidableEq for Ptr that does NOT require DecidableEq α.
+    Ptr equality depends only on the address, not the phantom type parameter. -/
+instance {α : Type} : DecidableEq (Ptr α) := fun p q =>
+  if h : p.addr = q.addr then
+    isTrue (by cases p; cases q; simp at h; exact congrArg _ h)
+  else
+    isFalse (by intro heq; apply h; cases heq; rfl)
 
 instance {α : Type} : Inhabited (Ptr α) := ⟨⟨⟨0, by unfold memSize; omega⟩⟩⟩
 
@@ -143,6 +154,276 @@ instance : MemType UInt32 where
   fromMem := UInt32.fromBytes'
   toMem := UInt32.toBytes'
   roundtrip := UInt32.fromBytes_toBytes'
+
+/-! # UInt8 MemType instance -/
+
+/-- Read UInt8 from 1 byte. -/
+def UInt8.fromBytes' (f : Fin 1 → UInt8) : UInt8 := f ⟨0, by omega⟩
+
+/-- Write UInt8 to 1 byte. -/
+def UInt8.toBytes' (v : UInt8) : Fin 1 → UInt8 := fun _ => v
+
+theorem UInt8.fromBytes_toBytes' (v : UInt8) :
+    UInt8.fromBytes' (UInt8.toBytes' v) = v := by
+  simp [UInt8.fromBytes', UInt8.toBytes']
+
+instance : MemType UInt8 where
+  size := 1
+  align := 1
+  typeTag := ⟨2⟩
+  size_pos := by omega
+  fromMem := UInt8.fromBytes'
+  toMem := UInt8.toBytes'
+  roundtrip := UInt8.fromBytes_toBytes'
+
+/-! # UInt16 MemType instance (little-endian, 2 bytes) -/
+
+/-- Reassemble a UInt16 from 2 bytes. -/
+private def assembleByte16 (b0 b1 : UInt8) : UInt16 :=
+  ⟨⟨b0.toNat + b1.toNat * 256, by
+    have h0 := b0.toBitVec.isLt
+    have h1 := b1.toBitVec.isLt
+    simp only [UInt8.toNat] at *
+    omega⟩⟩
+
+/-- Read UInt16 from 2 bytes (little-endian). -/
+def UInt16.fromBytes' (f : Fin 2 → UInt8) : UInt16 :=
+  assembleByte16 (f ⟨0, by omega⟩) (f ⟨1, by omega⟩)
+
+/-- Write UInt16 to 2 bytes (little-endian). -/
+def UInt16.toBytes' (v : UInt16) : Fin 2 → UInt8 := fun i =>
+  match i with
+  | ⟨0, _⟩ => ⟨⟨v.toNat % 256, by omega⟩⟩
+  | ⟨1, _⟩ => ⟨⟨v.toNat / 256 % 256, by omega⟩⟩
+
+/-- Byte decomposition for UInt16: n < 2^16 => n%256 + (n/256)%256*256 = n. -/
+private theorem byte_decompose16 (n : Nat) (hn : n < 65536) :
+    n % 256 + n / 256 % 256 * 256 = n := by
+  have h1 : n % 256 + 256 * (n / 256) = n := Nat.mod_add_div n 256
+  have h2 : n / 256 < 256 := by omega
+  have h3 : n / 256 % 256 = n / 256 := Nat.mod_eq_of_lt h2
+  omega
+
+theorem UInt16.fromBytes_toBytes' (v : UInt16) :
+    UInt16.fromBytes' (UInt16.toBytes' v) = v := by
+  have hv : v.toNat < 65536 := v.toBitVec.isLt
+  suffices h : (UInt16.fromBytes' (UInt16.toBytes' v)).toNat = v.toNat from
+    UInt16.ext h
+  show v.toNat % 256 + v.toNat / 256 % 256 * 256 = v.toNat
+  exact byte_decompose16 v.toNat hv
+
+instance : MemType UInt16 where
+  size := 2
+  align := 2
+  typeTag := ⟨3⟩
+  size_pos := by omega
+  fromMem := UInt16.fromBytes'
+  toMem := UInt16.toBytes'
+  roundtrip := UInt16.fromBytes_toBytes'
+
+/-! # UInt64 MemType instance (little-endian, 8 bytes) -/
+
+/-- Reassemble a UInt64 from 8 bytes using Nat arithmetic. -/
+private def assembleByte64 (b0 b1 b2 b3 b4 b5 b6 b7 : UInt8) : UInt64 :=
+  ⟨⟨b0.toNat + b1.toNat * 256 + b2.toNat * 65536 + b3.toNat * 16777216
+   + b4.toNat * 4294967296 + b5.toNat * 1099511627776
+   + b6.toNat * 281474976710656 + b7.toNat * 72057594037927936, by
+    have h0 := b0.toBitVec.isLt
+    have h1 := b1.toBitVec.isLt
+    have h2 := b2.toBitVec.isLt
+    have h3 := b3.toBitVec.isLt
+    have h4 := b4.toBitVec.isLt
+    have h5 := b5.toBitVec.isLt
+    have h6 := b6.toBitVec.isLt
+    have h7 := b7.toBitVec.isLt
+    simp only [UInt8.toNat] at *
+    omega⟩⟩
+
+/-- Read UInt64 from 8 bytes (little-endian). -/
+def UInt64.fromBytes' (f : Fin 8 → UInt8) : UInt64 :=
+  assembleByte64 (f ⟨0, by omega⟩) (f ⟨1, by omega⟩)
+    (f ⟨2, by omega⟩) (f ⟨3, by omega⟩)
+    (f ⟨4, by omega⟩) (f ⟨5, by omega⟩)
+    (f ⟨6, by omega⟩) (f ⟨7, by omega⟩)
+
+/-- Write UInt64 to 8 bytes (little-endian). -/
+def UInt64.toBytes' (v : UInt64) : Fin 8 → UInt8 := fun i =>
+  match i with
+  | ⟨0, _⟩ => ⟨⟨v.toNat % 256, by omega⟩⟩
+  | ⟨1, _⟩ => ⟨⟨v.toNat / 256 % 256, by omega⟩⟩
+  | ⟨2, _⟩ => ⟨⟨v.toNat / 65536 % 256, by omega⟩⟩
+  | ⟨3, _⟩ => ⟨⟨v.toNat / 16777216 % 256, by omega⟩⟩
+  | ⟨4, _⟩ => ⟨⟨v.toNat / 4294967296 % 256, by omega⟩⟩
+  | ⟨5, _⟩ => ⟨⟨v.toNat / 1099511627776 % 256, by omega⟩⟩
+  | ⟨6, _⟩ => ⟨⟨v.toNat / 281474976710656 % 256, by omega⟩⟩
+  | ⟨7, _⟩ => ⟨⟨v.toNat / 72057594037927936 % 256, by omega⟩⟩
+
+/-- Byte decomposition for UInt64. -/
+private theorem byte_decompose64 (n : Nat) (hn : n < 18446744073709551616) :
+    n % 256 + n / 256 % 256 * 256 + n / 65536 % 256 * 65536
+    + n / 16777216 % 256 * 16777216
+    + n / 4294967296 % 256 * 4294967296
+    + n / 1099511627776 % 256 * 1099511627776
+    + n / 281474976710656 % 256 * 281474976710656
+    + n / 72057594037927936 % 256 * 72057594037927936 = n := by
+  have h1 : n % 256 + 256 * (n / 256) = n := Nat.mod_add_div n 256
+  have h2 : n / 256 % 256 + 256 * (n / 256 / 256) = n / 256 :=
+    Nat.mod_add_div (n / 256) 256
+  have h3 : n / 256 / 256 % 256 + 256 * (n / 256 / 256 / 256) = n / 256 / 256 :=
+    Nat.mod_add_div (n / 256 / 256) 256
+  have h4 : n / 256 / 256 / 256 % 256 + 256 * (n / 256 / 256 / 256 / 256) =
+    n / 256 / 256 / 256 := Nat.mod_add_div (n / 256 / 256 / 256) 256
+  have h5 : n / 256 / 256 / 256 / 256 % 256 + 256 * (n / 256 / 256 / 256 / 256 / 256) =
+    n / 256 / 256 / 256 / 256 := Nat.mod_add_div (n / 256 / 256 / 256 / 256) 256
+  have h6 : n / 256 / 256 / 256 / 256 / 256 % 256 +
+    256 * (n / 256 / 256 / 256 / 256 / 256 / 256) =
+    n / 256 / 256 / 256 / 256 / 256 := Nat.mod_add_div (n / 256 / 256 / 256 / 256 / 256) 256
+  have h7 : n / 256 / 256 / 256 / 256 / 256 / 256 % 256 +
+    256 * (n / 256 / 256 / 256 / 256 / 256 / 256 / 256) =
+    n / 256 / 256 / 256 / 256 / 256 / 256 :=
+    Nat.mod_add_div (n / 256 / 256 / 256 / 256 / 256 / 256) 256
+  have h8 : n / 256 / 256 / 256 / 256 / 256 / 256 / 256 < 256 := by omega
+  have h9 : n / 256 / 256 / 256 / 256 / 256 / 256 / 256 % 256 =
+    n / 256 / 256 / 256 / 256 / 256 / 256 / 256 := Nat.mod_eq_of_lt h8
+  -- Rewrite nested divisions to flat divisions
+  have d2 : n / 256 / 256 = n / 65536 := by omega
+  have d3 : n / 256 / 256 / 256 = n / 16777216 := by omega
+  have d4 : n / 256 / 256 / 256 / 256 = n / 4294967296 := by omega
+  have d5 : n / 256 / 256 / 256 / 256 / 256 = n / 1099511627776 := by omega
+  have d6 : n / 256 / 256 / 256 / 256 / 256 / 256 = n / 281474976710656 := by omega
+  have d7 : n / 256 / 256 / 256 / 256 / 256 / 256 / 256 = n / 72057594037927936 := by omega
+  omega
+
+theorem UInt64.fromBytes_toBytes' (v : UInt64) :
+    UInt64.fromBytes' (UInt64.toBytes' v) = v := by
+  have hv : v.toNat < 18446744073709551616 := v.toBitVec.isLt
+  suffices h : (UInt64.fromBytes' (UInt64.toBytes' v)).toNat = v.toNat from
+    UInt64.ext h
+  show v.toNat % 256 + v.toNat / 256 % 256 * 256
+    + v.toNat / 65536 % 256 * 65536
+    + v.toNat / 16777216 % 256 * 16777216
+    + v.toNat / 4294967296 % 256 * 4294967296
+    + v.toNat / 1099511627776 % 256 * 1099511627776
+    + v.toNat / 281474976710656 % 256 * 281474976710656
+    + v.toNat / 72057594037927936 % 256 * 72057594037927936 = v.toNat
+  exact byte_decompose64 v.toNat hv
+
+instance : MemType UInt64 where
+  size := 8
+  align := 8
+  typeTag := ⟨4⟩
+  size_pos := by omega
+  fromMem := UInt64.fromBytes'
+  toMem := UInt64.toBytes'
+  roundtrip := UInt64.fromBytes_toBytes'
+
+/-! # Ptr MemType instance (8 bytes on x86-64 LP64)
+
+Pointers are stored as 8-byte little-endian addresses.
+We encode Ptr α as a UInt64 (the address), using the same
+byte layout as UInt64. -/
+
+/-- Read a Ptr from 8 bytes (little-endian address). -/
+def Ptr.fromBytes' {α : Type} (f : Fin 8 → UInt8) : Ptr α :=
+  let addr_nat := (UInt64.fromBytes' f).toNat
+  ⟨⟨addr_nat % memSize, Nat.mod_lt _ (by unfold memSize; omega)⟩⟩
+
+/-- Write a Ptr to 8 bytes (little-endian address). -/
+def Ptr.toBytes' {α : Type} (p : Ptr α) : Fin 8 → UInt8 :=
+  UInt64.toBytes' ⟨⟨p.addr.val, by
+    have := p.addr.isLt; unfold memSize at this; omega⟩⟩
+
+theorem Ptr.fromBytes_toBytes' {α : Type} (p : Ptr α) :
+    Ptr.fromBytes' (Ptr.toBytes' p) = p := by
+  simp only [Ptr.fromBytes', Ptr.toBytes']
+  have hbound : p.addr.val < memSize := p.addr.isLt
+  -- Show the UInt64 roundtrip preserves the Nat value
+  -- First, the UInt64 we construct
+  let u64 : UInt64 := ⟨⟨p.addr.val, by unfold memSize at hbound; omega⟩⟩
+  -- After roundtrip, u64 is preserved
+  have key : UInt64.fromBytes' (UInt64.toBytes' u64) = u64 :=
+    UInt64.fromBytes_toBytes' u64
+  -- So (UInt64.fromBytes' (UInt64.toBytes' u64)).toNat = u64.toNat = p.addr.val
+  have hnat : u64.toNat = p.addr.val := by
+    simp only [u64, UInt64.toNat]
+    rfl
+  have key2 : (UInt64.fromBytes' (UInt64.toBytes' u64)).toNat = p.addr.val := by
+    rw [key, hnat]
+  -- mod memSize is identity
+  have hmod : (UInt64.fromBytes' (UInt64.toBytes' u64)).toNat % memSize = p.addr.val := by
+    rw [key2]; exact Nat.mod_eq_of_lt hbound
+  show Ptr.mk ⟨_, _⟩ = p
+  congr 1
+  exact Fin.ext hmod
+
+instance {α : Type} [CType α] : CType (Ptr α) where
+  size := 8
+  align := 8
+  typeTag := ⟨100 + (CType.typeTag (α := α)).id⟩  -- Encode "pointer to T" in tag
+  size_pos := by omega
+
+instance {α : Type} [CType α] : MemType (Ptr α) where
+  size := 8
+  align := 8
+  typeTag := ⟨100 + (CType.typeTag (α := α)).id⟩
+  size_pos := by omega
+  fromMem := Ptr.fromBytes'
+  toMem := Ptr.toBytes'
+  roundtrip := Ptr.fromBytes_toBytes'
+
+/-! # StructField descriptor and layout computation
+
+Following gcc's x86-64 LP64 ABI rules:
+- Each field is aligned to its natural alignment
+- Struct alignment is the max alignment of all fields
+- Struct size is padded to a multiple of struct alignment -/
+
+/-- Descriptor for a single struct field. -/
+structure StructField where
+  /-- Field name (for documentation). -/
+  name : String
+  /-- Field size in bytes. -/
+  size : Nat
+  /-- Field alignment requirement. -/
+  align : Nat
+  /-- Computed byte offset within the struct. -/
+  offset : Nat
+  deriving Repr, DecidableEq
+
+/-- Round up `n` to the next multiple of `a`. -/
+def alignUp (n a : Nat) : Nat :=
+  if a = 0 then n else ((n + a - 1) / a) * a
+
+theorem alignUp_ge (n a : Nat) (ha : 0 < a) : n ≤ alignUp n a := by
+  unfold alignUp
+  split
+  · omega
+  · -- Need: n ≤ ((n + a - 1) / a) * a
+    -- From Nat.div_add_mod: (n+a-1) = a * ((n+a-1)/a) + (n+a-1)%a
+    -- So a * ((n+a-1)/a) = (n+a-1) - (n+a-1)%a ≥ n+a-1-(a-1) = n
+    have h4 := Nat.div_add_mod (n + a - 1) a
+    have h5 : (n + a - 1) % a < a := Nat.mod_lt _ (by omega)
+    -- a * ((n+a-1)/a) ≥ n
+    have h6 : a * ((n + a - 1) / a) ≥ n := by omega
+    -- ((n+a-1)/a) * a = a * ((n+a-1)/a)
+    have h7 : ((n + a - 1) / a) * a = a * ((n + a - 1) / a) := Nat.mul_comm _ _
+    omega
+
+/-- Compute struct layout: given a list of (size, alignment) pairs,
+    return (fields with offsets, total struct size, struct alignment). -/
+def computeStructLayout (fields : List (String × Nat × Nat)) :
+    List StructField × Nat × Nat :=
+  let result := fields.foldl (fun (acc : List StructField × Nat × Nat) (f : String × Nat × Nat) =>
+    let (laid, curOffset, maxAlign) := acc
+    let (name, sz, al) := f
+    let offset := alignUp curOffset al
+    let field := { name := name, size := sz, align := al, offset := offset : StructField }
+    (laid ++ [field], offset + sz, max maxAlign al)
+  ) ([], 0, 1)
+  let (fields_out, rawSize, structAlign) := result
+  -- Pad struct size to multiple of struct alignment
+  let paddedSize := alignUp rawSize structAlign
+  (fields_out, paddedSize, structAlign)
 
 /-! # Pointer validity -/
 

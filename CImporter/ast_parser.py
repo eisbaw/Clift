@@ -1,6 +1,7 @@
 """Clang JSON AST parser for the CImporter.
 
 Traverses clang's -ast-dump=json output and extracts:
+  - Struct definitions (name, fields, layout)
   - Function declarations (name, return type, parameters)
   - Local variable declarations (name, type)
   - Statement structure (if/else, while, return, assignments, expressions)
@@ -20,7 +21,11 @@ import logging
 from dataclasses import dataclass, field
 from typing import Optional
 
-from .c_types import CType, parse_clang_type, return_type_from_qual, UnsupportedTypeError
+from .c_types import (
+    CType, parse_clang_type, return_type_from_qual, UnsupportedTypeError,
+    StructDef, StructField, compute_struct_layout, register_struct,
+    clear_struct_defs, get_struct_defs,
+)
 
 log = logging.getLogger(__name__)
 
@@ -41,7 +46,7 @@ class VarInfo:
 @dataclass
 class Expr:
     """An expression in the C AST."""
-    kind: str  # "var_ref", "int_literal", "binop", "unop", "ternary", "deref"
+    kind: str  # "var_ref", "int_literal", "binop", "unop", "ternary", "deref", "member_access"
     # Fields depend on kind:
     var_name: Optional[str] = None       # for var_ref
     int_value: Optional[int] = None      # for int_literal
@@ -51,11 +56,16 @@ class Expr:
     third: Optional['Expr'] = None       # for ternary (false branch)
     operand: Optional['Expr'] = None     # for unop, deref (the pointer expr)
     result_type: Optional[CType] = None  # type of the expression result
+    # For member_access (s.field or p->field):
+    member_name: Optional[str] = None    # field name
+    member_is_arrow: bool = False        # True for p->field (implies deref)
+    member_base: Optional['Expr'] = None # the struct/pointer expression
 
 @dataclass
 class Stmt:
     """A statement in the C AST."""
-    kind: str  # "compound", "return", "if", "while", "assign", "decl_init", "expr", "deref_write"
+    kind: str  # "compound", "return", "if", "while", "assign", "decl_init", "expr",
+               # "deref_write", "member_write"
     # Fields depend on kind:
     stmts: list['Stmt'] = field(default_factory=list)  # for compound
     expr: Optional[Expr] = None                         # for return, expr, decl_init value
@@ -64,8 +74,12 @@ class Stmt:
     else_body: Optional['Stmt'] = None                  # for if
     loop_body: Optional['Stmt'] = None                  # for while
     target_var: Optional[str] = None                    # for assign, decl_init
-    value: Optional[Expr] = None                        # for assign, deref_write (the RHS value)
+    value: Optional[Expr] = None                        # for assign, deref_write, member_write
     target_expr: Optional[Expr] = None                  # for deref_write (the pointer being written to)
+    # For member_write (p->field = val):
+    member_base_expr: Optional[Expr] = None             # the struct/pointer expression
+    member_name: Optional[str] = None                   # field name
+    member_is_arrow: bool = False                       # True for p->field
 
 @dataclass
 class FuncInfo:
@@ -81,6 +95,7 @@ class FuncInfo:
 class TranslationUnit:
     """Parsed translation unit (one .c file)."""
     functions: list[FuncInfo]
+    structs: list[StructDef]  # Struct definitions in order
 
 
 # --- Parser ---
@@ -92,13 +107,22 @@ def parse_translation_unit(ast: dict) -> TranslationUnit:
         ast: The root dict from clang's -ast-dump=json output.
 
     Returns:
-        TranslationUnit with all user-defined functions.
+        TranslationUnit with all user-defined functions and structs.
     """
     assert ast.get("kind") == "TranslationUnitDecl", \
         f"Expected TranslationUnitDecl, got {ast.get('kind')}"
 
+    clear_struct_defs()
+    structs = []
     functions = []
+
     for node in ast.get("inner", []):
+        # Parse struct definitions first (must come before functions that use them)
+        if node.get("kind") == "RecordDecl" and node.get("completeDefinition"):
+            sdef = _parse_struct(node)
+            if sdef is not None:
+                structs.append(sdef)
+
         if node.get("kind") == "FunctionDecl" and not node.get("isImplicit"):
             # Skip functions without a body (forward declarations)
             has_body = any(
@@ -113,7 +137,46 @@ def parse_translation_unit(ast: dict) -> TranslationUnit:
                          ", ".join(f"{p.name}: {p.c_type.name}" for p in func.params),
                          func.return_type.name)
 
-    return TranslationUnit(functions=functions)
+    return TranslationUnit(functions=functions, structs=structs)
+
+
+def _parse_struct(node: dict) -> Optional[StructDef]:
+    """Parse a RecordDecl node into a StructDef.
+
+    Returns None for anonymous structs or incomplete definitions.
+    """
+    name = node.get("name")
+    if not name:
+        log.debug("Skipping anonymous struct")
+        return None
+
+    tag = node.get("tagUsed", "struct")
+    if tag != "struct":
+        raise StrictCViolation(f"Only struct is supported, got '{tag}'")
+
+    fields = []
+    for child in node.get("inner", []):
+        if child.get("kind") == "FieldDecl":
+            fname = child.get("name", "")
+            ftype = parse_clang_type(child["type"])
+            fields.append(StructField(name=fname, c_type=ftype))
+
+    sdef = StructDef(name=name, fields=fields)
+
+    # Assign a unique type tag id (starting from 200 to avoid collisions with scalars)
+    sdef.type_tag_id = 200 + len(get_struct_defs())
+
+    # Compute layout (offsets, total size, alignment)
+    compute_struct_layout(sdef)
+    register_struct(sdef)
+
+    log.info("Parsed struct %s: %d fields, size=%d, align=%d",
+             name, len(fields), sdef.total_size, sdef.alignment)
+    for f in fields:
+        log.info("  field %s: type=%s, offset=%d, size=%d, align=%d",
+                 f.name, f.c_type.name, f.offset, f.size, f.align)
+
+    return sdef
 
 
 def _parse_function(node: dict) -> FuncInfo:
@@ -214,6 +277,19 @@ def _parse_stmt(node: dict) -> Stmt:
             value = _parse_expr(rhs)
             return Stmt(kind="deref_write", target_expr=deref_target, value=value)
 
+        # Check if LHS is a member access (s.field = val or p->field = val)
+        member_info = _extract_member_lvalue(lhs)
+        if member_info is not None:
+            base_expr, field_name, is_arrow = member_info
+            value = _parse_expr(rhs)
+            return Stmt(
+                kind="member_write",
+                member_base_expr=base_expr,
+                member_name=field_name,
+                member_is_arrow=is_arrow,
+                value=value,
+            )
+
         target = _extract_var_name(lhs)
         if target is None:
             raise StrictCViolation(
@@ -271,14 +347,14 @@ def _parse_expr(node: dict) -> Expr:
     """Parse an expression node."""
     kind = node.get("kind", "")
 
-    # Skip implicit casts — look through to the real expression
+    # Skip implicit casts -- look through to the real expression
     if kind == "ImplicitCastExpr":
         inner = node.get("inner", [])
         if inner:
             return _parse_expr(inner[0])
         raise StrictCViolation(f"ImplicitCastExpr with no inner node")
 
-    # Explicit casts — also look through for now (Phase 1: same-width integers)
+    # Explicit casts -- also look through for now (Phase 1: same-width integers)
     if kind == "CStyleCastExpr":
         inner = node.get("inner", [])
         if inner:
@@ -297,6 +373,19 @@ def _parse_expr(node: dict) -> Expr:
 
     if kind == "IntegerLiteral":
         return Expr(kind="int_literal", int_value=int(node.get("value", "0")))
+
+    if kind == "MemberExpr":
+        # Struct field access: s.field or p->field
+        inner = node.get("inner", [])
+        name = node.get("name", "")
+        is_arrow = node.get("isArrow", False)
+        base = _parse_expr(inner[0]) if inner else None
+        return Expr(
+            kind="member_access",
+            member_name=name,
+            member_is_arrow=is_arrow,
+            member_base=base,
+        )
 
     if kind == "BinaryOperator":
         opcode = node["opcode"]
@@ -368,6 +457,29 @@ def _parse_expr(node: dict) -> Expr:
         )
 
     raise StrictCViolation(f"Unsupported expression kind: {kind}")
+
+
+def _extract_member_lvalue(node: dict) -> Optional[tuple[Expr, str, bool]]:
+    """Check if an lvalue is a member access (s.field or p->field).
+
+    Returns (base_expr, field_name, is_arrow) or None.
+    """
+    kind = node.get("kind", "")
+    if kind == "MemberExpr":
+        inner = node.get("inner", [])
+        name = node.get("name", "")
+        is_arrow = node.get("isArrow", False)
+        base = _parse_expr(inner[0]) if inner else None
+        return (base, name, is_arrow)
+    if kind == "ImplicitCastExpr":
+        inner = node.get("inner", [])
+        if inner:
+            return _extract_member_lvalue(inner[0])
+    if kind == "ParenExpr":
+        inner = node.get("inner", [])
+        if inner:
+            return _extract_member_lvalue(inner[0])
+    return None
 
 
 def _extract_deref_target(node: dict) -> Optional[Expr]:
