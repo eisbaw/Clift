@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-04-09 16:52'
-updated_date: '2026-04-09 19:15'
+updated_date: '2026-04-09 22:10'
 labels:
   - phase-4
   - sorry
@@ -42,4 +42,10 @@ Attempted multiple proof strategies for l1_swap_validHoare:
 Root cause: Lean 4 kernel deep recursion limit on proof terms composed from 7+ nested Hoare rule applications. The proof is mathematically trivial but the kernel cannot handle the term depth.
 
 Required solution: A MetaM-level VCG tactic that constructs FLAT proof terms by unfolding validHoare and directly building set membership witnesses, bypassing the compositional rule composition entirely.
+
+Attempted swap proof decomposition with explicit constructor functions (swap_f1/f2/f3) to avoid deep kernel terms.
+Result: L1corres proof works, but validHoare proof still hits kernel depth limits.
+Root cause: ANY proof step that requires the kernel to reduce structure projections through composed functions (e.g., (swap_f1 s).globals) triggers deep recursion.
+This is fundamental to Lean 4 kernel limits, not a proof strategy issue.
+The sorry remains; workaround is the HeapLift-level proof (SwapHeapLift.lean).
 <!-- SECTION:NOTES:END -->

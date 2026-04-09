@@ -4,6 +4,7 @@ title: 'Lean 4 { s with ... } kernel depth issue: upstream report or workaround'
 status: To Do
 assignee: []
 created_date: '2026-04-09 19:34'
+updated_date: '2026-04-09 22:10'
 labels:
   - phase-5
   - lean4-bug
@@ -24,3 +25,16 @@ Lean 4's kernel hits a hardcoded deep recursion limit when type-checking proof t
 - [ ] #2 Upstream issue filed OR workaround implemented
 - [ ] #3 Impact on Clift documented
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Confirmed the kernel depth issue with concrete evidence:
+- Simply assigning `have : heapPtrValid (swap_f1 s).globals.rawHeap ... := h_va` triggers deep recursion
+- The kernel must reduce (swap_f1 s).globals through the CState/Globals constructors
+- This happens even with explicit anonymous constructors (no {s with ...})
+- The L1corres proof succeeds because it only matches L1 combinator structure
+- The validHoare proof fails because it requires reasoning about state after transformation
+- Workaround: HeapLift-level proofs work (SwapHeapLift.lean is sorry-free)
+- Fix needed: MetaM VCG (task-0071) that builds flat proof terms without structure projections
+<!-- SECTION:NOTES:END -->

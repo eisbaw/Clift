@@ -61,9 +61,26 @@ theorem gcd_while_body_result (s : ProgramState) (hb : s.locals.b ≠ 0) :
       t := s.locals.b } }
     (Except.ok (), s') ∈ (gcd_while_body s).results := by
   show _ ∈ (gcd_while_body s).results
+  -- The body is: seq (modify t:=b) (seq (seq (guard b≠0) (modify b:=a%b)) (modify a:=t))
+  -- After modify t:=b, state is s1 = {s with t := b}
+  -- After guard b≠0 (holds since hb), state is still s1
+  -- After modify b:=a%b, state is s2 = {s1 with b := a%b}
+  -- After modify a:=t, state is s3 = {s2 with a := t} = {s2 with a := b}
+  -- s3 has a=b, b=a%b, t=b which matches s'
   unfold gcd_while_body L1.seq L1.modify L1.guard
+  -- Provide the outer seq witness: intermediate state after first modify
+  apply Set.mem_union_left
+  refine ⟨{ s with locals := { s.locals with t := s.locals.b } }, rfl, ?_⟩
+  -- Now need membership in inner seq
+  apply Set.mem_union_left
+  -- The inner seq = seq (seq (guard b≠0) (modify b:=a%b)) (modify a:=t)
+  -- Intermediate: state after guard+modify
+  refine ⟨{ s with locals := { s.locals with b := s.locals.a % s.locals.b, t := s.locals.b } }, ?_, rfl⟩
+  -- Membership in (seq (guard b≠0) (modify b:=a%b))
+  apply Set.mem_union_left
+  refine ⟨{ s with locals := { s.locals with t := s.locals.b } }, ?_, rfl⟩
+  -- Membership in guard result
   simp [hb]
-  sorry
 
 /-! # While loop computes gcd_l3 -/
 
