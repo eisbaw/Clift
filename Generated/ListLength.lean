@@ -5,6 +5,7 @@
 import Clift.CSemantics
 
 set_option maxHeartbeats 400000
+set_option linter.unusedVariables false
 
 namespace ListLength
 
@@ -69,7 +70,8 @@ instance : MemType C_node where
   toMem := C_node.toBytes
   roundtrip := C_node.fromBytes_toBytes
 
-/-- Local variables (merged from all functions). -/
+/-- Local variables (merged from all functions).
+    NOTE: Locals use Inhabited default (zero-init). See task-0060. -/
 structure Locals where
   count : UInt32
   head : Ptr C_node

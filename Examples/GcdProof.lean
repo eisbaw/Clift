@@ -24,7 +24,8 @@ def l1_gcd_body : L1Monad ProgramState :=
         (L1.seq
           (L1.modify (fun s => { s with locals := { s.locals with t := s.locals.b } }))
           (L1.seq
-            (L1.modify (fun s => { s with locals := { s.locals with b := (s.locals.a % s.locals.b) } }))
+            (L1.seq (L1.guard (fun s => s.locals.b ≠ 0))
+              (L1.modify (fun s => { s with locals := { s.locals with b := (s.locals.a % s.locals.b) } })))
             (L1.modify (fun s => { s with locals := { s.locals with a := s.locals.t } })))))
       (L1.seq
         (L1.modify (fun s => { s with locals := { s.locals with ret__val := s.locals.a } }))
@@ -43,7 +44,7 @@ theorem l1_gcd_body_corres :
       apply L1corres_seq
       · exact L1corres_basic _ _
       · apply L1corres_seq
-        · exact L1corres_basic _ _
+        · exact L1corres_guard _ (L1corres_basic _ _)
         · exact L1corres_basic _ _
     · apply L1corres_seq
       · exact L1corres_basic _ _

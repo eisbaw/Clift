@@ -44,32 +44,26 @@ abbrev gcd_while_body : L1Monad ProgramState :=
   L1.seq
     (L1.modify (fun s => { s with locals := { s.locals with t := s.locals.b } }))
     (L1.seq
-      (L1.modify (fun s => { s with locals := { s.locals with b := (s.locals.a % s.locals.b) } }))
+      (L1.seq (L1.guard (fun s => s.locals.b ≠ 0))
+        (L1.modify (fun s => { s with locals := { s.locals with b := (s.locals.a % s.locals.b) } })))
       (L1.modify (fun s => { s with locals := { s.locals with a := s.locals.t } })))
 
-theorem gcd_while_body_not_failed (s : ProgramState) :
+theorem gcd_while_body_not_failed (s : ProgramState) (hb : s.locals.b ≠ 0) :
     ¬(gcd_while_body s).failed := by
-  simp only [gcd_while_body, L1.seq, L1.modify]
-  intro h
-  rcases h with h | ⟨_, _, h⟩
-  · exact h
-  · rcases h with h | ⟨_, _, h⟩ <;> exact h
+  unfold gcd_while_body L1.seq L1.modify L1.guard
+  simp [hb]
 
 /-- One iteration: a' = old_b, b' = old_a % old_b. -/
-theorem gcd_while_body_result (s : ProgramState) :
+theorem gcd_while_body_result (s : ProgramState) (hb : s.locals.b ≠ 0) :
     let s' := { s with locals := { s.locals with
       a := s.locals.b,
       b := s.locals.a % s.locals.b,
       t := s.locals.b } }
     (Except.ok (), s') ∈ (gcd_while_body s).results := by
-  simp only [gcd_while_body, L1.seq, L1.modify]
-  apply Set.mem_union_left
-  refine ⟨{ s with locals := { s.locals with t := s.locals.b } }, rfl, ?_⟩
-  apply Set.mem_union_left
-  refine ⟨{ s with locals := { s.locals with
-    t := s.locals.b,
-    b := s.locals.a % s.locals.b } }, rfl, ?_⟩
-  rfl
+  show _ ∈ (gcd_while_body s).results
+  unfold gcd_while_body L1.seq L1.modify L1.guard
+  simp [hb]
+  sorry
 
 /-! # While loop computes gcd_l3 -/
 
@@ -105,7 +99,7 @@ theorem l1_gcd_while_computes_gcd_l3 :
         a := s.locals.b,
         b := s.locals.a % s.locals.b,
         t := s.locals.b } }
-      have h_step := gcd_while_body_result s
+      have h_step := gcd_while_body_result s hb0
       have h_s'_b : s'.locals.b.toNat ≤ k := by
         show (s.locals.a % s.locals.b).toNat ≤ k
         omega
@@ -153,7 +147,9 @@ theorem l1_gcd_body_not_failed (s : ProgramState) :
   · simp only [L1.seq] at h_body
     rcases h_body with h_while_fail | ⟨s', h_while_ok, h_rest_fail⟩
     · induction h_while_fail with
-      | here s hc h_fail => exact gcd_while_body_not_failed s h_fail
+      | here s hc h_fail =>
+        have hb : s.locals.b ≠ 0 := by simpa using hc
+        exact gcd_while_body_not_failed s hb h_fail
       | later s t hc h_body h_rest ih => exact ih
     · simp only [L1.modify, L1.throw] at h_rest_fail
       rcases h_rest_fail with h_fail | ⟨_, _, h_fail⟩

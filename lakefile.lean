@@ -14,7 +14,8 @@ lean_lib Clift where
 -- Generated CSimpl definitions (output of CImporter, version controlled)
 @[default_target]
 lean_lib Generated where
-  roots := #[`Generated.Max, `Generated.Gcd, `Generated.Swap, `Generated.ListLength, `Generated.Rotate3]
+  roots := #[`Generated.Max, `Generated.Gcd, `Generated.Swap, `Generated.ListLength, `Generated.Rotate3,
+             `Generated.DivTest, `Generated.SignedArith, `Generated.ForLoop, `Generated.DoWhile, `Generated.SwitchTest]
 
 -- User proof examples
 @[default_target]

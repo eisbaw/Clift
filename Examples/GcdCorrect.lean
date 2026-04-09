@@ -123,7 +123,7 @@ theorem gcd_base_case :
       | whileTrue _ _ _ _ _ hb => simp [h_b0] at hb
       | whileAbrupt _ _ _ _ hb => simp [h_b0] at hb
   | catchFault _ _ _ h_body =>
-    -- Body faulted: impossible (no guards in this program)
+    -- Body faulted: impossible when b=0 (loop never enters, guard unreachable)
     cases h_body with
     | seqFault _ _ _ h_while =>
       cases h_while with

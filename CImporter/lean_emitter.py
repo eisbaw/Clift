@@ -151,6 +151,7 @@ class LeanEmitter:
         self._w("import Clift.CSemantics")
         self._w()
         self._w(f"set_option maxHeartbeats 400000")
+        self._w(f"set_option linter.unusedVariables false")
         self._w()
         self._w(f"namespace {self.module_name}")
         self._w()
@@ -347,7 +348,17 @@ class LeanEmitter:
         raise ValueError(f"No toMem function for type {lean}")
 
     def _emit_locals(self):
-        self._w(f"/-- Local variables (merged from all functions). -/")
+        # DESIGN DECISION (task-0060): Uninitialized locals use Lean's Inhabited default
+        # (zero-initialization). This is technically unsound -- C locals have indeterminate
+        # values until assigned. However:
+        #   1. All our current C functions assign locals before use.
+        #   2. Many embedded compilers zero-initialize (gcc -O0, most debug builds).
+        #   3. Emitting CSimpl.spec for nondet init would require NondetM plumbing in
+        #      every proof, making Phase 1 proofs significantly harder.
+        #   4. This assumption is in the TCB and documented here.
+        # Future: Add a --strict-locals flag to emit CSimpl.spec for nondet init.
+        self._w(f"/-- Local variables (merged from all functions).")
+        self._w(f"    NOTE: Locals use Inhabited default (zero-init). See task-0060. -/")
         self._w("structure Locals where")
         self._indent += 1
         # Sort for deterministic output
@@ -412,9 +423,12 @@ class LeanEmitter:
 
         elif stmt.kind == "return":
             if stmt.expr is not None and func.return_type != VOID:
-                # return X => .seq (.basic (set ret__val := X)) .throw
+                # return X => guards + .seq (.basic (set ret__val := X)) .throw
                 expr_str = self._emit_expr(stmt.expr, func)
-                self._w(f".seq (.basic (fun s => {{ s with locals := {{ s.locals with ret__val := {expr_str} }} }})) .throw")
+                guards = self._collect_all_guards(stmt.expr, func)
+                def emit_return():
+                    self._w(f".seq (.basic (fun s => {{ s with locals := {{ s.locals with ret__val := {expr_str} }} }})) .throw")
+                self._emit_with_guards(guards, emit_return)
             else:
                 # return; (void) => .throw
                 self._w(".throw")
@@ -451,80 +465,40 @@ class LeanEmitter:
         elif stmt.kind == "assign":
             field = self._field_name(stmt.target_var, func)
             expr_str = self._emit_expr(stmt.value, func)
-            # If the RHS contains pointer dereferences, emit guards
-            deref_guards = self._collect_deref_guards(stmt.value, func)
-            if deref_guards:
-                for guard_str in deref_guards:
-                    self._w(f".guard (fun s => {guard_str})")
-                    self._indent += 1
-                    self._w("(")
-                    self._indent += 1
+            guards = self._collect_all_guards(stmt.value, func)
+            def emit_assign():
                 self._w(f".basic (fun s => {{ s with locals := {{ s.locals with {field} := {expr_str} }} }})")
-                for _ in deref_guards:
-                    self._indent -= 1
-                    self._w(")")
-                    self._indent -= 1
-            else:
-                self._w(f".basic (fun s => {{ s with locals := {{ s.locals with {field} := {expr_str} }} }})")
+            self._emit_with_guards(guards, emit_assign)
 
         elif stmt.kind == "decl_init":
             # Variable declaration with initializer: same as assignment
             field = self._field_name(stmt.target_var, func)
             expr_str = self._emit_expr(stmt.expr, func)
-            deref_guards = self._collect_deref_guards(stmt.expr, func)
-            if deref_guards:
-                for guard_str in deref_guards:
-                    self._w(f".guard (fun s => {guard_str})")
-                    self._indent += 1
-                    self._w("(")
-                    self._indent += 1
+            guards = self._collect_all_guards(stmt.expr, func)
+            def emit_decl_init():
                 self._w(f".basic (fun s => {{ s with locals := {{ s.locals with {field} := {expr_str} }} }})")
-                for _ in deref_guards:
-                    self._indent -= 1
-                    self._w(")")
-                    self._indent -= 1
-            else:
-                self._w(f".basic (fun s => {{ s with locals := {{ s.locals with {field} := {expr_str} }} }})")
+            self._emit_with_guards(guards, emit_decl_init)
 
         elif stmt.kind == "deref_write":
-            # *p = v  =>  guards for all derefs + .basic (heapUpdate)
+            # *p = v  =>  guards for all derefs/div/overflow + .basic (heapUpdate)
             ptr_str = self._emit_expr(stmt.target_expr, func)
             val_str = self._emit_expr(stmt.value, func)
-            # Collect guards for the write target AND any derefs in the RHS value
-            all_guards = [f"heapPtrValid s.globals.rawHeap {ptr_str}"]
-            all_guards.extend(self._collect_deref_guards(stmt.value, func))
-            for guard_str in all_guards:
-                self._w(f".guard (fun s => {guard_str})")
-                self._indent += 1
-                self._w("(")
-                self._indent += 1
-            self._w(f".basic (fun s => {{ s with globals := {{ s.globals with rawHeap := heapUpdate s.globals.rawHeap {ptr_str} {val_str} }} }})")
-            for _ in all_guards:
-                self._indent -= 1
-                self._w(")")
-                self._indent -= 1
+            guards = [f"heapPtrValid s.globals.rawHeap {ptr_str}"]
+            guards.extend(self._collect_all_guards(stmt.value, func))
+            def emit_deref_write():
+                self._w(f".basic (fun s => {{ s with globals := {{ s.globals with rawHeap := heapUpdate s.globals.rawHeap {ptr_str} {val_str} }} }})")
+            self._emit_with_guards(guards, emit_deref_write)
 
         elif stmt.kind == "member_write":
             # p->field = val or s.field = val
-            # For arrow (p->field = val):
-            #   1. Read the struct from heap: old = hVal heap p
-            #   2. Update the field: new = { old with field := val }
-            #   3. Write back: heapUpdate heap p new
             if stmt.member_is_arrow:
                 ptr_str = self._emit_expr(stmt.member_base_expr, func)
                 val_str = self._emit_expr(stmt.value, func)
-                all_guards = [f"heapPtrValid s.globals.rawHeap {ptr_str}"]
-                all_guards.extend(self._collect_deref_guards(stmt.value, func))
-                for guard_str in all_guards:
-                    self._w(f".guard (fun s => {guard_str})")
-                    self._indent += 1
-                    self._w("(")
-                    self._indent += 1
-                self._w(f".basic (fun s => {{ s with globals := {{ s.globals with rawHeap := heapUpdate s.globals.rawHeap {ptr_str} ({{ hVal s.globals.rawHeap {ptr_str} with {stmt.member_name} := {val_str} }}) }} }})")
-                for _ in all_guards:
-                    self._indent -= 1
-                    self._w(")")
-                    self._indent -= 1
+                guards = [f"heapPtrValid s.globals.rawHeap {ptr_str}"]
+                guards.extend(self._collect_all_guards(stmt.value, func))
+                def emit_member_write():
+                    self._w(f".basic (fun s => {{ s with globals := {{ s.globals with rawHeap := heapUpdate s.globals.rawHeap {ptr_str} ({{ hVal s.globals.rawHeap {ptr_str} with {stmt.member_name} := {val_str} }}) }} }})")
+                self._emit_with_guards(guards, emit_member_write)
             else:
                 # Direct struct field write (s.field = val) -- not via pointer
                 # This would be a local struct variable, which is in locals
@@ -754,6 +728,120 @@ class LeanEmitter:
         if expr.member_base is not None and expr.kind != "member_access":
             guards.extend(self._collect_deref_guards(expr.member_base, func))
         return guards
+
+    def _collect_div_guards(self, expr: Expr, func: FuncInfo) -> list[str]:
+        """Collect UB guards for division/modulo by zero.
+
+        For every / and % operation, emit a guard that the divisor is nonzero.
+        Division by zero is undefined behavior in C for both signed and unsigned.
+        """
+        guards = []
+        if expr is None:
+            return guards
+        if expr.kind == "binop" and expr.op in ("/", "%"):
+            divisor_str = self._emit_expr(expr.rhs, func)
+            guards.append(f"{divisor_str} \u2260 0")
+        # Recurse into sub-expressions
+        if expr.lhs is not None:
+            guards.extend(self._collect_div_guards(expr.lhs, func))
+        if expr.rhs is not None:
+            guards.extend(self._collect_div_guards(expr.rhs, func))
+        if expr.third is not None:
+            guards.extend(self._collect_div_guards(expr.third, func))
+        if expr.operand is not None:
+            guards.extend(self._collect_div_guards(expr.operand, func))
+        if expr.member_base is not None:
+            guards.extend(self._collect_div_guards(expr.member_base, func))
+        return guards
+
+    def _collect_signed_overflow_guards(self, expr: Expr, func: FuncInfo) -> list[str]:
+        """Collect UB guards for signed integer overflow.
+
+        Signed overflow is UB in C. For every signed +, -, * operation, guard that
+        the result is in [INT_MIN, INT_MAX] for the appropriate bit width.
+        Also guards INT_MIN / -1 for signed division.
+
+        Uses result_type propagated from the clang AST to determine signedness.
+        """
+        guards = []
+        if expr is None:
+            return guards
+
+        if expr.kind == "binop" and expr.result_type is not None and expr.result_type.signed:
+            bits = expr.result_type.bits
+            if bits > 0:
+                int_min = -(2 ** (bits - 1))
+                int_max = 2 ** (bits - 1) - 1
+
+                if expr.op in ("+", "-", "*"):
+                    # Guard: INT_MIN <= result <= INT_MAX
+                    # Use toBitVec.toInt for signed interpretation of UInt values.
+                    # UInt32.toBitVec.toInt gives the two's complement signed value.
+                    lhs_str = self._emit_expr(expr.lhs, func)
+                    rhs_str = self._emit_expr(expr.rhs, func)
+                    lean_op = {"+": "+", "-": "-", "*": "*"}[expr.op]
+                    guards.append(
+                        f"{int_min} \u2264 ({lhs_str}).toBitVec.toInt {lean_op} ({rhs_str}).toBitVec.toInt "
+                        f"\u2227 ({lhs_str}).toBitVec.toInt {lean_op} ({rhs_str}).toBitVec.toInt \u2264 {int_max}"
+                    )
+
+                elif expr.op == "/":
+                    # Signed division: INT_MIN / -1 is UB (result overflows)
+                    lhs_str = self._emit_expr(expr.lhs, func)
+                    rhs_str = self._emit_expr(expr.rhs, func)
+                    # Guard: not (lhs == INT_MIN and rhs == -1)
+                    # We express INT_MIN as a bit pattern for the UInt type
+                    # Since we map signed to unsigned in Lean, INT_MIN as UInt is 2^(bits-1)
+                    uint_int_min = 2 ** (bits - 1)
+                    # -1 as unsigned is 2^bits - 1
+                    uint_neg_one = 2 ** bits - 1
+                    guards.append(
+                        f"\u00ac({lhs_str} = {uint_int_min} \u2227 {rhs_str} = {uint_neg_one})"
+                    )
+
+        # Recurse into sub-expressions
+        if expr.lhs is not None:
+            guards.extend(self._collect_signed_overflow_guards(expr.lhs, func))
+        if expr.rhs is not None:
+            guards.extend(self._collect_signed_overflow_guards(expr.rhs, func))
+        if expr.third is not None:
+            guards.extend(self._collect_signed_overflow_guards(expr.third, func))
+        if expr.operand is not None:
+            guards.extend(self._collect_signed_overflow_guards(expr.operand, func))
+        if expr.member_base is not None:
+            guards.extend(self._collect_signed_overflow_guards(expr.member_base, func))
+        return guards
+
+    def _collect_all_guards(self, expr: Expr, func: FuncInfo) -> list[str]:
+        """Collect all UB guards for an expression: deref, division, signed overflow."""
+        guards = []
+        if expr is None:
+            return guards
+        guards.extend(self._collect_deref_guards(expr, func))
+        guards.extend(self._collect_div_guards(expr, func))
+        guards.extend(self._collect_signed_overflow_guards(expr, func))
+        return guards
+
+    def _emit_with_guards(self, guards: list[str], inner_emit):
+        """Emit guard wrappers around an inner emission.
+
+        Args:
+            guards: List of guard condition strings.
+            inner_emit: Callable that emits the guarded statement.
+        """
+        if guards:
+            for guard_str in guards:
+                self._w(f".guard (fun s => {guard_str})")
+                self._indent += 1
+                self._w("(")
+                self._indent += 1
+            inner_emit()
+            for _ in guards:
+                self._indent -= 1
+                self._w(")")
+                self._indent -= 1
+        else:
+            inner_emit()
 
     def _emit_proc_env(self):
         """Emit the procedure environment mapping function names to bodies."""

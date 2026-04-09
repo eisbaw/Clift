@@ -5,10 +5,12 @@
 import Clift.CSemantics
 
 set_option maxHeartbeats 400000
+set_option linter.unusedVariables false
 
 namespace Gcd
 
-/-- Local variables (merged from all functions). -/
+/-- Local variables (merged from all functions).
+    NOTE: Locals use Inhabited default (zero-init). See task-0060. -/
 structure Locals where
   a : UInt32
   b : UInt32
@@ -34,7 +36,10 @@ def gcd_body : CSimpl ProgramState :=
                 (
                   .seq
                     (
-                      .basic (fun s => { s with locals := { s.locals with b := (s.locals.a % s.locals.b) } })
+                      .guard (fun s => s.locals.b ≠ 0)
+                        (
+                          .basic (fun s => { s with locals := { s.locals with b := (s.locals.a % s.locals.b) } })
+                        )
                     )
                     (
                       .basic (fun s => { s with locals := { s.locals with a := s.locals.t } })

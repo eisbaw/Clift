@@ -138,6 +138,105 @@ class TestParseGcd:
         assert body.stmts[1].kind == "return"
 
 
+class TestParseDivTest:
+    """Tests against div_test.c clang JSON."""
+
+    def test_parse_two_functions(self):
+        ast = _load_test_json("DivTest")
+        tu = parse_translation_unit(ast)
+        assert len(tu.functions) == 2
+
+    def test_has_division_op(self):
+        ast = _load_test_json("DivTest")
+        tu = parse_translation_unit(ast)
+        # safe_div body has a return with a / b
+        func = tu.functions[0]
+        ret = func.body.stmts[0]
+        assert ret.kind == "return"
+        assert ret.expr.kind == "binop"
+        assert ret.expr.op == "/"
+
+
+class TestParseForLoop:
+    """Tests against for_loop.c clang JSON -- desugaring."""
+
+    def test_parse_one_function(self):
+        ast = _load_test_json("ForLoop")
+        tu = parse_translation_unit(ast)
+        assert len(tu.functions) == 1
+
+    def test_desugared_to_compound_with_while(self):
+        ast = _load_test_json("ForLoop")
+        tu = parse_translation_unit(ast)
+        func = tu.functions[0]
+        body = func.body
+        # After desugaring: compound(sum=0, compound(i=0, while(...)))
+        assert body.kind == "compound"
+        # Find a while statement somewhere in the body
+        def has_while(stmt):
+            if stmt.kind == "while":
+                return True
+            for s in getattr(stmt, 'stmts', []):
+                if has_while(s):
+                    return True
+            return False
+        assert has_while(body), "for loop should desugar to a while"
+
+    def test_has_local_i(self):
+        ast = _load_test_json("ForLoop")
+        tu = parse_translation_unit(ast)
+        func = tu.functions[0]
+        local_names = [l.name for l in func.locals]
+        assert "i" in local_names
+
+
+class TestParseDoWhile:
+    """Tests against do_while.c clang JSON -- desugaring."""
+
+    def test_parse_one_function(self):
+        ast = _load_test_json("DoWhile")
+        tu = parse_translation_unit(ast)
+        assert len(tu.functions) == 1
+
+    def test_desugared_has_while(self):
+        ast = _load_test_json("DoWhile")
+        tu = parse_translation_unit(ast)
+        func = tu.functions[0]
+        body = func.body
+        def has_while(stmt):
+            if stmt.kind == "while":
+                return True
+            for s in getattr(stmt, 'stmts', []):
+                if has_while(s):
+                    return True
+            return False
+        assert has_while(body), "do-while should desugar to include a while"
+
+
+class TestParseSwitchTest:
+    """Tests against switch_test.c clang JSON -- desugaring."""
+
+    def test_parse_one_function(self):
+        ast = _load_test_json("SwitchTest")
+        tu = parse_translation_unit(ast)
+        assert len(tu.functions) == 1
+
+    def test_desugared_to_nested_if(self):
+        ast = _load_test_json("SwitchTest")
+        tu = parse_translation_unit(ast)
+        func = tu.functions[0]
+        body = func.body
+        # The switch should become nested if statements
+        def has_if(stmt):
+            if stmt.kind == "if":
+                return True
+            for s in getattr(stmt, 'stmts', []):
+                if has_if(s):
+                    return True
+            return False
+        assert has_if(body), "switch should desugar to nested if/else"
+
+
 class TestStrictCRejection:
     """Test that unsupported constructs are rejected."""
 

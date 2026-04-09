@@ -23,6 +23,14 @@ import FILE NAME:
 import-all:
     just import test/c_sources/gcd.c Gcd
     just import test/c_sources/max.c Max
+    just import test/c_sources/swap.c Swap
+    just import test/c_sources/list_length.c ListLength
+    just import test/c_sources/rotate3.c Rotate3
+    just import test/c_sources/div_test.c DivTest
+    just import test/c_sources/signed_arith.c SignedArith
+    just import test/c_sources/for_loop.c ForLoop
+    just import test/c_sources/do_while.c DoWhile
+    just import test/c_sources/switch_test.c SwitchTest
 
 # Run CImporter Python unit tests
 test-importer:

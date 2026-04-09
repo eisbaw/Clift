@@ -314,14 +314,65 @@ def _parse_stmt(node: dict) -> Stmt:
         rhs = Expr(kind="binop", op=op, lhs=var_expr, rhs=one)
         return Stmt(kind="assign", target_var=target, value=rhs)
 
-    elif kind in ("ForStmt", "DoStmt"):
-        raise StrictCViolation(
-            f"{kind} not yet supported. Use while loops. "
-            f"(for-loop desugaring will be added later)"
-        )
+    elif kind == "ForStmt":
+        # Desugar: for (init; cond; step) body -> init; while (cond) { body; step }
+        inner = node.get("inner", [])
+        # ForStmt children: [0]=init, [1]=condvar (empty dict if none), [2]=cond, [3]=step, [4]=body
+        # Some children may be missing (empty dict {}) if omitted in source.
+        if len(inner) < 5:
+            raise StrictCViolation(
+                f"ForStmt has {len(inner)} children, expected 5 "
+                "(init, condvar, cond, step, body)"
+            )
+        init_node = inner[0]
+        cond_node = inner[2]
+        step_node = inner[3]
+        body_node = inner[4]
+
+        # Parse init (may be DeclStmt or expression)
+        init_stmt = _parse_stmt(init_node) if init_node.get("kind") else Stmt(kind="compound", stmts=[])
+
+        # Parse condition
+        cond_expr = _parse_expr(cond_node) if cond_node.get("kind") else None
+        if cond_expr is None:
+            raise StrictCViolation("for-loop without condition not supported (StrictC)")
+
+        # Parse step (increment expression)
+        step_stmt = _parse_stmt(step_node) if step_node.get("kind") else Stmt(kind="compound", stmts=[])
+
+        # Parse body
+        body_stmt = _parse_stmt(body_node)
+
+        # Desugar: compound(init, while(cond, compound(body, step)))
+        while_body = Stmt(kind="compound", stmts=[body_stmt, step_stmt])
+        while_stmt = Stmt(kind="while", condition=cond_expr, loop_body=while_body)
+        return Stmt(kind="compound", stmts=[init_stmt, while_stmt])
+
+    elif kind == "DoStmt":
+        # Desugar: do { body } while (cond) -> body; while (cond) { body }
+        inner = node.get("inner", [])
+        if len(inner) < 2:
+            raise StrictCViolation(f"DoStmt has {len(inner)} children, expected 2 (body, cond)")
+        body_stmt = _parse_stmt(inner[0])
+        cond_expr = _parse_expr(inner[1])
+        # Deep-copy body for the while loop body (since AST is immutable dataclasses, sharing is fine)
+        while_stmt = Stmt(kind="while", condition=cond_expr, loop_body=body_stmt)
+        return Stmt(kind="compound", stmts=[body_stmt, while_stmt])
 
     elif kind == "SwitchStmt":
-        raise StrictCViolation("switch is not supported (StrictC restriction: no fall-through)")
+        # Desugar: switch(x) { case v1: ...; case v2: ...; default: ... }
+        #       -> nested if/else: if (x == v1) ... else if (x == v2) ... else ...
+        # StrictC: no fall-through, each case must end with break.
+        inner = node.get("inner", [])
+        if len(inner) < 2:
+            raise StrictCViolation(f"SwitchStmt has {len(inner)} children, expected >= 2")
+        switch_expr = _parse_expr(inner[0])
+        compound = inner[1]
+        if compound.get("kind") != "CompoundStmt":
+            raise StrictCViolation(f"SwitchStmt body is not CompoundStmt: {compound.get('kind')}")
+
+        cases, default_body = _parse_switch_cases(compound, switch_expr)
+        return _build_switch_if_chain(cases, default_body)
 
     elif kind == "BreakStmt":
         return Stmt(kind="break")
@@ -341,6 +392,21 @@ def _parse_stmt(node: dict) -> Stmt:
             raise StrictCViolation(
                 f"Unsupported statement kind: {kind}. Error: {e}"
             )
+
+
+def _try_extract_result_type(node: dict) -> Optional[CType]:
+    """Try to extract the result CType from a clang AST node's type field.
+
+    Returns None if the type is not recognized or not present.
+    Does not raise on failure -- callers use this for best-effort type tracking.
+    """
+    type_node = node.get("type")
+    if not type_node:
+        return None
+    try:
+        return parse_clang_type(type_node)
+    except (UnsupportedTypeError, KeyError):
+        return None
 
 
 def _parse_expr(node: dict) -> Expr:
@@ -369,10 +435,21 @@ def _parse_expr(node: dict) -> Expr:
 
     if kind == "DeclRefExpr":
         ref = node.get("referencedDecl", {})
-        return Expr(kind="var_ref", var_name=ref.get("name", ""))
+        result_type = _try_extract_result_type(node)
+        return Expr(kind="var_ref", var_name=ref.get("name", ""), result_type=result_type)
 
     if kind == "IntegerLiteral":
         return Expr(kind="int_literal", int_value=int(node.get("value", "0")))
+
+    if kind == "ConstantExpr":
+        # ConstantExpr is a wrapper around a compile-time constant.
+        # It may have a 'value' field directly, or we look through to inner.
+        if "value" in node:
+            return Expr(kind="int_literal", int_value=int(node["value"]))
+        inner = node.get("inner", [])
+        if inner:
+            return _parse_expr(inner[0])
+        raise StrictCViolation("ConstantExpr with no value and no inner node")
 
     if kind == "MemberExpr":
         # Struct field access: s.field or p->field
@@ -414,7 +491,8 @@ def _parse_expr(node: dict) -> Expr:
         if opcode not in supported_ops:
             raise StrictCViolation(f"Unsupported binary operator: {opcode}")
 
-        return Expr(kind="binop", op=opcode, lhs=lhs_expr, rhs=rhs_expr)
+        result_type = _try_extract_result_type(node)
+        return Expr(kind="binop", op=opcode, lhs=lhs_expr, rhs=rhs_expr, result_type=result_type)
 
     if kind == "UnaryOperator":
         opcode = node["opcode"]
@@ -457,6 +535,87 @@ def _parse_expr(node: dict) -> Expr:
         )
 
     raise StrictCViolation(f"Unsupported expression kind: {kind}")
+
+
+def _parse_switch_cases(compound: dict, switch_expr: Expr) -> tuple[list[tuple[Expr, Stmt]], Optional[Stmt]]:
+    """Parse the body of a SwitchStmt into a list of (condition, body) pairs.
+
+    Returns:
+        (cases, default_body) where cases is [(condition_expr, body_stmt), ...].
+        The condition is an equality check: switch_expr == case_value.
+        default_body is the body for the default case, or None.
+    """
+    children = compound.get("inner", [])
+    cases = []
+    default_body = None
+    i = 0
+    while i < len(children):
+        child = children[i]
+        ckind = child.get("kind", "")
+
+        if ckind == "CaseStmt":
+            case_inner = child.get("inner", [])
+            if len(case_inner) < 2:
+                raise StrictCViolation(f"CaseStmt has {len(case_inner)} children, expected >= 2")
+            # First child is the case value, rest are body statements
+            case_value = _parse_expr(case_inner[0])
+            body_stmts = [_parse_stmt(c) for c in case_inner[1:]]
+            # Collect subsequent statements until BreakStmt or next CaseStmt/DefaultStmt
+            i += 1
+            while i < len(children):
+                next_kind = children[i].get("kind", "")
+                if next_kind in ("CaseStmt", "DefaultStmt"):
+                    break
+                if next_kind == "BreakStmt":
+                    i += 1  # Skip the break
+                    break
+                body_stmts.append(_parse_stmt(children[i]))
+                i += 1
+            # Build condition: switch_expr == case_value
+            cond = Expr(kind="binop", op="==", lhs=switch_expr, rhs=case_value)
+            body = Stmt(kind="compound", stmts=body_stmts) if len(body_stmts) > 1 else (
+                body_stmts[0] if body_stmts else Stmt(kind="compound", stmts=[])
+            )
+            cases.append((cond, body))
+
+        elif ckind == "DefaultStmt":
+            case_inner = child.get("inner", [])
+            body_stmts = [_parse_stmt(c) for c in case_inner]
+            # Collect subsequent statements until BreakStmt
+            i += 1
+            while i < len(children):
+                next_kind = children[i].get("kind", "")
+                if next_kind in ("CaseStmt", "DefaultStmt"):
+                    break
+                if next_kind == "BreakStmt":
+                    i += 1
+                    break
+                body_stmts.append(_parse_stmt(children[i]))
+                i += 1
+            default_body = Stmt(kind="compound", stmts=body_stmts) if len(body_stmts) > 1 else (
+                body_stmts[0] if body_stmts else Stmt(kind="compound", stmts=[])
+            )
+
+        else:
+            # Skip stray nodes (shouldn't happen in well-formed switch)
+            i += 1
+
+    return cases, default_body
+
+
+def _build_switch_if_chain(cases: list[tuple[Expr, Stmt]], default_body: Optional[Stmt]) -> Stmt:
+    """Build a nested if/else chain from switch cases.
+
+    The last else branch is the default case (or skip if no default).
+    """
+    if not cases:
+        return default_body if default_body else Stmt(kind="compound", stmts=[])
+
+    # Build from the end: last case gets default as else
+    result = default_body if default_body else Stmt(kind="compound", stmts=[])
+    for cond, body in reversed(cases):
+        result = Stmt(kind="if", condition=cond, then_body=body, else_body=result)
+    return result
 
 
 def _extract_member_lvalue(node: dict) -> Optional[tuple[Expr, str, bool]]:
