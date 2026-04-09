@@ -10,8 +10,8 @@ import Clift.Lifting.L1HoareRules
 import Clift.MonadLib.HoareRules
 import Examples.GcdCorrect  -- for L1corres_cHoare_bridge
 
-set_option maxHeartbeats 6400000
-set_option maxRecDepth 2048
+set_option maxHeartbeats 12800000
+set_option maxRecDepth 4096
 
 open Swap
 
@@ -53,16 +53,39 @@ theorem l1_swap_body_corres :
         exact L1corres_basic _ _
   · exact L1corres_skip _
 
-/-! # validHoare: swap preserves pointer validity and exchanges values
+/-! # validHoare: direct computation proof
 
-For the validHoare proof, we need to show:
-1. l1_swap_body doesn't fail under valid preconditions
-2. Every ok-result has the swapped heap values
+    Known blocker (task-0062): Lean 4's {s with ...} desugars to
+    `have __src := s.field` in some contexts and `let __src := s.field`
+    in others. These are NOT definitionally equal for non-Prop types.
+    This prevents composing L1 result lemmas with theorem statements.
 
-Both are mechanical: the computation is deterministic, and all guards
-hold under preconditions (using heapUpdate_preserves_heapPtrValid). -/
+    The l1_swap_validHoare proof is deferred to Phase 4 where a VCG
+    tactic will normalize the have/let forms before applying rules.
 
-/-- The expected final state after swap. -/
+    The sep-logic level proof (swap_sep_correct in SepLogic.lean and
+    swap_heapLift_corres in SwapHeapLift.lean) is complete and sorry-free,
+    demonstrating that the HeapLift layer works correctly. -/
+
+theorem l1_swap_validHoare (va vb : UInt32) :
+    validHoare
+      (fun s : ProgramState =>
+        heapPtrValid s.globals.rawHeap s.locals.a ∧
+        heapPtrValid s.globals.rawHeap s.locals.b ∧
+        ptrDisjoint s.locals.a s.locals.b ∧
+        hVal s.globals.rawHeap s.locals.a = va ∧
+        hVal s.globals.rawHeap s.locals.b = vb)
+      l1_swap_body
+      (fun r s =>
+        match r with
+        | Except.ok () =>
+          hVal s.globals.rawHeap s.locals.a = vb ∧
+          hVal s.globals.rawHeap s.locals.b = va
+        | Except.error () => True) := by
+  sorry
+
+/-! # The expected final state after swap. -/
+
 noncomputable def swapFinalHeap (s : ProgramState) : HeapRawState :=
   heapUpdate
     (heapUpdate s.globals.rawHeap s.locals.a (hVal s.globals.rawHeap s.locals.b))
@@ -83,38 +106,7 @@ theorem swap_values_exchanged (s : ProgramState)
                 hVal_heapUpdate_same _ _ _ hba],
          hVal_heapUpdate_same _ _ _ hbb⟩
 
-/-! # C-level correctness theorem via L1corres bridge
-
-The full proof requires completing the validHoare for l1_swap_body.
-The L1corres proof (above) is complete and sorry-free.
-The swap_values_exchanged theorem (above) shows the heap property.
-
-The remaining gap is the mechanical set membership reasoning in the
-L1 monadic computation, which Phase 4 automation (c_vcg tactic) will handle.
-For Phase 3a, we state the theorem and note the proof obligation. -/
-
--- The validHoare proof requires tracing through L1 set-membership reasoning.
--- Blocked by Lean 4 have/let desugaring mismatch in {s with ...} syntax:
--- the L1 combinator result lemmas produce terms with 'let' form but the
--- l1_swap_body unfold produces 'have' form. These are not definitionally equal.
--- Needs: VCG tactic (Phase 4) or structure update normalization.
--- See backlog task-0062 for details.
-theorem l1_swap_validHoare (va vb : UInt32) :
-    validHoare
-      (fun s : ProgramState =>
-        heapPtrValid s.globals.rawHeap s.locals.a ∧
-        heapPtrValid s.globals.rawHeap s.locals.b ∧
-        ptrDisjoint s.locals.a s.locals.b ∧
-        hVal s.globals.rawHeap s.locals.a = va ∧
-        hVal s.globals.rawHeap s.locals.b = vb)
-      l1_swap_body
-      (fun r s =>
-        match r with
-        | Except.ok () =>
-          hVal s.globals.rawHeap s.locals.a = vb ∧
-          hVal s.globals.rawHeap s.locals.b = va
-        | Except.error () => True) := by
-  sorry
+/-! # End-to-end: C-level correctness via L1corres bridge -/
 
 theorem swap_correct (va vb : UInt32) :
     cHoare Swap.procEnv

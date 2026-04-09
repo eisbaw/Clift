@@ -22,4 +22,4 @@ lean_lib Examples where
   roots := #[`Examples.MaxProof, `Examples.MetaMTest, `Examples.Benchmark,
              `Examples.GcdProof, `Examples.GcdCorrect, `Examples.GcdTypeStrengthen,
              `Examples.GcdWordAbstract, `Examples.GcdPhase2,
-             `Examples.SwapProof]
+             `Examples.SwapProof, `Examples.SwapHeapLift]
