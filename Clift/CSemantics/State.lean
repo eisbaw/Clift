@@ -428,24 +428,59 @@ def computeStructLayout (fields : List (String × Nat × Nat)) :
 /-! # Pointer validity -/
 
 /-- A pointer p is valid in heap state h when:
-    1. The htd at p's address matches the type's tag
+    1. ALL bytes in [addr, addr+size) have the correct type tag in htd
     2. The pointer is not null (addr ≠ 0)
-    3. The pointer's range [addr, addr+size) fits in memory -/
+    3. The pointer's range [addr, addr+size) fits in memory
+    4. The address is aligned to the type's alignment
+
+    Checking all bytes (not just the base) prevents overlapping typed regions
+    and is required for type-safety (Tuch POPL 2007, AutoCorres2 root_ptr_valid).
+    The alignment check prevents misaligned access (UB in C). -/
 def heapPtrValid {α : Type} [inst : CType α] (h : HeapRawState) (p : Ptr α) : Prop :=
-  h.htd p.addr = some inst.typeTag ∧
+  p.addr.val + inst.size ≤ memSize ∧
   p.addr.val ≠ 0 ∧
-  p.addr.val + inst.size ≤ memSize
+  p.addr.val % inst.align = 0 ∧
+  (∀ (i : Nat), i < inst.size →
+    h.htd ⟨(p.addr.val + i) % memSize,
+      Nat.mod_lt _ (by unfold memSize; omega)⟩ = some inst.typeTag)
 
 /-- heapPtrValid is decidable (all components are decidable). -/
-instance {α : Type} [inst : CType α] (h : HeapRawState) (p : Ptr α) :
-    Decidable (heapPtrValid h p) := by
-  unfold heapPtrValid
-  exact instDecidableAnd
+noncomputable instance {α : Type} [inst : CType α] (h : HeapRawState) (p : Ptr α) :
+    Decidable (heapPtrValid h p) :=
+  open Classical in propDecidable _
 
 /-- heapPtrValid implies the address range fits in memory. -/
 theorem heapPtrValid_bound {α : Type} [inst : CType α] {h : HeapRawState} {p : Ptr α}
     (hv : heapPtrValid h p) : p.addr.val + inst.size ≤ memSize :=
-  hv.2.2
+  hv.1
+
+/-- heapPtrValid implies all bytes are tagged. -/
+theorem heapPtrValid_htd_all {α : Type} [inst : CType α] {h : HeapRawState} {p : Ptr α}
+    (hv : heapPtrValid h p) (i : Nat) (hi : i < inst.size) :
+    h.htd ⟨p.addr.val + i, by have := heapPtrValid_bound hv; omega⟩ = some inst.typeTag := by
+  have h0 := hv.2.2.2 i hi
+  have hmod : (p.addr.val + i) % memSize = p.addr.val + i :=
+    Nat.mod_eq_of_lt (by have := heapPtrValid_bound hv; omega)
+  simp only [hmod] at h0
+  exact h0
+
+/-- heapPtrValid implies the base address has the correct tag. -/
+theorem heapPtrValid_htd_base {α : Type} [inst : CType α] {h : HeapRawState} {p : Ptr α}
+    (hv : heapPtrValid h p) :
+    h.htd p.addr = some inst.typeTag := by
+  have h0 := heapPtrValid_htd_all hv 0 inst.size_pos
+  simp only [Nat.add_zero] at h0
+  exact h0
+
+/-- heapPtrValid implies the address is aligned. -/
+theorem heapPtrValid_aligned {α : Type} [inst : CType α] {h : HeapRawState} {p : Ptr α}
+    (hv : heapPtrValid h p) : p.addr.val % inst.align = 0 :=
+  hv.2.2.1
+
+/-- heapPtrValid implies non-null. -/
+theorem heapPtrValid_nonnull {α : Type} [inst : CType α] {h : HeapRawState} {p : Ptr α}
+    (hv : heapPtrValid h p) : p.addr.val ≠ 0 :=
+  hv.2.1
 
 /-! # Memory slice operations -/
 
@@ -609,8 +644,10 @@ theorem heapUpdate_preserves_heapPtrValid {α β : Type} [instA : MemType α] [i
     (hv : heapPtrValid h q) :
     heapPtrValid (heapUpdate h p v) q := by
   unfold heapPtrValid at *
-  rw [heapUpdate_htd]
-  exact hv
+  obtain ⟨hbound, hnn, halign, htags⟩ := hv
+  refine ⟨hbound, hnn, halign, fun i hi => ?_⟩
+  have := htags i hi
+  rwa [heapUpdate_htd]
 
 /-! # ptrDisjoint symmetry -/
 
@@ -619,6 +656,69 @@ theorem ptrDisjoint_symm {α β : Type} [instA : CType α] [instB : CType β]
     ptrDisjoint q p := by
   unfold ptrDisjoint at *
   omega
+
+/-! # Type-safety: valid pointers of different types are disjoint -/
+
+/-- If two valid pointers have different type tags, their footprints are disjoint.
+    This is a key property for separation logic: the htd assigns exactly one
+    type tag per byte, so overlapping footprints would force the same byte
+    to have two different tags (contradiction).
+
+    Following Tuch POPL 2007 Lemma 3.2. -/
+theorem heapPtrValid_different_type_disjoint
+    {α β : Type} [instA : CType α] [instB : CType β]
+    {h : HeapRawState} {p : Ptr α} {q : Ptr β}
+    (hvp : heapPtrValid h p) (hvq : heapPtrValid h q)
+    (htag : instA.typeTag ≠ instB.typeTag) :
+    ptrDisjoint p q := by
+  unfold ptrDisjoint
+  -- Proof by contradiction: if the footprints overlap, a shared byte
+  -- would have two different type tags, which is impossible.
+  -- We show ¬¬(A ∨ B) → (A ∨ B) via classical logic, but actually
+  -- we can do it constructively by case-splitting on the address relationship.
+  suffices h : ¬(p.addr.val + instA.size > q.addr.val ∧
+                 q.addr.val + instB.size > p.addr.val) by
+    omega
+  intro ⟨h1, h2⟩
+  -- The ranges overlap. Pick the max of the two start addresses.
+  have hbp := heapPtrValid_bound hvp
+  have hbq := heapPtrValid_bound hvq
+  -- Use p.addr as the overlap byte (it's in both footprints since ranges overlap)
+  -- p.addr is in p's footprint (offset 0)
+  have hipa : 0 < instA.size := instA.size_pos
+  -- p.addr is in q's footprint since q.addr + sizeB > p.addr and p.addr >= q.addr
+  --   ... but we don't know p.addr >= q.addr. So we case split.
+  -- Actually, just pick p.addr.val if p.addr >= q.addr, else q.addr.val
+  by_cases hpq : p.addr.val ≥ q.addr.val
+  · -- p.addr is in both footprints
+    have hip : 0 < instA.size := instA.size_pos
+    have hiq : p.addr.val - q.addr.val < instB.size := by omega
+    have htag_a := hvp.2.2.2 0 hip
+    have htag_b := hvq.2.2.2 (p.addr.val - q.addr.val) hiq
+    -- Simplify modular arithmetic
+    have hmod_a : (p.addr.val + 0) % memSize = p.addr.val := by
+      rw [Nat.add_zero]; exact Nat.mod_eq_of_lt (by omega)
+    have hmod_b : (q.addr.val + (p.addr.val - q.addr.val)) % memSize = p.addr.val := by
+      have : q.addr.val + (p.addr.val - q.addr.val) = p.addr.val := by omega
+      rw [this, Nat.mod_eq_of_lt (by omega)]
+    simp only [hmod_a] at htag_a
+    simp only [hmod_b] at htag_b
+    rw [htag_a] at htag_b
+    exact htag (Option.some.inj htag_b)
+  · -- q.addr is in both footprints
+    have hip : q.addr.val - p.addr.val < instA.size := by omega
+    have hiq : 0 < instB.size := instB.size_pos
+    have htag_a := hvp.2.2.2 (q.addr.val - p.addr.val) hip
+    have htag_b := hvq.2.2.2 0 hiq
+    have hmod_a : (p.addr.val + (q.addr.val - p.addr.val)) % memSize = q.addr.val := by
+      have : p.addr.val + (q.addr.val - p.addr.val) = q.addr.val := by omega
+      rw [this, Nat.mod_eq_of_lt (by omega)]
+    have hmod_b : (q.addr.val + 0) % memSize = q.addr.val := by
+      rw [Nat.add_zero]; exact Nat.mod_eq_of_lt (by omega)
+    simp only [hmod_a] at htag_a
+    simp only [hmod_b] at htag_b
+    rw [htag_a] at htag_b
+    exact htag (Option.some.inj htag_b)
 
 /-! # Global state infrastructure -/
 

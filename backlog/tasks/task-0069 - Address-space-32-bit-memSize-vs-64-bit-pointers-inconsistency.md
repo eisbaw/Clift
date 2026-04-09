@@ -1,9 +1,11 @@
 ---
 id: TASK-0069
 title: 'Address space: 32-bit memSize vs 64-bit pointers inconsistency'
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-04-09 17:13'
+updated_date: '2026-04-09 20:10'
 labels:
   - phase-3c
   - review
@@ -19,5 +21,11 @@ memSize is 2^32 (32-bit address space) but Ptr stores addresses as UInt64 (8 byt
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Document or fix the 32-bit/64-bit inconsistency
+- [x] #1 Document or fix the 32-bit/64-bit inconsistency
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Documented the 32-bit/64-bit address space inconsistency in ADR-004. Decision: keep memSize=2^32 for proof ergonomics. The truncation is safe because heapPtrValid bounds all valid addresses within memSize. The path to 64-bit is to change the memSize constant; all proofs are parametric over it.
+<!-- SECTION:FINAL_SUMMARY:END -->

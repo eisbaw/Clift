@@ -232,16 +232,62 @@ class LeanEmitter:
         self._indent -= 1  # Close the fun i =>
         self._w()
 
-        # Roundtrip proof (sorry for now -- this is Phase 3b, proofs come later)
+        # Roundtrip proof: mechanically generated from field layout.
+        # Strategy:
+        # 1. For each field, emit a helper showing toBytes at that field's byte range
+        #    dispatches to the field's toBytes function.
+        # 2. Main theorem: unfold fromBytes, rewrite byte slices via helpers,
+        #    apply scalar roundtrip lemmas, close with `cases v; rfl`.
+        for idx, field in enumerate(sdef.fields):
+            to_fn = self._memtype_to_fn(field.c_type)
+            roundtrip_fn = self._memtype_roundtrip_fn(field.c_type)
+            end = field.offset + field.size
+            self._w(f"private theorem {lean_name}.toBytes_{field.name}_byte "
+                    f"(v : {lean_name}) (i : Nat) (hi : i < {field.size}) :")
+            self._indent += 1
+            self._w(f"{lean_name}.toBytes v \u27e8{field.offset} + i, by omega\u27e9 = "
+                    f"{to_fn} v.{field.name} \u27e8i, hi\u27e9 := by")
+            self._indent += 1
+            self._w(f"unfold {lean_name}.toBytes")
+            # For fields before this one: show their guard is false via dif_neg
+            for prev_idx in range(idx):
+                prev_field = sdef.fields[prev_idx]
+                prev_end = prev_field.offset + prev_field.size
+                self._w(f"rw [dif_neg (show \u00ac({prev_field.offset} \u2264 ({field.offset} + i) "
+                        f"\u2227 ({field.offset} + i) < {prev_end}) from by omega)]")
+            # This field's guard is true via dif_pos
+            self._w(f"rw [dif_pos (show ({field.offset} \u2264 ({field.offset} + i) "
+                    f"\u2227 ({field.offset} + i) < {end}) from by omega)]")
+            # Close the Fin equality (value may differ by offset arithmetic)
+            self._w(f"congr 1; apply Fin.ext; simp")
+            self._indent -= 2
+            self._w()
+
         self._w(f"/-- Roundtrip: fromBytes (toBytes v) = v. -/")
         self._w(f"theorem {lean_name}.fromBytes_toBytes (v : {lean_name}) :")
         self._indent += 1
         self._w(f"{lean_name}.fromBytes ({lean_name}.toBytes v) = v := by")
         self._indent += 1
-        # For the roundtrip, we need to show each field reads back correctly.
-        # This requires showing that the if-then-else dispatches correctly.
-        # Using native_decide for Bool-valued goals, ext + omega for the rest.
-        self._w("sorry")
+        # Build the funext helpers for each field
+        for field in sdef.fields:
+            from_fn = self._memtype_from_fn(field.c_type)
+            to_fn = self._memtype_to_fn(field.c_type)
+            self._w(f"have h_{field.name} : (fun i : Fin {field.size} => "
+                    f"{lean_name}.toBytes v \u27e8{field.offset} + i.val, by omega\u27e9) = "
+                    f"{to_fn} v.{field.name} := by")
+            self._indent += 1
+            self._w(f"funext \u27e8i, hi\u27e9; exact {lean_name}.toBytes_{field.name}_byte v i hi")
+            self._indent -= 1
+        # Main proof: unfold fromBytes, rewrite, apply roundtrips
+        self._w(f"show {lean_name}.fromBytes ({lean_name}.toBytes v) = v")
+        self._w(f"unfold {lean_name}.fromBytes")
+        rewrites = ", ".join(f"h_{f.name}" for f in sdef.fields)
+        roundtrips = ", ".join(
+            self._memtype_roundtrip_fn(f.c_type) + f" v.{f.name}"
+            for f in sdef.fields
+        )
+        self._w(f"rw [{rewrites}, {roundtrips}]")
+        self._w(f"cases v; rfl")
         self._indent -= 2
         self._w()
 
@@ -256,6 +302,20 @@ class LeanEmitter:
         self._w(f"toMem := {lean_name}.toBytes")
         self._w(f"roundtrip := {lean_name}.fromBytes_toBytes")
         self._indent -= 1
+
+    def _memtype_roundtrip_fn(self, ctype: CType) -> str:
+        """Get the roundtrip theorem name for a CType (fromBytes(toBytes v) = v)."""
+        if ctype.is_pointer:
+            return "Ptr.fromBytes_toBytes'"
+        if ctype.is_struct:
+            return f"{ctype.lean_type}.fromBytes_toBytes"
+        lean = ctype.lean_type
+        if lean in ("UInt8", "UInt16", "UInt32", "UInt64"):
+            return f"{lean}.fromBytes_toBytes'"
+        if lean in ("Int8", "Int16", "Int32", "Int64"):
+            unsigned = lean.replace("Int", "UInt")
+            return f"{unsigned}.fromBytes_toBytes'"
+        raise ValueError(f"No roundtrip theorem for type {lean}")
 
     def _memtype_from_fn(self, ctype: CType) -> str:
         """Get the fromMem/fromBytes function name for a CType."""

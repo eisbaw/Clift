@@ -1,9 +1,11 @@
 ---
 id: TASK-0065
 title: 'heapPtrValid: add alignment check'
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-04-09 17:13'
+updated_date: '2026-04-09 20:10'
 labels:
   - phase-3c
   - soundness
@@ -19,6 +21,12 @@ Tuch's c_guard and AutoCorres2 root_ptr_valid require that pointers are aligned 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 heapPtrValid checks addr % align = 0
-- [ ] #2 All existing proofs still hold
+- [x] #1 heapPtrValid checks addr % align = 0
+- [x] #2 All existing proofs still hold
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Added alignment check to heapPtrValid: addr % align = 0. This prevents misaligned memory access (UB in C). The alignment requirement is part of the CType typeclass so each type specifies its natural alignment (UInt32=4, UInt64=8, Ptr=8, etc.). All existing proofs pass since alignment is a pure address property preserved by heap writes.
+<!-- SECTION:FINAL_SUMMARY:END -->

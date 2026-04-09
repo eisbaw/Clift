@@ -35,10 +35,30 @@ def C_node.toBytes (v : C_node) : Fin 16 → UInt8 := fun i =>
     else
       0  -- padding bytes
 
+private theorem C_node.toBytes_val_byte (v : C_node) (i : Nat) (hi : i < 4) :
+  C_node.toBytes v ⟨0 + i, by omega⟩ = UInt32.toBytes' v.val ⟨i, hi⟩ := by
+    unfold C_node.toBytes
+    rw [dif_pos (show (0 ≤ (0 + i) ∧ (0 + i) < 4) from by omega)]
+    congr 1; apply Fin.ext; simp
+
+private theorem C_node.toBytes_next_byte (v : C_node) (i : Nat) (hi : i < 8) :
+  C_node.toBytes v ⟨8 + i, by omega⟩ = Ptr.toBytes' v.next ⟨i, hi⟩ := by
+    unfold C_node.toBytes
+    rw [dif_neg (show ¬(0 ≤ (8 + i) ∧ (8 + i) < 4) from by omega)]
+    rw [dif_pos (show (8 ≤ (8 + i) ∧ (8 + i) < 16) from by omega)]
+    congr 1; apply Fin.ext; simp
+
 /-- Roundtrip: fromBytes (toBytes v) = v. -/
 theorem C_node.fromBytes_toBytes (v : C_node) :
   C_node.fromBytes (C_node.toBytes v) = v := by
-    sorry
+    have h_val : (fun i : Fin 4 => C_node.toBytes v ⟨0 + i.val, by omega⟩) = UInt32.toBytes' v.val := by
+      funext ⟨i, hi⟩; exact C_node.toBytes_val_byte v i hi
+    have h_next : (fun i : Fin 8 => C_node.toBytes v ⟨8 + i.val, by omega⟩) = Ptr.toBytes' v.next := by
+      funext ⟨i, hi⟩; exact C_node.toBytes_next_byte v i hi
+    show C_node.fromBytes (C_node.toBytes v) = v
+    unfold C_node.fromBytes
+    rw [h_val, h_next, UInt32.fromBytes_toBytes' v.val, Ptr.fromBytes_toBytes' v.next]
+    cases v; rfl
 
 instance : MemType C_node where
   size := 16
