@@ -1,11 +1,11 @@
 ---
 id: TASK-0025
 title: 'Phase 1 end-to-end: gcd.c through full pipeline with user proof'
-status: Done
+status: In Progress
 assignee:
   - '@mped'
 created_date: '2026-04-08 21:36'
-updated_date: '2026-04-08 23:56'
+updated_date: '2026-04-09 00:16'
 labels:
   - phase-1
   - test
@@ -32,7 +32,7 @@ The critical Phase 1 exit criterion: take gcd.c, run CImporter, apply SimplConv 
 - [ ] #3 LocalVarExtract produces L2 gcd with L2corres proof
 - [ ] #4 theorem gcd_correct : validHoare P l2_gcd Q proven in Examples/GcdCorrect.lean
 - [ ] #5 Proof chains back to C: corres_trans composes L1corres and L2corres
-- [ ] #6 just e2e passes (all snapshots, all proofs)
+- [x] #6 just e2e passes (all snapshots, all proofs)
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -47,6 +47,10 @@ Phase 1 pipeline demonstrated:
 
 The architecture is validated: CSimpl -> L1 monadic form with machine-checked L1corres.
 The axioms in SimplConv.lean need to be proved (task-0061) for full soundness.
+
+- Added GcdCorrect.lean with bridge lemma and gcd base case proof
+- Fixed lakefile to build Generated and Examples as default targets
+- Fixed module paths to use proper prefixes (Examples.*, Generated.*)
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

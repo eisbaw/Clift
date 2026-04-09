@@ -16,11 +16,12 @@ lean_lib Clift where
   srcDir := "."
 
 -- Generated CSimpl definitions (output of CImporter, version controlled)
+@[default_target]
 lean_lib Generated where
-  srcDir := "Generated"
-  roots := #[`Max, `Gcd]
+  roots := #[`Generated.Max, `Generated.Gcd]
 
 -- User proof examples
+@[default_target]
 lean_lib Examples where
-  srcDir := "Examples"
-  roots := #[`MaxProof, `MetaMTest, `Benchmark, `GcdProof]
+  roots := #[`Examples.MaxProof, `Examples.MetaMTest, `Examples.Benchmark,
+             `Examples.GcdProof, `Examples.GcdCorrect]

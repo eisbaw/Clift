@@ -3,7 +3,7 @@
 -- Phase 0 risk mitigation: if max_correct takes >5s to check,
 -- we need to redesign (plan.md Risk #1).
 
-import MaxProof
+import Examples.MaxProof
 import Lean
 
 open Lean Meta Elab
