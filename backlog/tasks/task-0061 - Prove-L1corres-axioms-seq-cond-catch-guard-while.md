@@ -1,9 +1,11 @@
 ---
 id: TASK-0061
 title: 'Prove L1corres axioms: seq, cond, catch, guard, while'
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@mped'
 created_date: '2026-04-08 23:54'
+updated_date: '2026-04-09 00:07'
 labels:
   - phase-1
   - lifting
@@ -20,10 +22,26 @@ The L1corres lemmas for seq, cond, catch, guard, while are currently axioms in C
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 L1corres_seq proved (no axiom)
-- [ ] #2 L1corres_cond proved
-- [ ] #3 L1corres_catch proved
-- [ ] #4 L1corres_guard proved
-- [ ] #5 L1corres_while proved
-- [ ] #6 No axioms remain in SimplConv.lean
+- [x] #1 L1corres_seq proved (no axiom)
+- [x] #2 L1corres_cond proved
+- [x] #3 L1corres_catch proved
+- [x] #4 L1corres_guard proved
+- [x] #5 L1corres_while proved
+- [x] #6 No axioms remain in SimplConv.lean
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+All 5 L1corres axioms proved as theorems in Clift/Lifting/SimplConv.lean:
+
+- L1corres_seq: set membership reasoning on L1.seq result/failure sets
+- L1corres_cond: case split on boolean condition, delegate to sub-corres
+- L1corres_catch: set membership on L1.catch, body/handler failure propagation
+- L1corres_guard: extract predicate from non-failure, reduce guard+seq to body
+- L1corres_while: generalized induction on Exec with command-equation hypothesis, construct L1.WhileResult from Exec derivation
+
+Helper lemmas for failure propagation (L1_seq_not_failed_left/right, L1_catch_not_failed_body/handler, L1_while_body_not_failed, L1_while_step_not_failed).
+
+No axioms or sorry remain in the codebase. lake build succeeds, all e2e tests pass.
+<!-- SECTION:FINAL_SUMMARY:END -->
