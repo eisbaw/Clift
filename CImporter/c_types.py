@@ -8,11 +8,11 @@ Supported types (StrictC subset):
   - int8_t, int16_t, int32_t, int64_t (signed integers)
   - void (return type only)
   - _Bool / bool
+  - Pointers to supported scalar types (Phase 3a)
 
 Unsupported (rejected with clear error):
   - float, double (no floating point in Phase 1)
-  - pointers (Phase 3)
-  - structs (Phase 3)
+  - structs (Phase 3b)
   - arrays, VLAs
 """
 
@@ -29,10 +29,14 @@ class CType:
     name: str        # Canonical name: "uint32_t", "int64_t", "void", "bool"
     signed: bool     # True for int8_t..int64_t
     bits: int        # Bit width (0 for void)
+    is_pointer: bool = False  # True for pointer types (e.g. uint32_t *)
+    pointee: Optional['CType'] = None  # The type being pointed to (for pointers)
 
     @property
     def lean_type(self) -> str:
         """Lean 4 type name for this C type."""
+        if self.is_pointer:
+            return f"Ptr {self.pointee.lean_type}"
         if self.name == "void":
             return "Unit"
         if self.name == "bool":
@@ -42,6 +46,8 @@ class CType:
     @property
     def lean_default(self) -> str:
         """Lean 4 default value for this type."""
+        if self.is_pointer:
+            return "default"
         if self.name == "void":
             return "()"
         if self.name == "bool":
@@ -50,7 +56,7 @@ class CType:
 
     @property
     def is_unsigned(self) -> bool:
-        return not self.signed and self.name != "void" and self.name != "bool"
+        return not self.signed and self.name != "void" and self.name != "bool" and not self.is_pointer
 
 
 # Canonical type instances
@@ -134,14 +140,54 @@ def parse_clang_type(type_node: dict) -> CType:
                 f"Floating point type '{qual}' not supported (StrictC restriction). "
                 f"Only integer types are allowed in Phase 1."
             )
+
+    # Handle pointer types (Phase 3a: scalar pointers only)
     if "*" in qual or "*" in desugared:
-        raise UnsupportedTypeError(
-            f"Pointer type '{qual}' not yet supported (Phase 3). "
-        )
+        return _parse_pointer_type(type_node)
 
     raise UnsupportedTypeError(
         f"Unknown C type: qualType='{qual}', desugaredQualType='{desugared}'. "
         f"Supported types: {sorted(_CLANG_TYPE_MAP.keys())}"
+    )
+
+
+def _parse_pointer_type(type_node: dict) -> CType:
+    """Parse a pointer type from a clang type node.
+
+    Handles types like 'uint32_t *' by stripping the '*' and recursing
+    to find the pointee type.
+    """
+    desugared = type_node.get("desugaredQualType", "")
+    qual = type_node.get("qualType", "")
+
+    # Strip the pointer: "unsigned int *" -> "unsigned int"
+    pointee_str = desugared.rstrip("* ").strip() if desugared else qual.rstrip("* ").strip()
+
+    if pointee_str in _CLANG_TYPE_MAP:
+        pointee = _CLANG_TYPE_MAP[pointee_str]
+        return CType(
+            name=f"{pointee.name} *",
+            signed=False,
+            bits=0,  # Pointers don't have a meaningful bit width for values
+            is_pointer=True,
+            pointee=pointee,
+        )
+
+    # Try qualType without '*'
+    qual_stripped = qual.rstrip("* ").strip()
+    if qual_stripped in _CLANG_TYPE_MAP:
+        pointee = _CLANG_TYPE_MAP[qual_stripped]
+        return CType(
+            name=f"{pointee.name} *",
+            signed=False,
+            bits=0,
+            is_pointer=True,
+            pointee=pointee,
+        )
+
+    raise UnsupportedTypeError(
+        f"Pointer to unsupported type: '{qual}'. "
+        f"Only pointers to scalar types are supported in Phase 3a."
     )
 
 

@@ -254,13 +254,58 @@ class LeanEmitter:
         elif stmt.kind == "assign":
             field = self._field_name(stmt.target_var, func)
             expr_str = self._emit_expr(stmt.value, func)
-            self._w(f".basic (fun s => {{ s with locals := {{ s.locals with {field} := {expr_str} }} }})")
+            # If the RHS contains pointer dereferences, emit guards
+            deref_guards = self._collect_deref_guards(stmt.value, func)
+            if deref_guards:
+                for guard_str in deref_guards:
+                    self._w(f".guard (fun s => {guard_str})")
+                    self._indent += 1
+                    self._w("(")
+                    self._indent += 1
+                self._w(f".basic (fun s => {{ s with locals := {{ s.locals with {field} := {expr_str} }} }})")
+                for _ in deref_guards:
+                    self._indent -= 1
+                    self._w(")")
+                    self._indent -= 1
+            else:
+                self._w(f".basic (fun s => {{ s with locals := {{ s.locals with {field} := {expr_str} }} }})")
 
         elif stmt.kind == "decl_init":
             # Variable declaration with initializer: same as assignment
             field = self._field_name(stmt.target_var, func)
             expr_str = self._emit_expr(stmt.expr, func)
-            self._w(f".basic (fun s => {{ s with locals := {{ s.locals with {field} := {expr_str} }} }})")
+            deref_guards = self._collect_deref_guards(stmt.expr, func)
+            if deref_guards:
+                for guard_str in deref_guards:
+                    self._w(f".guard (fun s => {guard_str})")
+                    self._indent += 1
+                    self._w("(")
+                    self._indent += 1
+                self._w(f".basic (fun s => {{ s with locals := {{ s.locals with {field} := {expr_str} }} }})")
+                for _ in deref_guards:
+                    self._indent -= 1
+                    self._w(")")
+                    self._indent -= 1
+            else:
+                self._w(f".basic (fun s => {{ s with locals := {{ s.locals with {field} := {expr_str} }} }})")
+
+        elif stmt.kind == "deref_write":
+            # *p = v  =>  guards for all derefs + .basic (heapUpdate)
+            ptr_str = self._emit_expr(stmt.target_expr, func)
+            val_str = self._emit_expr(stmt.value, func)
+            # Collect guards for the write target AND any derefs in the RHS value
+            all_guards = [f"heapPtrValid s.globals.rawHeap {ptr_str}"]
+            all_guards.extend(self._collect_deref_guards(stmt.value, func))
+            for guard_str in all_guards:
+                self._w(f".guard (fun s => {guard_str})")
+                self._indent += 1
+                self._w("(")
+                self._indent += 1
+            self._w(f".basic (fun s => {{ s with globals := {{ s.globals with rawHeap := heapUpdate s.globals.rawHeap {ptr_str} {val_str} }} }})")
+            for _ in all_guards:
+                self._indent -= 1
+                self._w(")")
+                self._indent -= 1
 
         elif stmt.kind == "break":
             # break in a while loop: throw (caught by while's internal handling)
@@ -362,6 +407,11 @@ class LeanEmitter:
                 return f"(~~~{operand})"
             return f"({expr.op}{operand})"
 
+        elif expr.kind == "deref":
+            # Pointer dereference: *p => hVal heap p
+            ptr_str = self._emit_expr(expr.operand, func)
+            return f"(hVal s.globals.rawHeap {ptr_str})"
+
         elif expr.kind == "ternary":
             cond = self._emit_bool_expr(expr.lhs, func)
             true_val = self._emit_expr(expr.rhs, func)
@@ -416,6 +466,25 @@ class LeanEmitter:
         # Fallback: treat as integer, compare != 0
         val = self._emit_expr(expr, func)
         return f"decide ({val} ≠ 0)"
+
+    def _collect_deref_guards(self, expr: Expr, func: FuncInfo) -> list[str]:
+        """Collect heapPtrValid guard strings for all pointer dereferences in an expression."""
+        guards = []
+        if expr is None:
+            return guards
+        if expr.kind == "deref":
+            ptr_str = self._emit_expr(expr.operand, func)
+            guards.append(f"heapPtrValid s.globals.rawHeap {ptr_str}")
+        # Recurse into sub-expressions
+        if expr.lhs is not None:
+            guards.extend(self._collect_deref_guards(expr.lhs, func))
+        if expr.rhs is not None:
+            guards.extend(self._collect_deref_guards(expr.rhs, func))
+        if expr.third is not None:
+            guards.extend(self._collect_deref_guards(expr.third, func))
+        if expr.operand is not None and expr.kind != "deref":
+            guards.extend(self._collect_deref_guards(expr.operand, func))
+        return guards
 
     def _emit_proc_env(self):
         """Emit the procedure environment mapping function names to bodies."""

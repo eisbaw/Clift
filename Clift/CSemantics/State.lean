@@ -31,7 +31,7 @@ structure HeapRawState where
 /-- Pointer with phantom type tag. -/
 structure Ptr (α : Type) where
   addr : Fin memSize
-  deriving DecidableEq
+  deriving DecidableEq, Repr
 
 instance {α : Type} : Inhabited (Ptr α) := ⟨⟨⟨0, by unfold memSize; omega⟩⟩⟩
 
@@ -163,11 +163,30 @@ theorem heapPtrValid_bound {α : Type} [inst : CType α] {h : HeapRawState} {p :
 /-! # Memory slice operations -/
 
 /-- Read `n` consecutive bytes from memory starting at `addr`.
-    Requires: addr + n ≤ memSize (guaranteed by heapPtrValid). -/
-def readMemSlice (mem : Fin memSize → UInt8) (addr : Nat) (n : Nat)
+    When addr + i overflows memSize, wraps via modular arithmetic.
+    heapPtrValid ensures no wrapping occurs in practice. -/
+def readMemSlice (mem : Fin memSize → UInt8) (addr : Nat) (n : Nat) :
+    Fin n → UInt8 :=
+  fun i => mem ⟨(addr + i.val) % memSize, Nat.mod_lt _ (by unfold memSize; omega)⟩
+
+/-- Read `n` consecutive bytes from memory starting at `addr`.
+    Version with bound proof: no modular wrapping needed. -/
+def readMemSlice' (mem : Fin memSize → UInt8) (addr : Nat) (n : Nat)
     (_h_bound : addr + n ≤ memSize) :
     Fin n → UInt8 :=
   fun i => mem ⟨addr + i.val, by omega⟩
+
+/-- readMemSlice and readMemSlice' agree when bound holds. -/
+theorem readMemSlice_eq_readMemSlice'
+    (mem : Fin memSize → UInt8) (addr : Nat) (n : Nat)
+    (h_bound : addr + n ≤ memSize) :
+    readMemSlice mem addr n = readMemSlice' mem addr n h_bound := by
+  funext ⟨i, hi⟩
+  simp only [readMemSlice, readMemSlice']
+  congr 1
+  apply Fin.ext
+  simp
+  exact Nat.mod_eq_of_lt (by omega)
 
 /-- Write data to `n` consecutive bytes starting at `addr`.
     Overwrites [addr, addr+n), leaves all other addresses unchanged. -/
@@ -183,38 +202,77 @@ def writeMemSlice (mem : Fin memSize → UInt8) (addr : Nat) {n : Nat}
 
 /-! # Typed heap read/write -/
 
-/-- Read a typed value from raw memory at a pointer's address. -/
-def hVal {α : Type} [inst : MemType α] (h : HeapRawState) (p : Ptr α)
-    (h_bound : p.addr.val + inst.size ≤ memSize) : α :=
-  inst.fromMem (readMemSlice h.mem p.addr.val inst.size h_bound)
+/-- Read a typed value from raw memory at a pointer's address.
+    Total function — safe to use in CSimpl.basic.
+    When the pointer is out of bounds, returns a garbage value
+    (but heapPtrValid guards prevent this in practice). -/
+def hVal {α : Type} [inst : MemType α] (h : HeapRawState) (p : Ptr α) : α :=
+  inst.fromMem (readMemSlice h.mem p.addr.val inst.size)
 
-/-- Write a typed value to raw memory at a pointer's address. -/
-def heapUpdate {α : Type} [inst : MemType α] (h : HeapRawState) (p : Ptr α) (v : α)
+/-- Read a typed value with explicit bound proof (for proofs). -/
+def hVal' {α : Type} [inst : MemType α] (h : HeapRawState) (p : Ptr α)
+    (h_bound : p.addr.val + inst.size ≤ memSize) : α :=
+  inst.fromMem (readMemSlice' h.mem p.addr.val inst.size h_bound)
+
+/-- hVal and hVal' agree when bound holds. -/
+theorem hVal_eq_hVal' {α : Type} [inst : MemType α] (h : HeapRawState) (p : Ptr α)
+    (h_bound : p.addr.val + inst.size ≤ memSize) :
+    hVal h p = hVal' h p h_bound := by
+  simp only [hVal, hVal']
+  rw [readMemSlice_eq_readMemSlice' _ _ _ h_bound]
+
+/-- Write a typed value to raw memory. Version with bound proof. -/
+def heapUpdate' {α : Type} [inst : MemType α] (h : HeapRawState) (p : Ptr α) (v : α)
     (h_bound : p.addr.val + inst.size ≤ memSize) : HeapRawState :=
   { h with mem := writeMemSlice h.mem p.addr.val (inst.toMem v) h_bound }
 
+/-- Write a typed value to raw memory at a pointer's address.
+    Total function — safe to use in CSimpl.basic.
+    When the pointer is out of bounds, returns the heap unchanged
+    (but heapPtrValid guards prevent this in practice). -/
+def heapUpdate {α : Type} [inst : MemType α] (h : HeapRawState) (p : Ptr α) (v : α) :
+    HeapRawState :=
+  if hb : p.addr.val + inst.size ≤ memSize then
+    heapUpdate' h p v hb
+  else h
+
+/-- heapUpdate and heapUpdate' agree when bound holds. -/
+theorem heapUpdate_eq_heapUpdate' {α : Type} [inst : MemType α]
+    (h : HeapRawState) (p : Ptr α) (v : α)
+    (h_bound : p.addr.val + inst.size ≤ memSize) :
+    heapUpdate h p v = heapUpdate' h p v h_bound := by
+  simp only [heapUpdate, dif_pos h_bound]
+
 /-! # Core lemma: read after write at same pointer -/
 
-theorem readMemSlice_writeMemSlice_same
+theorem readMemSlice'_writeMemSlice_same
     (mem : Fin memSize → UInt8) (addr : Nat) {n : Nat}
     (data : Fin n → UInt8) (h_bound : addr + n ≤ memSize) :
-    readMemSlice (writeMemSlice mem addr data h_bound) addr n h_bound = data := by
+    readMemSlice' (writeMemSlice mem addr data h_bound) addr n h_bound = data := by
   funext ⟨i, hi⟩
-  simp only [readMemSlice, writeMemSlice]
+  simp only [readMemSlice', writeMemSlice]
   have h_in : addr ≤ addr + i ∧ addr + i < addr + n := by omega
   rw [dif_pos h_in]
   congr 1
   apply Fin.ext
   simp
 
-/-- hVal after heapUpdate at the same pointer returns the written value. -/
+/-- hVal' after heapUpdate' at the same pointer returns the written value. -/
+theorem hVal'_heapUpdate'_same {α : Type} [inst : MemType α]
+    (h : HeapRawState) (p : Ptr α) (v : α)
+    (h_bound : p.addr.val + inst.size ≤ memSize) :
+    hVal' (heapUpdate' h p v h_bound) p h_bound = v := by
+  simp only [hVal', heapUpdate']
+  rw [readMemSlice'_writeMemSlice_same]
+  exact inst.roundtrip v
+
+/-- hVal (total) after heapUpdate (total) at the same pointer returns the written value. -/
 theorem hVal_heapUpdate_same {α : Type} [inst : MemType α]
     (h : HeapRawState) (p : Ptr α) (v : α)
     (h_bound : p.addr.val + inst.size ≤ memSize) :
-    hVal (heapUpdate h p v h_bound) p h_bound = v := by
-  simp only [hVal, heapUpdate]
-  rw [readMemSlice_writeMemSlice_same]
-  exact inst.roundtrip v
+    hVal (heapUpdate h p v) p = v := by
+  rw [heapUpdate_eq_heapUpdate' _ _ _ h_bound, hVal_eq_hVal' _ _ h_bound]
+  exact hVal'_heapUpdate'_same h p v h_bound
 
 /-! # Disjoint write: read at different pointer unaffected -/
 
@@ -223,17 +281,17 @@ def ptrDisjoint {α β : Type} [instA : CType α] [instB : CType β]
     (p : Ptr α) (q : Ptr β) : Prop :=
   p.addr.val + instA.size ≤ q.addr.val ∨ q.addr.val + instB.size ≤ p.addr.val
 
-theorem readMemSlice_writeMemSlice_disjoint
+theorem readMemSlice'_writeMemSlice_disjoint
     (mem : Fin memSize → UInt8) (addr_w addr_r : Nat)
     {nw nr : Nat}
     (data : Fin nw → UInt8)
     (h_bound_w : addr_w + nw ≤ memSize)
     (h_bound_r : addr_r + nr ≤ memSize)
     (h_disj : addr_w + nw ≤ addr_r ∨ addr_r + nr ≤ addr_w) :
-    readMemSlice (writeMemSlice mem addr_w data h_bound_w) addr_r nr h_bound_r =
-    readMemSlice mem addr_r nr h_bound_r := by
+    readMemSlice' (writeMemSlice mem addr_w data h_bound_w) addr_r nr h_bound_r =
+    readMemSlice' mem addr_r nr h_bound_r := by
   funext ⟨i, hi⟩
-  simp only [readMemSlice, writeMemSlice]
+  simp only [readMemSlice', writeMemSlice]
   have h_out : ¬(addr_w ≤ addr_r + i ∧ addr_r + i < addr_w + nw) := by omega
   rw [dif_neg h_out]
 
@@ -243,9 +301,10 @@ theorem hVal_heapUpdate_disjoint {α β : Type} [instA : MemType α] [instB : Me
     (h_bound_p : p.addr.val + instA.size ≤ memSize)
     (h_bound_q : q.addr.val + instB.size ≤ memSize)
     (h_disj : ptrDisjoint p q) :
-    hVal (heapUpdate h p v h_bound_p) q h_bound_q = hVal h q h_bound_q := by
-  simp only [hVal, heapUpdate]
-  rw [readMemSlice_writeMemSlice_disjoint]
+    hVal (heapUpdate h p v) q = hVal h q := by
+  rw [heapUpdate_eq_heapUpdate' _ _ _ h_bound_p]
+  simp only [hVal_eq_hVal' _ _ h_bound_q, hVal', heapUpdate']
+  rw [readMemSlice'_writeMemSlice_disjoint]
   exact h_disj
 
 /-! # Global state infrastructure -/

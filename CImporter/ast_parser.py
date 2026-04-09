@@ -41,7 +41,7 @@ class VarInfo:
 @dataclass
 class Expr:
     """An expression in the C AST."""
-    kind: str  # "var_ref", "int_literal", "binop", "unop", "ternary"
+    kind: str  # "var_ref", "int_literal", "binop", "unop", "ternary", "deref"
     # Fields depend on kind:
     var_name: Optional[str] = None       # for var_ref
     int_value: Optional[int] = None      # for int_literal
@@ -49,13 +49,13 @@ class Expr:
     lhs: Optional['Expr'] = None         # for binop, ternary (condition)
     rhs: Optional['Expr'] = None         # for binop, ternary (true branch)
     third: Optional['Expr'] = None       # for ternary (false branch)
-    operand: Optional['Expr'] = None     # for unop
+    operand: Optional['Expr'] = None     # for unop, deref (the pointer expr)
     result_type: Optional[CType] = None  # type of the expression result
 
 @dataclass
 class Stmt:
     """A statement in the C AST."""
-    kind: str  # "compound", "return", "if", "while", "assign", "decl_init", "expr"
+    kind: str  # "compound", "return", "if", "while", "assign", "decl_init", "expr", "deref_write"
     # Fields depend on kind:
     stmts: list['Stmt'] = field(default_factory=list)  # for compound
     expr: Optional[Expr] = None                         # for return, expr, decl_init value
@@ -64,7 +64,8 @@ class Stmt:
     else_body: Optional['Stmt'] = None                  # for if
     loop_body: Optional['Stmt'] = None                  # for while
     target_var: Optional[str] = None                    # for assign, decl_init
-    value: Optional[Expr] = None                        # for assign
+    value: Optional[Expr] = None                        # for assign, deref_write (the RHS value)
+    target_expr: Optional[Expr] = None                  # for deref_write (the pointer being written to)
 
 @dataclass
 class FuncInfo:
@@ -206,6 +207,13 @@ def _parse_stmt(node: dict) -> Stmt:
         inner = node.get("inner", [])
         lhs = inner[0]
         rhs = inner[1]
+
+        # Check if LHS is a pointer dereference (*p = value)
+        deref_target = _extract_deref_target(lhs)
+        if deref_target is not None:
+            value = _parse_expr(rhs)
+            return Stmt(kind="deref_write", target_expr=deref_target, value=value)
+
         target = _extract_var_name(lhs)
         if target is None:
             raise StrictCViolation(
@@ -329,6 +337,10 @@ def _parse_expr(node: dict) -> Expr:
                 f"Use as standalone statement only."
             )
 
+        if opcode == "*":
+            # Pointer dereference: *p (read)
+            return Expr(kind="deref", operand=_parse_expr(inner[0]))
+
         if opcode == "!":
             return Expr(kind="unop", op="!", operand=_parse_expr(inner[0]))
         if opcode == "~":
@@ -356,6 +368,27 @@ def _parse_expr(node: dict) -> Expr:
         )
 
     raise StrictCViolation(f"Unsupported expression kind: {kind}")
+
+
+def _extract_deref_target(node: dict) -> Optional[Expr]:
+    """Check if an lvalue expression is a pointer dereference (*p).
+
+    Returns the pointer expression if it is a dereference, None otherwise.
+    """
+    kind = node.get("kind", "")
+    if kind == "UnaryOperator" and node.get("opcode") == "*":
+        inner = node.get("inner", [])
+        if inner:
+            return _parse_expr(inner[0])
+    if kind == "ImplicitCastExpr":
+        inner = node.get("inner", [])
+        if inner:
+            return _extract_deref_target(inner[0])
+    if kind == "ParenExpr":
+        inner = node.get("inner", [])
+        if inner:
+            return _extract_deref_target(inner[0])
+    return None
 
 
 def _extract_var_name(node: dict) -> Optional[str]:

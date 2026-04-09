@@ -54,9 +54,16 @@ class TestParseClangType:
         with pytest.raises(UnsupportedTypeError, match="Floating point"):
             parse_clang_type({"qualType": "double"})
 
-    def test_pointer_rejected(self):
-        with pytest.raises(UnsupportedTypeError, match="Pointer"):
-            parse_clang_type({"qualType": "int *"})
+    def test_pointer_to_scalar(self):
+        """Phase 3a: pointers to scalar types are now supported."""
+        t = parse_clang_type({"qualType": "unsigned int *", "desugaredQualType": "unsigned int *"})
+        assert t.is_pointer
+        assert t.pointee.lean_type == "UInt32"
+        assert t.lean_type == "Ptr UInt32"
+
+    def test_pointer_to_unsupported_rejected(self):
+        with pytest.raises(UnsupportedTypeError, match="Pointer to unsupported"):
+            parse_clang_type({"qualType": "struct foo *", "desugaredQualType": "struct foo *"})
 
     def test_unknown_rejected(self):
         with pytest.raises(UnsupportedTypeError, match="Unknown C type"):
