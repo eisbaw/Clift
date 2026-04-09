@@ -142,3 +142,190 @@ theorem L1_catch_singleton_ok {body : L1Monad σ} {s s' : σ}
       exact absurd (Prod.mk.inj h_err).1 (by intro h; cases h)
 
 end L1Results
+
+/-! # L1 Hoare rules (validHoare)
+
+These theorems let us prove `validHoare` for L1 monadic programs compositionally.
+Each rule handles one L1 combinator and produces small proof obligations. -/
+
+section L1Hoare
+
+variable {σ : Type}
+
+/-- L1.skip satisfies any postcondition that holds for ok in the initial state. -/
+theorem L1_hoare_skip (Q : Except Unit Unit → σ → Prop) :
+    validHoare (fun s => Q (Except.ok ()) s) L1.skip Q := by
+  intro s₀ hpre
+  constructor
+  · intro h; exact h  -- L1.skip = NondetM.pure, failed = False
+  · intro r s₁ h_mem
+    -- L1.skip s = NondetM.pure (ok ()), so results = {(ok (), s)}
+    have heq := (Prod.mk.inj h_mem)
+    rw [heq.1, heq.2]; exact hpre
+
+/-- L1.modify f: precondition must ensure Q holds at f s. -/
+theorem L1_hoare_modify (f : σ → σ) (Q : Except Unit Unit → σ → Prop) :
+    validHoare (fun s => Q (Except.ok ()) (f s)) (L1.modify f) Q := by
+  intro s₀ hpre
+  constructor
+  · intro h; exact h  -- L1.modify failed = False
+  · intro r s₁ h_mem
+    -- L1.modify f s = {(ok (), f s)}
+    have heq := (Prod.mk.inj h_mem)
+    rw [heq.1, heq.2]; exact hpre
+
+/-- L1.guard p: precondition must ensure p holds and Q holds at s. -/
+theorem L1_hoare_guard (p : σ → Prop) [DecidablePred p] (Q : Except Unit Unit → σ → Prop) :
+    validHoare (fun s => p s ∧ Q (Except.ok ()) s) (L1.guard p) Q := by
+  intro s₀ ⟨hp, hq⟩
+  constructor
+  · exact L1_guard_not_failed hp
+  · intro r s₁ h_mem
+    rw [L1_guard_results hp] at h_mem
+    have heq := (Prod.mk.inj h_mem)
+    rw [heq.1, heq.2]; exact hq
+
+/-- L1.seq: sequential composition with intermediate condition R.
+    m₁ must establish R on ok results, and propagate Q on error results.
+    m₂ from R must establish Q. -/
+theorem L1_hoare_seq (P : σ → Prop) (R : σ → Prop) (Q : Except Unit Unit → σ → Prop)
+    (m₁ m₂ : L1Monad σ)
+    (h1 : validHoare P m₁ (fun r s => match r with | Except.ok () => R s | Except.error () => Q (Except.error ()) s))
+    (h2 : validHoare R m₂ Q) :
+    validHoare P (L1.seq m₁ m₂) Q := by
+  intro s₀ hpre
+  have ⟨h1_nf, h1_post⟩ := h1 s₀ hpre
+  constructor
+  · -- no failure
+    intro hf
+    change (_ ∨ _) at hf
+    rcases hf with hf1 | ⟨s', h_mem, hf2⟩
+    · exact h1_nf hf1
+    · have h_R := h1_post (Except.ok ()) s' h_mem
+      exact (h2 s' h_R).1 hf2
+  · -- postcondition
+    intro r s₁ h_mem
+    change (_ ∨ _) at h_mem
+    rcases h_mem with ⟨s', h_m1, h_m2⟩ | ⟨h_err, h_eq⟩
+    · have h_R := h1_post (Except.ok ()) s' h_m1
+      exact (h2 s' h_R).2 r s₁ h_m2
+    · have h_Q := h1_post (Except.error ()) s₁ h_err
+      have : r = Except.error () := h_eq
+      rw [this]; exact h_Q
+
+/-- L1.catch: body ok results pass through, body error results go to handler.
+    R is the intermediate condition for error states entering the handler. -/
+theorem L1_hoare_catch (P : σ → Prop) (R : σ → Prop) (Q : Except Unit Unit → σ → Prop)
+    (body handler : L1Monad σ)
+    (h_body : validHoare P body (fun r s => match r with
+      | Except.ok () => Q (Except.ok ()) s
+      | Except.error () => R s))
+    (h_handler : validHoare R handler Q) :
+    validHoare P (L1.catch body handler) Q := by
+  intro s₀ hpre
+  have ⟨hb_nf, hb_post⟩ := h_body s₀ hpre
+  constructor
+  · -- no failure
+    intro hf
+    change (_ ∨ _) at hf
+    rcases hf with hf1 | ⟨s', h_err, hf2⟩
+    · exact hb_nf hf1
+    · have h_R := hb_post (Except.error ()) s' h_err
+      exact (h_handler s' h_R).1 hf2
+  · -- postcondition
+    intro r s₁ h_mem
+    change (_ ∨ _) at h_mem
+    rcases h_mem with ⟨h_ok, h_eq⟩ | ⟨s', h_err, h_handler_mem⟩
+    · -- ok from body passes through
+      have : r = Except.ok () := h_eq
+      rw [this]
+      have h_Q := hb_post (Except.ok ()) s₁ h_ok
+      exact h_Q
+    · -- error from body goes to handler
+      have h_R := hb_post (Except.error ()) s' h_err
+      exact (h_handler s' h_R).2 r s₁ h_handler_mem
+
+/-- Simplified seq rule for ok-only first monad.
+    When m₁ only produces ok results (like guard, modify, skip),
+    the error propagation in L1.seq is vacuous.
+    This avoids the nested match problem. -/
+theorem L1_hoare_seq_ok (P : σ → Prop) (R : σ → Prop) (Q : Except Unit Unit → σ → Prop)
+    (m₁ m₂ : L1Monad σ)
+    (h1 : validHoare P m₁ (fun r s => r = Except.ok () ∧ R s))
+    (h2 : validHoare R m₂ Q) :
+    validHoare P (L1.seq m₁ m₂) Q := by
+  intro s₀ hpre
+  have ⟨h1_nf, h1_post⟩ := h1 s₀ hpre
+  constructor
+  · intro hf
+    change (_ ∨ _) at hf
+    rcases hf with hf1 | ⟨s', h_mem, hf2⟩
+    · exact h1_nf hf1
+    · exact (h2 s' (h1_post _ s' h_mem).2).1 hf2
+  · intro r s₁ h_mem
+    change (_ ∨ _) at h_mem
+    rcases h_mem with ⟨s', h_m1, h_m2⟩ | ⟨h_err, h_eq⟩
+    · exact (h2 s' (h1_post _ s' h_m1).2).2 r s₁ h_m2
+    · -- error from m₁: but m₁ only produces ok, contradiction
+      -- h_err : (Except.error (), (r, s₁).snd) ∈ results
+      -- h_eq : (r, s₁).fst = Except.error ()
+      have h_post := h1_post (Except.error ()) (r, s₁).snd h_err
+      exact absurd h_post.1 (by intro h; cases h)
+
+/-- Guard Hoare rule producing r = ok ∧ R form. -/
+theorem L1_hoare_guard' (p : σ → Prop) [DecidablePred p] (R : σ → Prop) :
+    validHoare (fun s => p s ∧ R s) (L1.guard p)
+      (fun r s => r = Except.ok () ∧ R s) := by
+  intro s₀ ⟨hp, hr⟩
+  constructor
+  · exact L1_guard_not_failed hp
+  · intro r s₁ h_mem
+    rw [L1_guard_results hp] at h_mem
+    have heq := Prod.mk.inj h_mem
+    exact ⟨heq.1, heq.2 ▸ hr⟩
+
+/-- Modify Hoare rule producing r = ok ∧ R form. -/
+theorem L1_hoare_modify' (f : σ → σ) (R : σ → Prop) :
+    validHoare (fun s => R (f s)) (L1.modify f)
+      (fun r s => r = Except.ok () ∧ R s) := by
+  intro s₀ hpre
+  constructor
+  · intro h; exact h
+  · intro r s₁ h_mem
+    have heq := Prod.mk.inj h_mem
+    exact ⟨heq.1, heq.2 ▸ hpre⟩
+
+/-- Catch rule for ok-only body: when body only produces ok results,
+    the handler is never invoked, and the postcondition passes through. -/
+theorem L1_hoare_catch_ok (P : σ → Prop) (Q : Except Unit Unit → σ → Prop)
+    (body handler : L1Monad σ)
+    (h_body : validHoare P body (fun r s => r = Except.ok () ∧ Q (Except.ok ()) s)) :
+    validHoare P (L1.catch body handler) Q := by
+  intro s₀ hpre
+  have ⟨hb_nf, hb_post⟩ := h_body s₀ hpre
+  constructor
+  · intro hf
+    change (_ ∨ _) at hf
+    rcases hf with hf1 | ⟨s', h_err, _⟩
+    · exact hb_nf hf1
+    · have hp := hb_post (Except.error ()) s' h_err
+      exact absurd hp.1 (by intro h; cases h)
+  · intro r s₁ h_mem
+    change (_ ∨ _) at h_mem
+    rcases h_mem with ⟨h_ok, h_eq⟩ | ⟨s', h_err, _⟩
+    · -- h_ok : (Except.ok (), (r, s₁).snd) ∈ results
+      -- h_eq : (r, s₁).fst = Except.ok ()
+      have hp := hb_post (Except.ok ()) (r, s₁).snd h_ok
+      subst h_eq; exact hp.2
+    · have hp := hb_post (Except.error ()) s' h_err
+      exact absurd hp.1 (by intro h; cases h)
+
+/-- Pre-strengthening for validHoare. -/
+theorem L1_hoare_pre {P P' : σ → Prop} {Q : Except Unit Unit → σ → Prop}
+    {m : L1Monad σ}
+    (h_pre : ∀ s, P' s → P s)
+    (h : validHoare P m Q) :
+    validHoare P' m Q :=
+  fun s hp => h s (h_pre s hp)
+
+end L1Hoare

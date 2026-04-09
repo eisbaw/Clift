@@ -6,9 +6,12 @@
 
 import Generated.Swap
 import Clift.Lifting.SimplConv
+import Clift.Lifting.L1HoareRules
+import Clift.MonadLib.HoareRules
 import Examples.GcdCorrect  -- for L1corres_cHoare_bridge
 
 set_option maxHeartbeats 6400000
+set_option maxRecDepth 2048
 
 open Swap
 
@@ -90,6 +93,12 @@ The remaining gap is the mechanical set membership reasoning in the
 L1 monadic computation, which Phase 4 automation (c_vcg tactic) will handle.
 For Phase 3a, we state the theorem and note the proof obligation. -/
 
+-- The validHoare proof requires tracing through L1 set-membership reasoning.
+-- Blocked by Lean 4 have/let desugaring mismatch in {s with ...} syntax:
+-- the L1 combinator result lemmas produce terms with 'let' form but the
+-- l1_swap_body unfold produces 'have' form. These are not definitionally equal.
+-- Needs: VCG tactic (Phase 4) or structure update normalization.
+-- See backlog task-0062 for details.
 theorem l1_swap_validHoare (va vb : UInt32) :
     validHoare
       (fun s : ProgramState =>
