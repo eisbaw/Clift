@@ -10,22 +10,6 @@
 
 import Clift.Util.SetBasic
 
-/-! # Error types for C verification -/
-
-/-- Kinds of errors that C programs can produce.
-    These are used to classify failures in the verification pipeline. -/
-inductive CError where
-  | undefinedBehavior : CError
-  | overflow          : CError
-  | nullDeref         : CError
-  deriving DecidableEq, Repr
-
-/-- Result type for C computations: either a value or an error. -/
-inductive CResult (α : Type) where
-  | ok   : α → CResult α
-  | fail : CError → CResult α
-  deriving Repr
-
 /-! # NondetM: Nondeterministic state monad with failure -/
 
 /-- The outcome of running a nondeterministic computation on a state.
@@ -97,10 +81,6 @@ def guard (p : σ → Prop) [DecidablePred p] : NondetM σ Unit :=
 def select (S : Set α) : NondetM σ α :=
   fun s => { results := fun p => p.1 ∈ S ∧ p.2 = s, failed := False }
 
-/-- Condition: branch on a boolean predicate over state. -/
-def condition (c : σ → Bool) (t e : NondetM σ α) : NondetM σ α :=
-  fun s => if c s then t s else e s
-
 /-! ## Monad instance -/
 
 instance : Monad (NondetM σ) where
@@ -134,14 +114,6 @@ instance : Monad (NondetM σ) where
 @[simp] theorem modify_run (f : σ → σ) (s : σ) :
     (NondetM.modify f : NondetM σ Unit) s = { results := {((), f s)}, failed := False } :=
   rfl
-
-@[simp] theorem condition_run_true {c : σ → Bool} {t e : NondetM σ α} {s : σ} (h : c s = true) :
-    (NondetM.condition c t e) s = t s := by
-  simp [NondetM.condition, h]
-
-@[simp] theorem condition_run_false {c : σ → Bool} {t e : NondetM σ α} {s : σ} (h : c s = false) :
-    (NondetM.condition c t e) s = e s := by
-  simp [NondetM.condition, h]
 
 /-! ## NondetResult extensionality -/
 

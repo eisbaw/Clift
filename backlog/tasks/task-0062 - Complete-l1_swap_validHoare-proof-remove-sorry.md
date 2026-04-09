@@ -1,10 +1,10 @@
 ---
 id: TASK-0062
 title: Complete l1_swap_validHoare proof (remove sorry)
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-04-09 06:43'
-updated_date: '2026-04-09 16:23'
+updated_date: '2026-04-09 19:40'
 labels:
   - phase-3a
   - proof
@@ -32,3 +32,9 @@ Gotcha: Lean 4 {s with ...} desugars to 'have __src := s.field' in some contexts
 
 L1 Hoare rules committed (L1_hoare_skip, L1_hoare_modify, L1_hoare_guard, L1_hoare_seq, L1_hoare_catch, L1_hoare_seq_ok, L1_hoare_catch_ok, L1_hoare_guard', L1_hoare_modify', L1_hoare_pre). Sorry still present in l1_swap_validHoare. Next step: write a VCG tactic that normalizes {s with ...} desugaring before applying the rules, or redefine l1_swap_body with explicit anonymous constructors.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Duplicate of task-0063. L1 Hoare rules added (L1HoareRules.lean) but the sorry persists due to Lean 4 kernel depth limit. Tracked in task-0063 and task-0071 (MetaM VCG).
+<!-- SECTION:FINAL_SUMMARY:END -->
