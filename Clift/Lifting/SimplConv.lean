@@ -405,6 +405,59 @@ theorem L1corres_call {σ : Type} (Γ : ProcEnv σ) (l1Γ : L1.L1ProcEnv σ) (na
       have h_l1_none := h_none name h_lookup
       exact absurd (show (L1.call l1Γ name s).failed from by simp [L1.call, h_l1_none, L1.fail]) h_nf
 
+/-! ## L1corres_call_single
+
+Targeted version of L1corres_call: only requires the SPECIFIC callee to be
+present in the L1ProcEnv, not ALL procedures in Gamma. This enables corres
+proofs for calling functions even when the L1ProcEnv is not a complete mirror
+of the CSimpl ProcEnv (e.g., incremental builds or partial environments).
+
+The trade-off: if Gamma maps `name` to `none` (undefined call), this lemma
+requires the caller to ensure `Gamma name = some body`. For well-formed
+programs where every called function is defined, this always holds. -/
+
+theorem L1corres_call_single {σ : Type} (Γ : ProcEnv σ) (l1Γ : L1.L1ProcEnv σ)
+    (name : ProcName) (body : CSimpl σ) (l1_body : L1Monad σ)
+    (h_gamma : Γ name = some body)
+    (h_l1gamma : l1Γ name = some l1_body)
+    (h_corres : L1corres Γ l1_body body) :
+    L1corres Γ (L1.call l1Γ name) (.call name) := by
+  intro s h_nf
+  have h_nf' : ¬(l1_body s).failed := by
+    rwa [show L1.call l1Γ name = l1_body from by simp [L1.call, h_l1gamma]] at h_nf
+  obtain ⟨h_ok, h_err, h_fault⟩ := h_corres s h_nf'
+  refine ⟨?_, ?_, ?_⟩
+  · intro s' h_exec
+    cases h_exec with
+    | callDefined _ body' _ _ h_lookup h_body_exec =>
+      have h_eq : body' = body := by
+        have : some body' = some body := h_lookup ▸ h_gamma
+        exact Option.some.inj this
+      subst h_eq
+      show (Except.ok (), s') ∈ (L1.call l1Γ name s).results
+      simp only [L1.call, h_l1gamma]
+      exact h_ok s' h_body_exec
+  · intro s' h_exec
+    cases h_exec with
+    | callDefined _ body' _ _ h_lookup h_body_exec =>
+      have h_eq : body' = body := by
+        have : some body' = some body := h_lookup ▸ h_gamma
+        exact Option.some.inj this
+      subst h_eq
+      show (Except.error (), s') ∈ (L1.call l1Γ name s).results
+      simp only [L1.call, h_l1gamma]
+      exact h_err s' h_body_exec
+  · intro h_exec
+    cases h_exec with
+    | callDefined _ body' _ _ h_lookup h_body_exec =>
+      have h_eq : body' = body := by
+        have : some body' = some body := h_lookup ▸ h_gamma
+        exact Option.some.inj this
+      subst h_eq
+      exact h_fault h_body_exec
+    | callUndefined _ _ h_lookup =>
+      simp [h_lookup] at h_gamma
+
 /-! ## L1corres_dynCom
 
 L1corres for CSimpl.dynCom: if for all states s, L1corres holds for

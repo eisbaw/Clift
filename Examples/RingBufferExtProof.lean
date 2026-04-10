@@ -121,6 +121,12 @@ clift RingBufferExt
 -- Multi-buffer operations
 #check @RingBufferExt.l1_rb_equal_body_corres
 
+-- Call-containing functions (task 0117: now have L1corres proofs)
+#check @RingBufferExt.l1_rb_check_integrity_body_corres
+#check @RingBufferExt.l1_rb_push_if_not_full_body_corres
+#check @RingBufferExt.l1_rb_pop_if_not_empty_body_corres
+#check @RingBufferExt.l1_rb_drain_to_body_corres
+
 /-! # Step 4: Verify L2 forms exist -/
 
 #check @RingBufferExt.l2_rb_size_body
@@ -171,7 +177,7 @@ def rb_reverse_spec : FuncSpec ProgramState where
 - Generated Lean (CSimpl): 2460 lines
 - Functions imported: 40/40
 - Functions lifted to L1: 40/40
-- L1corres proofs generated: 36/40 (4 call other functions)
+- L1corres proofs generated: 40/40 (task 0117: call-containing functions now proven)
 - L2 forms generated: all non-calling functions
 - L3 classifications: simple accessors (size, capacity, etc.)
 - Build time (Generated.RingBufferExt): 2.9s

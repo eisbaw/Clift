@@ -305,9 +305,12 @@ private def convertOneFunctionDef (ns : Name) (bodyName : Name)
   return l1Name
 
 /-- Prove L1corres for a single function (after L1 definitions exist).
+    `calleeCorresNames` is an array of callee L1corres theorem names that should
+    be added as local hypotheses to help corres_auto discharge call goals.
     Returns true if the proof succeeded, false if it failed (logged as warning). -/
 private def proveOneFunctionCorres (ns : Name) (bodyName : Name)
-    (σ : Expr) (procEnvName : Name) (l1Name : Name) : CommandElabM Bool := do
+    (σ : Expr) (procEnvName : Name) (l1Name : Name)
+    (calleeCorresNames : Array Name := #[]) : CommandElabM Bool := do
   let corresName := ns ++ Name.mkSimple s!"l1_{bodyName.components.getLast!.toString}_corres"
 
   try
@@ -479,13 +482,27 @@ elab "clift_l1 " ns:ident : command => do
   let _ ← buildL1ProcEnv nsName σ l1Names
 
   -- Prove L1corres for each function (non-fatal on failure)
+  -- For calling functions, pass callee corres theorem names so corres_auto
+  -- can use assumption to discharge L1corres_call_single's h_corres obligation.
   let mut corresCount := 0
+  let mut provenCorres : Array (String × Name) := #[]  -- (funcName, corresName)
   for (funcName, bodyName, l1Name, σ_fn) in l1Entries do
     if cyclic.contains funcName then
       logWarning m!"clift_l1: skipping corres proof for {funcName} (mutual recursion)"
       continue
-    let ok ← proveOneFunctionCorres nsName bodyName σ_fn procEnvName l1Name
-    if ok then corresCount := corresCount + 1
+    -- Find callee corres theorem names for this function
+    let callees := callGraphLookup callGraph funcName
+    let mut calleeCorresNames : Array Name := #[]
+    for callee in callees do
+      -- Look up the callee's corres theorem name
+      match provenCorres.find? (fun (n, _) => n == callee) with
+      | some (_, corresN) => calleeCorresNames := calleeCorresNames.push corresN
+      | none => pure ()
+    let ok ← proveOneFunctionCorres nsName bodyName σ_fn procEnvName l1Name calleeCorresNames
+    if ok then
+      corresCount := corresCount + 1
+      let corresName := nsName ++ Name.mkSimple s!"l1_{bodyName.components.getLast!.toString}_corres"
+      provenCorres := provenCorres.push (funcName, corresName)
 
   let totalProvable := l1Entries.size - cyclic.size
   logInfo m!"clift_l1: {corresCount}/{totalProvable} L1corres proofs generated ({cyclic.size} skipped due to mutual recursion)"
