@@ -1,9 +1,11 @@
 ---
 id: TASK-0105
 title: 'MetaM VCG: flat proof term generation for multi-step L1 programs'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-04-10 12:58'
+updated_date: '2026-04-10 13:41'
 labels:
   - critical-path
   - metam
@@ -31,3 +33,28 @@ The single biggest bottleneck. Every validHoare proof for 10+ step programs requ
 - [ ] #5 Proof terms stay at bounded kernel depth regardless of program length
 - [ ] #6 Performance: <10s per function for 50-step programs
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Create Clift/Tactics/L1Vcg.lean with a MetaM tactic
+2. Walk the L1 term structure in MetaM
+3. At each L1.modify: extract lambda body, generate projection lemmas with local irreducible
+4. At each L1.guard: extract predicate, chain with L1_guard_modify_result
+5. At each L1.seq: apply L1_seq_singleton_ok
+6. At L1.catch: apply L1_catch_singleton_ok
+7. Test on swap (7 steps)
+8. Ensure proof terms stay at bounded depth
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+- Created Clift/Tactics/L1Vcg.lean with l1_vcg, l1_vcg_all, l1_vcg_simp, l1_vcg_finish tactics
+- Tactics apply L1 Hoare rules (guard, modify, seq_ok, catch_ok, skip)
+- Verified on swap step characterization (L1_guard_modify_result)
+- Key limitation: Lean higher-order unifier cannot infer intermediate conditions R
+  when postcondition involves complex structure updates
+- The SwapProof.lean results-level approach remains the working pattern
+- Full MetaM VCG for automatic R inference deferred (requires weakest precondition computation)
+<!-- SECTION:NOTES:END -->

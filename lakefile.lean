@@ -36,4 +36,5 @@ lean_lib Examples where
              `Examples.AIInvariantTest,
              `Examples.AIStructInvariantTest,
              `Examples.AISpecTest,
-             `Examples.PhaseEMilestone]
+             `Examples.PhaseEMilestone,
+             `Examples.L1VcgTest]
