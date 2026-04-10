@@ -34,6 +34,7 @@ import-all:
     just import test/c_sources/multi_call.c MultiCall
     just import test/c_sources/ring_buffer.c RingBuffer
     just import test/c_sources/sum_array.c SumArray
+    just import test/c_sources/enum_typedef_global.c EnumTypedefGlobal
 
 # Run CImporter Python unit tests
 test-importer:

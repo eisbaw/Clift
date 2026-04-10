@@ -56,10 +56,16 @@ class LeanEmitter:
         self._collect_all_vars()
 
     def _collect_all_vars(self):
-        """Merge all params and locals from all functions.
+        """Merge all params, locals, and global variables from all functions.
 
         Same-name, same-type locals share a field.
         Same-name, different-type locals get type-qualified names.
+
+        Global variables are included in the Locals record (Phase 1 limitation:
+        CState's Globals type is not parametric, so we cannot add fields to it
+        without a large refactor). This is semantically imprecise for inter-
+        procedural call save/restore, but correct for single-function programs
+        and programs where globals are explicitly managed.
         """
         # First pass: collect all (name, type) pairs
         name_types: dict[str, set[str]] = {}  # var_name -> set of desugared type names
@@ -81,6 +87,14 @@ class LeanEmitter:
                     name_to_ctype[rname] = {}
                 name_types[rname].add(func.return_type.lean_type)
                 name_to_ctype[rname][func.return_type.lean_type] = func.return_type
+
+        # Add global variables to the locals record
+        for gvar in self.tu.globals:
+            if gvar.name not in name_types:
+                name_types[gvar.name] = set()
+                name_to_ctype[gvar.name] = {}
+            name_types[gvar.name].add(gvar.c_type.lean_type)
+            name_to_ctype[gvar.name][gvar.c_type.lean_type] = gvar.c_type
 
         # Second pass: generate field names
         for var_name, types in name_types.items():
@@ -123,6 +137,10 @@ class LeanEmitter:
         """Generate the complete .lean file."""
         self._emit_header()
 
+        # Emit enum constants as named definitions
+        if self.tu.enums:
+            self._emit_enums()
+
         # Emit struct definitions before locals
         for sdef in self.tu.structs:
             self._emit_struct(sdef)
@@ -131,6 +149,11 @@ class LeanEmitter:
         self._emit_locals()
         self._emit_state_abbrev()
         self._w()
+
+        # Emit globals_init definition (initial values for global variables)
+        if self.tu.globals:
+            self._emit_globals_init()
+            self._w()
 
         for func in self.tu.functions:
             self._emit_function(func)
@@ -155,6 +178,43 @@ class LeanEmitter:
         self._w()
         self._w(f"namespace {self.module_name}")
         self._w()
+
+    def _emit_enums(self):
+        """Emit enum constants as named Lean definitions.
+
+        Each enumerator becomes: def ENUM_NAME : UInt32 := value
+        """
+        self._w("/-! # Enum constants -/")
+        self._w()
+        for enum_info in self.tu.enums:
+            if enum_info.name:
+                self._w(f"/-- enum {enum_info.name} -/")
+            for ec in enum_info.constants:
+                self._w(f"def {ec.name} : UInt32 := {ec.value}")
+            self._w()
+
+    def _emit_globals_init(self):
+        """Emit a globals_init definition with initial values for C global variables.
+
+        Since globals are in the Locals record (Phase 1 limitation), this emits
+        a Locals value with the specified initial values.
+        """
+        self._w("/-- Initial values for global variables (as Locals fields). -/")
+        self._w("def globals_init : Locals where")
+        self._indent += 1
+        for field_name in sorted(self.all_vars.keys()):
+            # Check if this field is a global variable with a specific init value
+            gvar_init = None
+            for gvar in self.tu.globals:
+                if gvar.name == field_name and gvar.init_value is not None:
+                    gvar_init = gvar.init_value
+                    break
+            if gvar_init is not None:
+                self._w(f"{field_name} := {gvar_init}")
+            else:
+                ctype = self.all_vars[field_name]
+                self._w(f"{field_name} := {ctype.lean_default}")
+        self._indent -= 1
 
     def _emit_struct(self, sdef: StructDef):
         """Emit a Lean structure and CType/MemType instances for a C struct."""
@@ -466,6 +526,15 @@ class LeanEmitter:
             self._w(")")
             self._indent -= 1
 
+        elif stmt.kind == "global_assign":
+            # Global variable assignment: in Locals record (Phase 1 limitation)
+            gname = stmt.target_var
+            expr_str = self._emit_expr(stmt.value, func)
+            guards = self._collect_all_guards(stmt.value, func)
+            def emit_global_assign():
+                self._w(f".basic (fun s => {{ s with locals := {{ s.locals with {gname} := {expr_str} }} }})")
+            self._emit_with_guards(guards, emit_global_assign)
+
         elif stmt.kind == "assign":
             # Check if the value is a function call
             if stmt.value and stmt.value.kind == "call_expr":
@@ -733,6 +802,10 @@ class LeanEmitter:
             field = self._field_name(expr.var_name, func)
             return f"s.locals.{field}"
 
+        elif expr.kind == "global_ref":
+            # Global variable: in Locals record (Phase 1 limitation)
+            return f"s.locals.{expr.var_name}"
+
         elif expr.kind == "int_literal":
             # Check if this literal 0 is used in a pointer context
             # (handled by the caller who knows the context)
@@ -814,6 +887,11 @@ class LeanEmitter:
                 if p.name == expr.var_name:
                     return p.c_type.is_pointer
             return False
+        if expr.kind == "global_ref":
+            # Check in all_vars (globals are merged into Locals)
+            if expr.var_name in self.all_vars:
+                return self.all_vars[expr.var_name].is_pointer
+            return False
         if expr.kind == "member_access":
             # Look up struct field type to determine if it's a pointer
             field_name = expr.member_name
@@ -876,6 +954,10 @@ class LeanEmitter:
         if expr.kind == "var_ref":
             field = self._field_name(expr.var_name, func)
             return f"decide (s.locals.{field} \u2260 0)"
+
+        if expr.kind == "global_ref":
+            # Global variable in Locals record (Phase 1 limitation)
+            return f"decide (s.locals.{expr.var_name} \u2260 0)"
 
         if expr.kind == "int_literal":
             return "true" if expr.int_value != 0 else "false"

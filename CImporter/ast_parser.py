@@ -95,13 +95,42 @@ class FuncInfo:
 
 
 @dataclass
+class EnumConstant:
+    """An enumerator within an enum definition."""
+    name: str
+    value: int
+
+@dataclass
+class EnumInfo:
+    """An enum definition."""
+    name: str  # May be empty for anonymous enums
+    constants: list[EnumConstant]
+
+@dataclass
+class GlobalVarInfo:
+    """A file-scope global variable."""
+    name: str
+    c_type: CType
+    init_value: Optional[int]  # Integer initializer, or None if no init
+
+@dataclass
 class TranslationUnit:
     """Parsed translation unit (one .c file)."""
     functions: list[FuncInfo]
     structs: list[StructDef]  # Struct definitions in order
+    enums: list[EnumInfo] = field(default_factory=list)
+    globals: list[GlobalVarInfo] = field(default_factory=list)
+    # Lookup tables populated during parsing
+    enum_constants: dict[str, int] = field(default_factory=dict)  # name -> value
+    global_var_names: set[str] = field(default_factory=set)  # names of globals
 
 
-# --- Parser ---
+# --- Parser context (module-level, set during parse_translation_unit) ---
+# These allow _parse_expr to distinguish globals/enums without threading
+# context through every recursive call.
+_ENUM_CONSTANTS: dict[str, int] = {}
+_GLOBAL_VAR_NAMES: set[str] = set()
+
 
 def parse_translation_unit(ast: dict) -> TranslationUnit:
     """Parse a clang JSON AST root node into a TranslationUnit.
@@ -110,23 +139,56 @@ def parse_translation_unit(ast: dict) -> TranslationUnit:
         ast: The root dict from clang's -ast-dump=json output.
 
     Returns:
-        TranslationUnit with all user-defined functions and structs.
+        TranslationUnit with all user-defined functions, structs, enums,
+        typedefs (resolved), and global variables.
     """
     assert ast.get("kind") == "TranslationUnitDecl", \
         f"Expected TranslationUnitDecl, got {ast.get('kind')}"
 
+    global _ENUM_CONSTANTS, _GLOBAL_VAR_NAMES
     clear_struct_defs()
+    _ENUM_CONSTANTS = {}
+    _GLOBAL_VAR_NAMES = set()
     structs = []
     functions = []
+    enums = []
+    globals_list = []
+    enum_constants: dict[str, int] = {}
+    global_var_names: set[str] = set()
 
     for node in ast.get("inner", []):
-        # Parse struct definitions first (must come before functions that use them)
-        if node.get("kind") == "RecordDecl" and node.get("completeDefinition"):
+        kind = node.get("kind", "")
+
+        # Parse enum definitions
+        if kind == "EnumDecl":
+            enum_info = _parse_enum(node)
+            if enum_info is not None:
+                enums.append(enum_info)
+                for ec in enum_info.constants:
+                    enum_constants[ec.name] = ec.value
+                    _ENUM_CONSTANTS[ec.name] = ec.value
+
+        # Parse typedefs: resolve to underlying type and register in type map.
+        # This is transparent — we don't emit anything for typedefs, but we
+        # make sure their names are recognized when used as types.
+        if kind == "TypedefDecl":
+            _register_typedef(node)
+
+        # Parse struct definitions (must come before functions that use them)
+        if kind == "RecordDecl" and node.get("completeDefinition"):
             sdef = _parse_struct(node)
             if sdef is not None:
                 structs.append(sdef)
 
-        if node.get("kind") == "FunctionDecl" and not node.get("isImplicit"):
+        # Parse file-scope global variables
+        if kind == "VarDecl" and not node.get("isImplicit"):
+            gvar = _parse_global_var(node, enum_constants)
+            if gvar is not None:
+                globals_list.append(gvar)
+                global_var_names.add(gvar.name)
+                _GLOBAL_VAR_NAMES.add(gvar.name)
+
+        if kind == "FunctionDecl" and not node.get("isImplicit"):
             # Skip functions without a body (forward declarations)
             has_body = any(
                 child.get("kind") == "CompoundStmt"
@@ -140,7 +202,159 @@ def parse_translation_unit(ast: dict) -> TranslationUnit:
                          ", ".join(f"{p.name}: {p.c_type.name}" for p in func.params),
                          func.return_type.name)
 
-    return TranslationUnit(functions=functions, structs=structs)
+    return TranslationUnit(
+        functions=functions, structs=structs, enums=enums,
+        globals=globals_list, enum_constants=enum_constants,
+        global_var_names=global_var_names,
+    )
+
+
+def _parse_enum(node: dict) -> Optional[EnumInfo]:
+    """Parse an EnumDecl node into an EnumInfo.
+
+    Returns None for system/implicit enums (no name and not in user source).
+    """
+    name = node.get("name", "")
+
+    constants = []
+    for child in node.get("inner", []):
+        if child.get("kind") == "EnumConstantDecl":
+            ec_name = child.get("name", "")
+            # Value is in the first ConstantExpr inner node
+            ec_value = 0
+            inner = child.get("inner", [])
+            if inner and "value" in inner[0]:
+                ec_value = int(inner[0]["value"])
+            constants.append(EnumConstant(name=ec_name, value=ec_value))
+
+    if not constants:
+        return None
+
+    log.info("Parsed enum %s: %d constants", name or "(anonymous)", len(constants))
+    for ec in constants:
+        log.info("  %s = %d", ec.name, ec.value)
+
+    return EnumInfo(name=name, constants=constants)
+
+
+def _register_typedef(node: dict):
+    """Register a TypedefDecl in the type map.
+
+    Typedefs are resolved transparently: we add the typedef name to the
+    clang type map pointing to the underlying type. This means when the
+    typedef name appears as a qualType, parse_clang_type will resolve it.
+
+    Only registers typedefs whose underlying type we already support.
+    System typedefs (stdint.h etc.) are already handled by the existing map.
+    """
+    name = node.get("name", "")
+    if not name:
+        return
+
+    type_node = node.get("type", {})
+    desugared = type_node.get("desugaredQualType", "")
+    qual = type_node.get("qualType", "")
+
+    # Skip if already in the type map (system typedefs like uint32_t)
+    from .c_types import _CLANG_TYPE_MAP
+    if name in _CLANG_TYPE_MAP:
+        return
+
+    # Try to resolve the underlying type
+    try:
+        # Prefer desugared form
+        if desugared and desugared in _CLANG_TYPE_MAP:
+            _CLANG_TYPE_MAP[name] = _CLANG_TYPE_MAP[desugared]
+            log.info("Registered typedef: %s -> %s", name, desugared)
+            return
+        if qual and qual in _CLANG_TYPE_MAP:
+            _CLANG_TYPE_MAP[name] = _CLANG_TYPE_MAP[qual]
+            log.info("Registered typedef: %s -> %s", name, qual)
+            return
+        # Try full parse of the type (handles pointers, structs)
+        underlying = parse_clang_type(type_node)
+        _CLANG_TYPE_MAP[name] = underlying
+        log.info("Registered typedef: %s -> %s", name, underlying.name)
+    except (UnsupportedTypeError, KeyError):
+        log.debug("Skipping unsupported typedef: %s (qualType=%s)", name, qual)
+
+
+def _parse_global_var(node: dict, enum_constants: dict[str, int]) -> Optional[GlobalVarInfo]:
+    """Parse a file-scope VarDecl into a GlobalVarInfo.
+
+    Returns None if:
+    - The variable is a local (has no file-level loc -- though file-scope
+      VarDecl is already filtered by the caller)
+    - The type is unsupported
+    - It's a system-provided variable
+    """
+    name = node.get("name", "")
+    if not name:
+        return None
+
+    # Skip extern declarations (no storage)
+    if node.get("storageClass") == "extern":
+        return None
+
+    try:
+        c_type = parse_clang_type(node["type"])
+    except (UnsupportedTypeError, KeyError):
+        log.debug("Skipping global with unsupported type: %s", name)
+        return None
+
+    # Extract integer initializer value
+    init_value = None
+    if node.get("init") is not None:
+        init_value = _extract_init_value(node, enum_constants)
+
+    log.info("Parsed global variable: %s : %s = %s", name, c_type.name,
+             init_value if init_value is not None else "default")
+    return GlobalVarInfo(name=name, c_type=c_type, init_value=init_value)
+
+
+def _extract_init_value(node: dict, enum_constants: dict[str, int]) -> Optional[int]:
+    """Extract a constant integer initializer from a VarDecl node.
+
+    Handles:
+    - Integer literals (direct value)
+    - Enum constant references (looked up in enum_constants)
+    - ConstantExpr wrappers
+
+    Returns None if the initializer is not a simple integer constant.
+    """
+    inner = node.get("inner", [])
+    for child in inner:
+        val = _extract_const_int(child, enum_constants)
+        if val is not None:
+            return val
+    return None
+
+
+def _extract_const_int(node: dict, enum_constants: dict[str, int]) -> Optional[int]:
+    """Recursively extract a constant integer from an AST expression node."""
+    kind = node.get("kind", "")
+
+    if kind == "IntegerLiteral":
+        return int(node.get("value", "0"))
+
+    if kind == "ConstantExpr" and "value" in node:
+        return int(node["value"])
+
+    if kind == "DeclRefExpr":
+        ref = node.get("referencedDecl", {})
+        if ref.get("kind") == "EnumConstantDecl":
+            name = ref.get("name", "")
+            if name in enum_constants:
+                return enum_constants[name]
+
+    # Look through implicit casts and constant expressions
+    if kind in ("ImplicitCastExpr", "ConstantExpr", "ParenExpr"):
+        for child in node.get("inner", []):
+            val = _extract_const_int(child, enum_constants)
+            if val is not None:
+                return val
+
+    return None
 
 
 def _parse_struct(node: dict) -> Optional[StructDef]:
@@ -313,6 +527,9 @@ def _parse_stmt(node: dict) -> Stmt:
                 f"Assignment to non-variable expression not supported: {lhs.get('kind')}"
             )
         value = _parse_expr(rhs)
+        # Distinguish global variable assignments from local assignments
+        if target in _GLOBAL_VAR_NAMES:
+            return Stmt(kind="global_assign", target_var=target, value=value)
         return Stmt(kind="assign", target_var=target, value=value)
 
     elif kind == "GotoStmt":
@@ -452,8 +669,19 @@ def _parse_expr(node: dict) -> Expr:
 
     if kind == "DeclRefExpr":
         ref = node.get("referencedDecl", {})
+        ref_name = ref.get("name", "")
+        ref_kind = ref.get("kind", "")
         result_type = _try_extract_result_type(node)
-        return Expr(kind="var_ref", var_name=ref.get("name", ""), result_type=result_type)
+
+        # Enum constant reference -> integer literal
+        if ref_kind == "EnumConstantDecl" and ref_name in _ENUM_CONSTANTS:
+            return Expr(kind="int_literal", int_value=_ENUM_CONSTANTS[ref_name])
+
+        # Global variable reference -> global_ref (accessed via s.globals.field)
+        if ref_name in _GLOBAL_VAR_NAMES:
+            return Expr(kind="global_ref", var_name=ref_name, result_type=result_type)
+
+        return Expr(kind="var_ref", var_name=ref_name, result_type=result_type)
 
     if kind == "IntegerLiteral":
         return Expr(kind="int_literal", int_value=int(node.get("value", "0")))

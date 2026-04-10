@@ -16,7 +16,8 @@ lean_lib Clift where
 lean_lib Generated where
   roots := #[`Generated.Max, `Generated.Gcd, `Generated.Swap, `Generated.ListLength, `Generated.Rotate3,
              `Generated.DivTest, `Generated.SignedArith, `Generated.ForLoop, `Generated.DoWhile, `Generated.SwitchTest,
-             `Generated.MultiCall, `Generated.RingBuffer, `Generated.SumArray]
+             `Generated.MultiCall, `Generated.RingBuffer, `Generated.SumArray,
+             `Generated.EnumTypedefGlobal]
 
 -- User proof examples
 @[default_target]
