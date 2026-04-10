@@ -123,6 +123,129 @@ partial def csimplToL1 (σ : Expr) (csimpl : Expr)
   | other =>
     throwError "csimplToL1: unexpected CSimpl head: {other}\nFull term: {csimpl}"
 
+/-! # Call graph extraction
+
+Extract procedure call names from CSimpl terms to build a dependency graph.
+This enables topological sorting so callees are converted before callers. -/
+
+/-- Extract all CSimpl.call names from a CSimpl expression (after whnf).
+    Returns the set of procedure names (as string literals) called by this body. -/
+partial def extractCallNames (csimpl : Expr) : MetaM (Array String) := do
+  let csimpl ← whnfD csimpl
+  match csimpl.getAppFn with
+  | .const ``CSimpl.skip _ => return #[]
+  | .const ``CSimpl.basic _ => return #[]
+  | .const ``CSimpl.throw _ => return #[]
+  | .const ``CSimpl.seq _ =>
+    let c1 := csimpl.getAppArgs[1]!
+    let c2 := csimpl.getAppArgs[2]!
+    let n1 ← extractCallNames c1
+    let n2 ← extractCallNames c2
+    return n1 ++ n2
+  | .const ``CSimpl.cond _ =>
+    let c1 := csimpl.getAppArgs[2]!
+    let c2 := csimpl.getAppArgs[3]!
+    let n1 ← extractCallNames c1
+    let n2 ← extractCallNames c2
+    return n1 ++ n2
+  | .const ``CSimpl.while _ =>
+    let c := csimpl.getAppArgs[2]!
+    extractCallNames c
+  | .const ``CSimpl.guard _ =>
+    let c := csimpl.getAppArgs[2]!
+    extractCallNames c
+  | .const ``CSimpl.catch _ =>
+    let c1 := csimpl.getAppArgs[1]!
+    let c2 := csimpl.getAppArgs[2]!
+    let n1 ← extractCallNames c1
+    let n2 ← extractCallNames c2
+    return n1 ++ n2
+  | .const ``CSimpl.spec _ => return #[]
+  | .const ``CSimpl.call _ =>
+    let nameExpr := csimpl.getAppArgs[1]!
+    -- The name is a string literal: Expr.lit (Literal.strVal s)
+    match nameExpr with
+    | .lit (.strVal s) => return #[s]
+    | _ =>
+      -- Try to reduce to a string literal
+      let nameExpr ← whnfD nameExpr
+      match nameExpr with
+      | .lit (.strVal s) => return #[s]
+      | _ => return #[]
+  | .const ``CSimpl.dynCom _ =>
+    let f := csimpl.getAppArgs[1]!
+    -- Go under the lambda to extract calls from the body
+    lambdaTelescope f fun _ body => extractCallNames body
+  | _ => return #[]
+
+/-- Look up callees for a function in the call graph (Array-based, small N). -/
+private def callGraphLookup (callGraph : Array (String × Array String))
+    (fn : String) : Array String :=
+  match callGraph.find? (fun (name, _) => name == fn) with
+  | some (_, callees) => callees
+  | none => #[]
+
+/-- Topological sort of function names given a call graph.
+    Returns functions in dependency order (callees first).
+    If cycles are detected, returns the acyclic portion and the cycle members separately.
+
+    Only considers callees that are in the function set (ignores external calls). -/
+private def topologicalSort (funcNames : Array String)
+    (callGraph : Array (String × Array String)) : Array String × Array String := Id.run do
+  -- Kahn's algorithm with Array-based lookups (function counts are small)
+  -- Dep-count: how many known functions this function CALLS (depends on).
+  -- Functions with dep-count 0 are leaves (call no known functions) and go first.
+  let mut depCount : Array (String × Nat) := funcNames.map fun fn => (fn, 0)
+  let getDeg (arr : Array (String × Nat)) (name : String) : Nat :=
+    match arr.find? (fun (n, _) => n == name) with
+    | some (_, d) => d
+    | none => 0
+  for fn in funcNames do
+    let callees := callGraphLookup callGraph fn
+    let internalCallees := callees.filter fun c => funcNames.contains c
+    depCount := depCount.map fun (n, d) =>
+      if n == fn then (n, internalCallees.size) else (n, d)
+  -- Start with functions that call no known functions (dep-count 0 = leaves)
+  let mut queue : Array String := #[]
+  for fn in funcNames do
+    if getDeg depCount fn == 0 then
+      queue := queue.push fn
+  -- Build reverse call graph: for each function, who calls it
+  let mut callers : Array (String × Array String) := funcNames.map fun fn => (fn, #[])
+  for fn in funcNames do
+    let callees := callGraphLookup callGraph fn
+    for callee in callees do
+      if funcNames.contains callee then
+        callers := callers.map fun (n, cs) =>
+          if n == callee then (n, cs.push fn) else (n, cs)
+  let getCallers (fn : String) : Array String :=
+    match callers.find? (fun (n, _) => n == fn) with
+    | some (_, cs) => cs
+    | none => #[]
+  let mut sorted : Array String := #[]
+  let mut idx := 0
+  while idx < queue.size do
+    let fn := queue[idx]!
+    idx := idx + 1
+    sorted := sorted.push fn
+    -- When fn is processed, reduce dep-count for its callers
+    -- (callers that called fn now have one fewer unresolved dependency)
+    let fnCallers := getCallers fn
+    for caller in fnCallers do
+      let deg := getDeg depCount caller
+      if deg != 0 then
+        let newDeg := deg - 1
+        depCount := depCount.map fun (n, d) =>
+          if n == caller then (n, newDeg) else (n, d)
+        if newDeg == 0 then
+          queue := queue.push caller
+  -- Functions not in sorted are part of cycles
+  let mut cyclic : Array String := #[]
+  for fn in funcNames do
+    unless sorted.contains fn do
+      cyclic := cyclic.push fn
+  (sorted, cyclic)
+
 /-! # Command: clift_l1
 
 Usage:
@@ -134,7 +257,10 @@ Usage:
 Generates for each <func>_body:
   - noncomputable def l1_<func>_body : L1Monad ProgramState
   - theorem l1_<func>_body_corres : L1corres <Module>.procEnv l1_<func>_body <Module>.<func>_body
--/
+
+Functions are processed in dependency order (callees before callers).
+Mutual recursion (cycles in the call graph) produces a warning and
+affected functions get L1 definitions but no corres proof. -/
 
 /-- Find all `*_body` definitions in a namespace that have type `CSimpl σ` for some σ. -/
 private def findCSimplBodies (ns : Name) : MetaM (Array (Name × Expr)) := do
@@ -249,10 +375,20 @@ private def buildL1ProcEnv (ns : Name) (σ : Expr)
 
 /-- `clift_l1 <Module>` command: auto-convert all CSimpl bodies in <Module> to L1 form.
 
-    Two-pass approach:
-    1. Convert all function bodies (without call resolution) and add definitions
-    2. Build L1ProcEnv from the converted definitions
-    3. Prove L1corres for each function -/
+    Dependency-ordered approach:
+    1. Extract call graph, topologically sort functions
+    2. Process in dependency order: convert, register, build incremental L1ProcEnv
+    3. Each function is converted with the L1ProcEnv containing all previously-converted functions
+    4. Prove L1corres for each function
+    5. Cyclic dependencies: L1.fail for unresolved calls, no corres proof
+
+    Limitation: L1corres_call requires the L1ProcEnv to cover ALL entries in the
+    CSimpl ProcEnv. Since we use incremental L1ProcEnvs, the corres_auto tactic
+    for call-containing functions may fail. This is accepted — corres proofs for
+    call-containing functions are non-fatal and logged as warnings.
+
+    The key improvement: L1 definitions for call-containing functions now have
+    L1.call instead of L1.fail, making them correct monadic embeddings. -/
 elab "clift_l1 " ns:ident : command => do
   let nsName := ns.getId
   let bodies ← liftTermElabM <| findCSimplBodies nsName
@@ -266,27 +402,93 @@ elab "clift_l1 " ns:ident : command => do
 
   logInfo m!"clift_l1: found {bodies.size} CSimpl bodies in {nsName}"
 
-  -- Pass 1: Convert all bodies to L1 definitions (no call resolution yet)
-  let mut l1Entries : Array (String × Name × Name × Expr) := #[]  -- (funcName, bodyName, l1Name, σ)
+  -- Build function name -> (bodyName, σ) mapping
+  let mut funcEntries : Array (String × Name × Expr) := #[]  -- (funcName, bodyName, σ)
+  let mut funcNames : Array String := #[]
   for (bodyName, σ) in bodies do
-    let l1Name ← convertOneFunctionDef nsName bodyName σ none
-    -- Extract function name from body name (e.g., "gcd_body" -> "gcd")
     let baseStr := bodyName.components.getLast!.toString
     let funcName := (baseStr.dropEnd 5).toString  -- remove "_body" suffix
-    l1Entries := l1Entries.push (funcName, bodyName, l1Name, σ)
+    funcEntries := funcEntries.push (funcName, bodyName, σ)
+    funcNames := funcNames.push funcName
 
-  -- Build L1ProcEnv
-  let envEntries := l1Entries.map fun (fn, _, l1n, _) => (fn, l1n)
-  if let some (_, _, _, σ) := l1Entries[0]? then
-    let _ ← buildL1ProcEnv nsName σ envEntries
+  -- Extract call graph
+  let mut callGraph : Array (String × Array String) := #[]
+  for (bodyName, _) in bodies do
+    let baseStr := bodyName.components.getLast!.toString
+    let funcName := (baseStr.dropEnd 5).toString
+    let callees ← liftTermElabM do
+      let bodyExpr := Lean.mkConst bodyName
+      let bodyVal ← unfoldDefinition bodyExpr
+      extractCallNames bodyVal
+    -- Deduplicate
+    let uniqueCallees := callees.foldl (init := #[])
+      fun acc c => if acc.contains c then acc else acc.push c
+    callGraph := callGraph.push (funcName, uniqueCallees)
 
-  -- Pass 2: Prove L1corres for each function (non-fatal on failure)
+  -- Topological sort
+  let (sorted, cyclic) := topologicalSort funcNames callGraph
+
+  if !cyclic.isEmpty then
+    logWarning m!"clift_l1: mutual recursion detected for: {cyclic}. These functions will get L1 definitions but no corres proof."
+
+  logInfo m!"clift_l1: processing order: {sorted}"
+
+  -- Helper function: look up (bodyName, σ) by funcName
+  let lookupFunc (fn : String) : Option (Name × Expr) :=
+    match funcEntries.find? (fun (name, _, _) => name == fn) with
+    | some (_, bodyName, σ) => some (bodyName, σ)
+    | none => none
+
+  -- Helper: get σ from first function
+  let some (_, σ) := lookupFunc (funcNames[0]!)
+    | throwError "clift_l1: internal error — no functions found"
+
+  -- Process functions in dependency order, building L1ProcEnv incrementally
+  let mut l1Names : Array (String × Name) := #[]  -- (funcName, l1Name)
+  let mut l1Entries : Array (String × Name × Name × Expr) := #[]
+
+  for funcName in sorted do
+    let some (bodyName, σ_fn) := lookupFunc funcName
+      | continue
+
+    -- Build current L1ProcEnv expression from already-converted functions
+    let l1ProcEnv? ← if l1Names.isEmpty then
+      pure none
+    else
+      some <$> liftTermElabM do
+        let mut envExpr := mkApp (.const ``L1.L1ProcEnv.empty []) σ_fn
+        for (fn, l1n) in l1Names do
+          let nameStr := mkStrLit fn
+          let l1Ref := Lean.mkConst l1n
+          envExpr := mkApp4 (.const ``L1.L1ProcEnv.insert []) σ_fn envExpr nameStr l1Ref
+        return envExpr
+
+    let l1Name ← convertOneFunctionDef nsName bodyName σ_fn l1ProcEnv?
+    l1Names := l1Names.push (funcName, l1Name)
+    l1Entries := l1Entries.push (funcName, bodyName, l1Name, σ_fn)
+
+  -- Process cyclic functions (without call resolution — they get L1.fail for calls)
+  for funcName in cyclic do
+    let some (bodyName, σ_fn) := lookupFunc funcName
+      | continue
+    let l1Name ← convertOneFunctionDef nsName bodyName σ_fn none
+    l1Names := l1Names.push (funcName, l1Name)
+    l1Entries := l1Entries.push (funcName, bodyName, l1Name, σ_fn)
+
+  -- Build final L1ProcEnv constant
+  let _ ← buildL1ProcEnv nsName σ l1Names
+
+  -- Prove L1corres for each function (non-fatal on failure)
   let mut corresCount := 0
-  for (_, bodyName, l1Name, σ) in l1Entries do
-    let ok ← proveOneFunctionCorres nsName bodyName σ procEnvName l1Name
+  for (funcName, bodyName, l1Name, σ_fn) in l1Entries do
+    if cyclic.contains funcName then
+      logWarning m!"clift_l1: skipping corres proof for {funcName} (mutual recursion)"
+      continue
+    let ok ← proveOneFunctionCorres nsName bodyName σ_fn procEnvName l1Name
     if ok then corresCount := corresCount + 1
 
-  logInfo m!"clift_l1: {corresCount}/{l1Entries.size} L1corres proofs generated"
+  let totalProvable := l1Entries.size - cyclic.size
+  logInfo m!"clift_l1: {corresCount}/{totalProvable} L1corres proofs generated ({cyclic.size} skipped due to mutual recursion)"
 
 /-- `clift_l1_fn <body_name> <procEnv_name>` command: convert a single CSimpl function. -/
 elab "clift_l1_fn" body:ident procEnv:ident : command => do

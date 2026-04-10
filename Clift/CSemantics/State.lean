@@ -49,6 +49,12 @@ instance {α : Type} : Inhabited (Ptr α) := ⟨⟨⟨0, by unfold memSize; omeg
 /-- Null pointer constant. Address 0 is never valid. -/
 def Ptr.null {α : Type} : Ptr α := ⟨⟨0, by unfold memSize; omega⟩⟩
 
+/-- Pointer arithmetic: offset a pointer by n bytes.
+    The result wraps modulo memSize, matching C pointer arithmetic semantics.
+    This is used for array subscript: arr[i] = *(arr + i * sizeof(elem)). -/
+def Ptr.addBytes {α : Type} (p : Ptr α) (byteOffset : Nat) : Ptr α :=
+  ⟨⟨(p.addr.val + byteOffset) % memSize, Nat.mod_lt _ (by unfold memSize; omega)⟩⟩
+
 /-! # CType typeclass -/
 
 /-- Typeclass for C types that can be stored in the heap. -/
@@ -61,6 +67,11 @@ class CType (α : Type) where
   typeTag : TypeTag
   /-- Size is positive -/
   size_pos : 0 < size
+
+/-- Pointer element offset: arr + i, where each element has size CType.size α.
+    Equivalent to C's pointer arithmetic: &arr[i]. -/
+def Ptr.elemOffset {α : Type} [CType α] (p : Ptr α) (i : Nat) : Ptr α :=
+  p.addBytes (i * CType.size α)
 
 /-! # MemType typeclass: typed heap access
 

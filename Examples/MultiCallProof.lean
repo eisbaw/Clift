@@ -136,8 +136,12 @@ example : MultiCall.l2_clamp_body = MultiCall.l2_clamp_body := rfl
 Phase B milestone metrics:
 - 5 functions in multi_call.c processed by CImporter (all with correct call emission)
 - 5/5 functions lifted to L1 automatically by clift
+- Call graph extracted and functions processed in dependency order: [add, max_val, double_val, sum3, clamp]
 - 2/5 L1corres proofs auto-generated (add, max_val -- the non-calling functions)
-- 3/5 L1corres proofs skipped (double_val, clamp, sum3 -- contain calls, need manual proof)
+- 3/5 L1corres proofs pending (double_val, clamp, sum3 -- L1.call present but
+  L1corres_call h_env/h_none obligations not yet automatically discharged)
+- L1 definitions for call-containing functions now use L1.call with inline L1ProcEnv
+  (previously used L1.fail, making them semantically incorrect)
 - 5/5 L2 wrappers generated with forward correspondence proofs
 - 5/5 L3 classifications done (add=pure, max_val=pure, others=nondet)
 - 2 no-fail proofs verified (add, max_val)

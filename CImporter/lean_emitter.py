@@ -527,6 +527,18 @@ class LeanEmitter:
                     "not yet supported. Use pointer access (p->field = val)."
                 )
 
+        elif stmt.kind == "array_write":
+            # arr[i] = val => guards + .basic (heapUpdate at Ptr.elemOffset)
+            base_str = self._emit_expr(stmt.member_base_expr, func)
+            index_str = self._emit_expr(stmt.target_expr, func)
+            val_str = self._emit_expr(stmt.value, func)
+            ptr_expr = f"Ptr.elemOffset {base_str} {index_str}.toNat"
+            guards = [f"heapPtrValid s.globals.rawHeap ({ptr_expr})"]
+            guards.extend(self._collect_all_guards(stmt.value, func))
+            def emit_array_write():
+                self._w(f".basic (fun s => {{ s with globals := {{ s.globals with rawHeap := heapUpdate s.globals.rawHeap ({ptr_expr}) {val_str} }} }})")
+            self._emit_with_guards(guards, emit_array_write)
+
         elif stmt.kind == "break":
             self._w(".throw")
 
@@ -775,6 +787,13 @@ class LeanEmitter:
                 # s.field => s.field (direct struct value access)
                 return f"{base_str}.{field_name}"
 
+        elif expr.kind == "array_subscript":
+            # arr[i] => hVal heap (Ptr.elemOffset base i)
+            # lhs is the base (pointer), rhs is the index
+            base_str = self._emit_expr(expr.lhs, func)
+            index_str = self._emit_expr(expr.rhs, func)
+            return f"(hVal s.globals.rawHeap (Ptr.elemOffset {base_str} {index_str}.toNat))"
+
         elif expr.kind == "ternary":
             cond = self._emit_bool_expr(expr.lhs, func)
             true_val = self._emit_expr(expr.rhs, func)
@@ -876,6 +895,13 @@ class LeanEmitter:
         if expr.kind == "deref":
             ptr_str = self._emit_expr(expr.operand, func)
             guards.append(f"heapPtrValid s.globals.rawHeap {ptr_str}")
+        if expr.kind == "array_subscript":
+            # arr[i] implies reading *(arr + i * sizeof(elem))
+            base_str = self._emit_expr(expr.lhs, func)
+            index_str = self._emit_expr(expr.rhs, func)
+            guards.append(
+                f"heapPtrValid s.globals.rawHeap (Ptr.elemOffset {base_str} {index_str}.toNat)"
+            )
         if expr.kind == "member_access" and expr.member_is_arrow:
             # p->field implies dereferencing p
             ptr_str = self._emit_expr(expr.member_base, func)

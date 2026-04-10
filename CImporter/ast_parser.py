@@ -280,6 +280,20 @@ def _parse_stmt(node: dict) -> Stmt:
             value = _parse_expr(rhs)
             return Stmt(kind="deref_write", target_expr=deref_target, value=value)
 
+        # Check if LHS is an array subscript (arr[i] = value)
+        array_sub = _extract_array_subscript_lvalue(lhs)
+        if array_sub is not None:
+            base_expr, index_expr = array_sub
+            value = _parse_expr(rhs)
+            # Emit as deref_write with the computed pointer
+            # arr[i] = val => *(arr + i*sizeof(elem)) = val
+            return Stmt(
+                kind="array_write",
+                member_base_expr=base_expr,  # reuse field: base pointer
+                target_expr=index_expr,       # reuse field: index expression
+                value=value,
+            )
+
         # Check if LHS is a member access (s.field = val or p->field = val)
         member_info = _extract_member_lvalue(lhs)
         if member_info is not None:
@@ -531,6 +545,17 @@ def _parse_expr(node: dict) -> Expr:
         false_expr = _parse_expr(inner[2])
         return Expr(kind="ternary", lhs=cond, rhs=true_expr, third=false_expr)
 
+    if kind == "ArraySubscriptExpr":
+        # Array element access: base[index]
+        # First child is the base (pointer/array), second is the index
+        inner = node.get("inner", [])
+        if len(inner) < 2:
+            raise StrictCViolation("ArraySubscriptExpr with fewer than 2 children")
+        base = _parse_expr(inner[0])
+        index = _parse_expr(inner[1])
+        result_type = _try_extract_result_type(node)
+        return Expr(kind="array_subscript", lhs=base, rhs=index, result_type=result_type)
+
     if kind == "CallExpr":
         # Parse function call: first inner is function reference, rest are args
         inner = node.get("inner", [])
@@ -631,6 +656,25 @@ def _build_switch_if_chain(cases: list[tuple[Expr, Stmt]], default_body: Optiona
     for cond, body in reversed(cases):
         result = Stmt(kind="if", condition=cond, then_body=body, else_body=result)
     return result
+
+
+def _extract_array_subscript_lvalue(node: dict) -> Optional[tuple[Expr, Expr]]:
+    """Check if an lvalue is an array subscript (arr[i]).
+
+    Returns (base_expr, index_expr) or None.
+    """
+    kind = node.get("kind", "")
+    if kind == "ArraySubscriptExpr":
+        inner = node.get("inner", [])
+        if len(inner) >= 2:
+            base = _parse_expr(inner[0])
+            index = _parse_expr(inner[1])
+            return (base, index)
+    if kind == "ImplicitCastExpr":
+        inner = node.get("inner", [])
+        if inner:
+            return _extract_array_subscript_lvalue(inner[0])
+    return None
 
 
 def _extract_member_lvalue(node: dict) -> Optional[tuple[Expr, str, bool]]:
