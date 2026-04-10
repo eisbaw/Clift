@@ -1,11 +1,11 @@
 ---
 id: TASK-0076
 title: 'Lean 4 { s with ... } kernel depth issue: upstream report or workaround'
-status: In Progress
+status: Done
 assignee:
   - '@mped'
 created_date: '2026-04-09 19:34'
-updated_date: '2026-04-09 22:11'
+updated_date: '2026-04-10 04:43'
 labels:
   - phase-5
   - lean4-bug
@@ -41,3 +41,15 @@ Confirmed the kernel depth issue with concrete evidence:
 
 Issue documented: Lean 4 kernel deep recursion on nested structure projections through composed functions. Affects any proof composing 7+ state transformations with CState/Globals. Minimal reproducer needed. Workaround exists: SwapHeapLift.lean proofs bypass the issue.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Lean 4 kernel depth issue: documented and workaround found.
+
+Root cause: The kernel has a hardcoded recursion depth limit. When checking rfl proofs like (swap_f1 s).globals = s.globals, the kernel type-checks the entire anonymous constructor including hVal s.globals.rawHeap s.locals.a, which unfolds through MemType.fromMem -> UInt32.fromBytes' -> assembleByte -> UInt8/BitVec arithmetic, exceeding the depth limit.
+
+Workaround: Mark hVal and heapUpdate as [local irreducible] before proofs that involve structure projection through composed state functions. Use simp with explicit projection lemmas to rewrite state fields before heapPtrValid/hVal see composed functions.
+
+No upstream issue filed — the workaround is clean and general.
+<!-- SECTION:FINAL_SUMMARY:END -->

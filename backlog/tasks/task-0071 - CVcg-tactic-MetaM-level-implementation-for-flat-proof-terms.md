@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-09 19:34'
-updated_date: '2026-04-09 22:55'
+updated_date: '2026-04-10 04:43'
 labels:
   - phase-5
   - tactics
@@ -31,21 +31,18 @@ The current CVcg tactic (macro-based) hits Lean 4 kernel deep recursion for prog
 - [ ] #4 No sorry
 <!-- AC:END -->
 
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+The SwapProof.lean sorry was eliminated without MetaM VCG. The two-level projection lemma strategy (show+rfl with [local irreducible] for first-level, rw for second-level) avoids kernel deep recursion. The MetaM VCG is still useful for automating proofs of larger programs but is no longer a blocker for the swap proof.
+<!-- SECTION:NOTES:END -->
+
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Deferred to Phase 5+. Documented the specification and design:
+The sorry was fixed WITHOUT MetaM VCG. The irreducible+simp approach is sufficient.
 
-The MetaM VCG needs to:
-1. Walk the L1 monadic body structure (seq, catch, while, guard, modify)
-2. For each combinator, apply the corresponding Hoare rule to decompose the VCG goal
-3. Build FLAT proof terms (not nested) to avoid Lean 4 kernel depth limits
-4. For while loops: generate invariant obligations and termination conditions
-5. For guards: generate side conditions as separate goals
+The key insight: the kernel depth issue was caused by hVal/heapUpdate unfolding through byte-level arithmetic (UInt32 fromBytes/toBytes -> BitVec -> Nat div/mod). Marking these as [local irreducible] prevents the kernel from unfolding them, while simp lemmas handle the rewriting at the proof level.
 
-Why the macro approach fails: The current CVcg tactic (macro-based) creates nested proof terms proportional to program depth. For 7+ sequential steps, the kernel hits deep recursion (stack overflow) when type-checking the nested CState structure projections through heapUpdate chains. AutoCorres2 solves this in Isabelle/ML by constructing flat proof terms programmatically.
-
-Blocked on engineering effort (estimated 2-4 weeks), not design. The L2corres combinator lemmas provide the building blocks. The MetaM VCG would automate their composition.
-
-The remaining sorry in SwapProof.lean (l1_swap_body_results) requires this MetaM VCG. The SwapHeapLift.lean proof demonstrates the same property at a higher abstraction level (sorry-free).
+A MetaM VCG would still be valuable for automation (avoiding manual step-by-step proofs), but it is not needed for soundness. Deferred to future work.
 <!-- SECTION:FINAL_SUMMARY:END -->
