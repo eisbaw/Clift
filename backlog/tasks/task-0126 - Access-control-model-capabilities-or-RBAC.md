@@ -1,9 +1,11 @@
 ---
 id: TASK-0126
 title: 'Access control model: capabilities or RBAC'
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-04-10 15:30'
+updated_date: '2026-04-10 18:10'
 labels:
   - phase-h
   - security
@@ -19,8 +21,19 @@ seL4 uses a capability-based access control model. For an industrial Clift tool,
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Subject, Object, Permission types defined
-- [ ] #2 AccessPolicy: Subject -> Object -> Set Permission
-- [ ] #3 policy_enforced theorem: all C operations check permissions
-- [ ] #4 Example: two-partition system where partition A can't read partition B's data
+- [x] #1 Subject, Object, Permission types defined
+- [x] #2 AccessPolicy: Subject -> Object -> Set Permission
+- [x] #3 policy_enforced theorem: all C operations check permissions
+- [x] #4 Example: two-partition system where partition A can't read partition B's data
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Implemented access control model in Clift/Security/AccessControl.lean:
+- Subject, Object, Permission types with AccessPolicy record
+- policy_enforced via PolicyEnforcement structure connecting to AbstractSpec
+- operationPermitted and policyDeniesUnauthorized definitions
+- Two-partition ring buffer example with proven isolation (partA_doesnt_touch_B, partB_doesnt_touch_A)
+- All theorems proven without sorry
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -1,9 +1,11 @@
 ---
 id: TASK-0128
 title: 'Binary verification: compiled code matches C semantics'
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-04-10 15:30'
+updated_date: '2026-04-10 18:10'
 labels:
   - phase-i
   - binary
@@ -22,8 +24,26 @@ seL4 verified the compiled ARM binary matches the C semantics (translation valid
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Approach selected and documented as ADR
+- [x] #1 Approach selected and documented as ADR
 - [ ] #2 Prototype: compile one C function, decompile binary, prove matches CSimpl
-- [ ] #3 Or: CompCert integration path documented
-- [ ] #4 Trust model documented: what's in the TCB after binary verification?
+- [x] #3 Or: CompCert integration path documented
+- [x] #4 Trust model documented: what's in the TCB after binary verification?
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+AC#2 (prototype): ADR documents why a prototype is not practical without an ISA model. The assessment section covers what would be needed for a single-function prototype. This is an honest 'not feasible yet' rather than a half-baked attempt.
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+ADR-008 documenting binary verification approaches:
+- Translation validation: feasible but requires ISA model (2-5 person-years per arch)
+- CompCert (recommended): verified compiler, minimal effort, cross-prover trust acceptable
+- Lean-as-compiler: not feasible with current infrastructure
+- Prototype assessment: even trivial function needs ISA model, calling convention model, instruction semantics
+- Trust model documented for each approach
+- Decision: CompCert primary, translation validation for highest assurance
+<!-- SECTION:FINAL_SUMMARY:END -->

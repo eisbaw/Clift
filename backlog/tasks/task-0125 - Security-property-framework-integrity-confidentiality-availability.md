@@ -1,9 +1,11 @@
 ---
 id: TASK-0125
 title: 'Security property framework: integrity, confidentiality, availability'
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-04-10 15:30'
+updated_date: '2026-04-10 18:09'
 labels:
   - phase-h
   - security
@@ -22,9 +24,20 @@ seL4's ultimate deliverable is security proofs layered on functional correctness
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Integrity property defined: state only changes via authorized operations
-- [ ] #2 Confidentiality property defined: noninterference or information flow
-- [ ] #3 Availability property defined: resource bounds preserved
-- [ ] #4 Security property transfer theorem: if abstract spec satisfies property AND C refines spec, then C satisfies property
-- [ ] #5 Example: ring buffer integrity (only push/pop modify queue, not size/peek)
+- [x] #1 Integrity property defined: state only changes via authorized operations
+- [x] #2 Confidentiality property defined: noninterference or information flow
+- [x] #3 Availability property defined: resource bounds preserved
+- [x] #4 Security property transfer theorem: if abstract spec satisfies property AND C refines spec, then C satisfies property
+- [x] #5 Example: ring buffer integrity (only push/pop modify queue, not size/peek)
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Implemented security property framework in Clift/Security/Properties.lean:
+- Integrity: state only changes via authorized operations
+- Confidentiality: LOW-equivalent inputs produce LOW-equivalent outputs (unwinding condition)
+- Availability: resource bounds preserved per domain
+- Transfer theorems: integrity_transfer, availability_transfer, security_transfer -- propagate security from abstract spec to C via refinement
+- Ring buffer example: owner/reader domains, push/pop authorized for owner only, integrity proven
+<!-- SECTION:FINAL_SUMMARY:END -->
