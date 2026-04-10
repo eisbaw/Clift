@@ -90,6 +90,62 @@ prove FILE:
 prove-dry FILE:
     python3 clift-prove-by-claudecode {{FILE}} --project-dir . --dry-run -v
 
+# CI: full verification pipeline (same checks as GitHub Actions)
+ci:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "=== CI: Sorry check ==="
+    SORRY_COUNT=$(grep -rn "sorry" Clift/ Examples/ Generated/ --include="*.lean" \
+      | grep -v "^.*:.*--" \
+      | grep -v "sorry-free" \
+      | grep -v "no sorry" \
+      | grep -v "zero sorry" \
+      | grep -v "Sorry" \
+      | grep -v "#print axioms" \
+      | grep -c "sorry" || true)
+    echo "Sorry count: $SORRY_COUNT"
+    if [ "$SORRY_COUNT" -gt 0 ]; then
+      echo "FAIL: Found $SORRY_COUNT sorry in code"
+      exit 1
+    fi
+    echo ""
+    echo "=== CI: CImporter unit tests ==="
+    python3 -m pytest CImporter/tests/ -v
+    echo ""
+    echo "=== CI: Snapshot tests ==="
+    just test-snapshots
+    echo ""
+    echo "=== CI: Struct layout tests ==="
+    just test-struct-layout
+    echo ""
+    echo "=== CI: Lake build (all targets) ==="
+    lake build
+    echo ""
+    echo "=== CI: All checks passed ==="
+
+# Sorry count: quick check for sorry in library code
+sorry-count:
+    #!/usr/bin/env bash
+    COUNT=$(grep -rn "sorry" Clift/ Examples/ Generated/ --include="*.lean" \
+      | grep -v "^.*:.*--" \
+      | grep -v "sorry-free" \
+      | grep -v "no sorry" \
+      | grep -v "zero sorry" \
+      | grep -v "Sorry" \
+      | grep -v "#print axioms" \
+      | grep -c "sorry" || true)
+    echo "Sorry count: $COUNT"
+    if [ "$COUNT" -gt 0 ]; then
+      grep -rn "sorry" Clift/ Examples/ Generated/ --include="*.lean" \
+        | grep -v "^.*:.*--" \
+        | grep -v "sorry-free" \
+        | grep -v "no sorry" \
+        | grep -v "zero sorry" \
+        | grep -v "Sorry" \
+        | grep -v "#print axioms" \
+        | grep "sorry"
+    fi
+
 # Clean Lake build artifacts
 clean:
     lake clean

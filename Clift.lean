@@ -7,3 +7,4 @@ import Clift.Lifting
 import Clift.Tactics
 import Clift.AI
 import Clift.Security
+import Clift.Specs

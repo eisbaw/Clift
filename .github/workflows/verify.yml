@@ -1,0 +1,106 @@
+# Clift CI: verify all proofs, check for sorry, validate CImporter output
+#
+# Runs on every push and PR. Blocks merge if:
+# 1. lake build fails (any Lean file has errors)
+# 2. sorry count > 0 in library/framework code
+# 3. CImporter snapshot tests fail (generated output changed)
+# 4. CImporter Python unit tests fail
+# 5. Struct layout tests fail (gcc vs CImporter agreement)
+#
+# Target: <5 min for incremental, <15 min for full build.
+
+name: Clift Verification
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+# Cancel in-progress runs for the same branch/PR
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Build + Verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v24
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+
+      # Cache Lake build artifacts between runs
+      - name: Cache Lake build
+        uses: actions/cache@v4
+        with:
+          path: |
+            .lake
+            ~/.elan
+          key: lake-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lakefile.lean') }}-${{ hashFiles('Clift/**/*.lean', 'Generated/**/*.lean', 'Examples/**/*.lean') }}
+          restore-keys: |
+            lake-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lakefile.lean') }}-
+            lake-${{ runner.os }}-
+
+      - name: Sorry check (library code)
+        run: |
+          echo "=== Checking for sorry in library/framework code ==="
+          # Count actual sorry usage (not comments about sorry)
+          SORRY_COUNT=$(grep -rn "sorry" Clift/ Examples/ Generated/ --include="*.lean" \
+            | grep -v "^.*:.*--" \
+            | grep -v "sorry-free" \
+            | grep -v "no sorry" \
+            | grep -v "zero sorry" \
+            | grep -v "Sorry" \
+            | grep -v "#print axioms" \
+            | grep -c "sorry" || true)
+          echo "Sorry count: $SORRY_COUNT"
+          if [ "$SORRY_COUNT" -gt 0 ]; then
+            echo "::error::Found $SORRY_COUNT sorry in library code. All proofs must be complete."
+            grep -rn "sorry" Clift/ Examples/ Generated/ --include="*.lean" \
+              | grep -v "^.*:.*--" \
+              | grep -v "sorry-free" \
+              | grep -v "no sorry" \
+              | grep -v "zero sorry" \
+              | grep -v "Sorry" \
+              | grep -v "#print axioms" \
+              | grep "sorry"
+            exit 1
+          fi
+          echo "No sorry found. All proofs complete."
+
+      - name: CImporter unit tests
+        run: |
+          nix develop --command bash -c "python3 -m pytest CImporter/tests/ -v"
+
+      - name: CImporter snapshot tests
+        run: |
+          nix develop --command bash -c "just test-snapshots"
+
+      - name: Struct layout tests
+        run: |
+          nix develop --command bash -c "just test-struct-layout"
+
+      - name: Lake build (all targets)
+        run: |
+          nix develop --command bash -c "lake build"
+
+      - name: Verification summary
+        if: always()
+        run: |
+          echo "=== Verification Summary ==="
+          echo "Functions in Generated/:"
+          grep -c "def .*_body" Generated/*.lean 2>/dev/null | paste -sd+ | bc || echo "0"
+          echo ""
+          echo "L1corres proofs:"
+          grep -rc "l1_.*_body_corres" Examples/*.lean Generated/*.lean 2>/dev/null | paste -sd+ | bc || echo "0"
+          echo ""
+          echo "FuncSpecs defined:"
+          grep -rc "FuncSpec" Examples/*.lean 2>/dev/null | paste -sd+ | bc || echo "0"

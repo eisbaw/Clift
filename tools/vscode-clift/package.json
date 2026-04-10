@@ -1,0 +1,123 @@
+{
+  "name": "clift-verification",
+  "displayName": "Clift: C Formal Verification",
+  "description": "Inline verification feedback for C code verified with the Clift pipeline (C -> Lean 4)",
+  "version": "0.1.0",
+  "publisher": "clift-project",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Programming Languages", "Linters"],
+  "activationEvents": [
+    "onLanguage:lean4",
+    "workspaceContains:**/Generated/*.lean",
+    "workspaceContains:**/lakefile.lean"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "clift.verifyFunction",
+        "title": "Clift: Verify Current Function",
+        "icon": "$(shield)"
+      },
+      {
+        "command": "clift.proveWithAI",
+        "title": "Clift: Prove with AI",
+        "icon": "$(sparkle)"
+      },
+      {
+        "command": "clift.showProofChain",
+        "title": "Clift: Show Proof Chain (C -> Spec)",
+        "icon": "$(git-branch)"
+      },
+      {
+        "command": "clift.importCFile",
+        "title": "Clift: Import C File",
+        "icon": "$(file-add)"
+      },
+      {
+        "command": "clift.runPipeline",
+        "title": "Clift: Run Lifting Pipeline",
+        "icon": "$(play)"
+      },
+      {
+        "command": "clift.showSorryCount",
+        "title": "Clift: Show Sorry Count",
+        "icon": "$(warning)"
+      }
+    ],
+    "configuration": {
+      "title": "Clift",
+      "properties": {
+        "clift.projectRoot": {
+          "type": "string",
+          "default": "",
+          "description": "Root directory of the Clift project (auto-detected from lakefile.lean)"
+        },
+        "clift.pythonPath": {
+          "type": "string",
+          "default": "python3",
+          "description": "Path to Python interpreter for CImporter"
+        },
+        "clift.autoVerifyOnSave": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically re-verify when .lean files are saved"
+        },
+        "clift.proofEngine": {
+          "type": "string",
+          "enum": ["claudecode", "none"],
+          "default": "claudecode",
+          "description": "Which AI proof engine to use for 'Prove with AI'"
+        }
+      }
+    },
+    "menus": {
+      "editor/context": [
+        {
+          "command": "clift.proveWithAI",
+          "when": "editorLangId == lean4",
+          "group": "clift"
+        },
+        {
+          "command": "clift.showProofChain",
+          "when": "editorLangId == lean4",
+          "group": "clift"
+        }
+      ]
+    },
+    "colors": [
+      {
+        "id": "clift.verified",
+        "description": "Color for verified functions (green gutter icon)",
+        "defaults": { "dark": "#4caf50", "light": "#2e7d32", "highContrast": "#00ff00" }
+      },
+      {
+        "id": "clift.partial",
+        "description": "Color for partially verified functions (yellow gutter icon)",
+        "defaults": { "dark": "#ffc107", "light": "#f57f17", "highContrast": "#ffff00" }
+      },
+      {
+        "id": "clift.unverified",
+        "description": "Color for unverified functions (red gutter icon)",
+        "defaults": { "dark": "#f44336", "light": "#c62828", "highContrast": "#ff0000" }
+      }
+    ]
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src --ext ts"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.3.0",
+    "eslint": "^8.50.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0"
+  },
+  "dependencies": {}
+}

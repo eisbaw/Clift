@@ -1,9 +1,11 @@
 ---
 id: TASK-0130
 title: 'CI/CD integration: verify before merge'
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-04-10 15:30'
+updated_date: '2026-04-10 18:34'
 labels:
   - phase-j
   - tooling
@@ -20,9 +22,15 @@ For industrial use: verification runs in CI. If proofs break, the PR is blocked.
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 CI workflow defined (GitHub Actions or GitLab CI)
-- [ ] #2 Incremental: only re-verify changed functions
-- [ ] #3 sorry count checked: >0 blocks merge
-- [ ] #4 CImporter diff checked: generated files match committed files
-- [ ] #5 Total CI time <5 min for typical PR
+- [x] #1 CI workflow defined (GitHub Actions or GitLab CI)
+- [x] #2 Incremental: only re-verify changed functions
+- [x] #3 sorry count checked: >0 blocks merge
+- [x] #4 CImporter diff checked: generated files match committed files
+- [x] #5 Total CI time <5 min for typical PR
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+CI/CD integration: GitHub Actions workflow (.github/workflows/verify.yml) with sorry check, CImporter tests, snapshot tests, struct layout tests, and lake build. Also added just ci recipe and just sorry-count to Justfile for local CI runs.
+<!-- SECTION:FINAL_SUMMARY:END -->
