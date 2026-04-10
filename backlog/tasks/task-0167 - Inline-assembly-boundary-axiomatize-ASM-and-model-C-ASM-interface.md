@@ -1,9 +1,10 @@
 ---
 id: TASK-0167
 title: 'Inline assembly boundary: axiomatize ASM and model C/ASM interface'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-10 18:50'
+updated_date: '2026-04-10 23:22'
 labels:
   - phase-n
   - asm

@@ -1,9 +1,10 @@
 ---
 id: TASK-0171
 title: 'Optimized-vs-clean equivalence: verify hand-tuned C matches spec-level C'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-10 18:53'
+updated_date: '2026-04-10 23:22'
 labels:
   - phase-l
   - seL4-parity
