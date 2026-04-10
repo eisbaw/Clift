@@ -1,9 +1,10 @@
 ---
 id: TASK-0153
 title: 'Write a paper: Clift — Lifting C into Lean 4 for Formal Verification'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-10 18:46'
+updated_date: '2026-04-10 23:39'
 labels:
   - phase-p
   - community

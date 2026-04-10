@@ -1,9 +1,10 @@
 ---
 id: TASK-0180
 title: 'Exception/fault delivery verification: CPU faults routed to user handlers'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-10 18:54'
+updated_date: '2026-04-10 23:39'
 labels:
   - phase-n
   - seL4-parity

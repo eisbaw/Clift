@@ -1,9 +1,10 @@
 ---
 id: TASK-0178
 title: 'Scheduler verification: priority scheduling correctness'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-10 18:53'
+updated_date: '2026-04-10 23:39'
 labels:
   - phase-n
   - seL4-parity

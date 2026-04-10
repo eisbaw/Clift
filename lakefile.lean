@@ -2,9 +2,12 @@ import Lake
 open Lake DSL
 
 package clift where
+  version := v!"0.1.0"
   leanOptions := #[
     ⟨`autoImplicit, false⟩
   ]
+  keywords := #["formal-verification", "c-verification", "refinement", "seL4", "autocorres"]
+  description := "Lifting C into Lean 4 for formal verification, following seL4's AutoCorres methodology"
 
 -- Core library: monadic foundations + C semantics + lifting + tactics
 @[default_target]

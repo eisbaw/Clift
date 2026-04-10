@@ -1,3 +1,10 @@
 import Clift.Security.Properties
 import Clift.Security.AccessControl
 import Clift.Security.Noninterference
+import Clift.Security.Capabilities
+import Clift.Security.PageTable
+import Clift.Security.Scheduler
+import Clift.Security.Interrupt
+import Clift.Security.FaultDelivery
+import Clift.Security.AuthorityConfinement
+import Clift.Security.Availability
