@@ -30,4 +30,5 @@ lean_lib Examples where
              `Examples.Rotate3Proof,
              `Examples.L1AutoTest,
              `Examples.PipelineTest,
-             `Examples.MultiCallProof]
+             `Examples.MultiCallProof,
+             `Examples.ListLengthProof]

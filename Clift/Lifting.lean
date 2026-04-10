@@ -7,3 +7,4 @@ import Clift.Lifting.L2Auto
 import Clift.Lifting.TypeStrengthen
 import Clift.Lifting.HeapLift
 import Clift.Lifting.WordAbstract
+import Clift.Lifting.WP
