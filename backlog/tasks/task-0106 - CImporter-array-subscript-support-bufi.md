@@ -1,11 +1,11 @@
 ---
 id: TASK-0106
 title: 'CImporter: array subscript support (buf[i])'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-10 12:58'
-updated_date: '2026-04-10 13:31'
+updated_date: '2026-04-10 14:33'
 labels:
   - critical-path
   - cimporter
@@ -53,3 +53,9 @@ Real C uses arrays extensively. Our CImporter cannot handle ArraySubscriptExpr. 
 - sum_array.c test compiles in Lean
 - AC#4 (local array decls) and AC#5 (struct array fields) deferred
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Implemented. CImporter parses ArraySubscriptExpr, emits Ptr.elemOffset pointer arithmetic with heapPtrValid bounds guard. Ptr.addBytes and Ptr.elemOffset added to State.lean. Tested with sum_array.c — Generated/SumArray.lean compiles. Array write (arr[i] = val) supported via heapUpdate at Ptr.elemOffset.
+<!-- SECTION:FINAL_SUMMARY:END -->
