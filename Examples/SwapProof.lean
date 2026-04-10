@@ -79,10 +79,105 @@ theorem l1_swap_body_corres :
     seq, catch). We unfold it directly and work with the L1 combinator definitions,
     avoiding any intermediate abbrevs that would create kernel checking depth. -/
 
-/-- Helper: the result set and failure flag of l1_swap_body at state s.
-    Proved by unfolding one combinator at a time, each at bounded depth.
-    The outer catch/seq structure is handled via L1_catch_singleton_ok
-    and L1_seq_singleton_ok, which produce FLAT proofs. -/
+/-! ## Projection lemmas for swap_f1, swap_f2, swap_f3
+
+Strategy to avoid kernel deep recursion:
+- First-level projections (.globals, .locals) use `show` to expand swap_fN
+  to its anonymous constructor, then `rfl`. With hVal/heapUpdate irreducible,
+  the kernel checks a single iota reduction without unfolding hVal internals.
+- Second-level projections (.locals.a, .globals.rawHeap) use `rw` with the
+  first-level lemma, reducing the double iota to a single iota step.
+-/
+
+-- swap_f1: ⟨s.globals, ⟨s.locals.a, s.locals.b, hVal s.globals.rawHeap s.locals.a⟩⟩
+attribute [local irreducible] hVal in
+@[simp] private theorem swap_f1_globals (s : ProgramState) :
+    (swap_f1 s).globals = s.globals := by
+  show (⟨s.globals, ⟨s.locals.a, s.locals.b, hVal s.globals.rawHeap s.locals.a⟩⟩ :
+    ProgramState).globals = _; rfl
+
+attribute [local irreducible] hVal in
+private theorem swap_f1_locals_eq (s : ProgramState) :
+    (swap_f1 s).locals = ⟨s.locals.a, s.locals.b, hVal s.globals.rawHeap s.locals.a⟩ := by
+  show (⟨s.globals, ⟨s.locals.a, s.locals.b, hVal s.globals.rawHeap s.locals.a⟩⟩ :
+    ProgramState).locals = _; rfl
+
+@[simp] private theorem swap_f1_locals_a (s : ProgramState) :
+    (swap_f1 s).locals.a = s.locals.a := by rw [swap_f1_locals_eq]
+@[simp] private theorem swap_f1_locals_b (s : ProgramState) :
+    (swap_f1 s).locals.b = s.locals.b := by rw [swap_f1_locals_eq]
+attribute [local irreducible] hVal in
+@[simp] private theorem swap_f1_locals_t (s : ProgramState) :
+    (swap_f1 s).locals.t = hVal s.globals.rawHeap s.locals.a := by rw [swap_f1_locals_eq]
+
+-- swap_f2: ⟨⟨heapUpdate s.globals.rawHeap s.locals.a (hVal s.globals.rawHeap s.locals.b)⟩, s.locals⟩
+attribute [local irreducible] hVal heapUpdate in
+private theorem swap_f2_globals_eq (s : ProgramState) :
+    (swap_f2 s).globals =
+      ⟨heapUpdate s.globals.rawHeap s.locals.a (hVal s.globals.rawHeap s.locals.b)⟩ := by
+  show (⟨⟨heapUpdate s.globals.rawHeap s.locals.a (hVal s.globals.rawHeap s.locals.b)⟩,
+    s.locals⟩ : ProgramState).globals = _; rfl
+
+attribute [local irreducible] hVal heapUpdate in
+@[simp] private theorem swap_f2_globals_rawHeap (s : ProgramState) :
+    (swap_f2 s).globals.rawHeap = heapUpdate s.globals.rawHeap s.locals.a
+      (hVal s.globals.rawHeap s.locals.b) := by rw [swap_f2_globals_eq]
+
+attribute [local irreducible] hVal heapUpdate in
+@[simp] private theorem swap_f2_locals (s : ProgramState) :
+    (swap_f2 s).locals = s.locals := by
+  show (⟨⟨heapUpdate s.globals.rawHeap s.locals.a (hVal s.globals.rawHeap s.locals.b)⟩,
+    s.locals⟩ : ProgramState).locals = _; rfl
+
+@[simp] private theorem swap_f2_locals_a (s : ProgramState) :
+    (swap_f2 s).locals.a = s.locals.a := by rw [swap_f2_locals]
+@[simp] private theorem swap_f2_locals_b (s : ProgramState) :
+    (swap_f2 s).locals.b = s.locals.b := by rw [swap_f2_locals]
+@[simp] private theorem swap_f2_locals_t (s : ProgramState) :
+    (swap_f2 s).locals.t = s.locals.t := by rw [swap_f2_locals]
+
+-- swap_f3: ⟨⟨heapUpdate s.globals.rawHeap s.locals.b s.locals.t⟩, s.locals⟩
+attribute [local irreducible] heapUpdate in
+private theorem swap_f3_globals_eq (s : ProgramState) :
+    (swap_f3 s).globals = ⟨heapUpdate s.globals.rawHeap s.locals.b s.locals.t⟩ := by
+  show (⟨⟨heapUpdate s.globals.rawHeap s.locals.b s.locals.t⟩,
+    s.locals⟩ : ProgramState).globals = _; rfl
+
+attribute [local irreducible] heapUpdate in
+@[simp] private theorem swap_f3_globals_rawHeap (s : ProgramState) :
+    (swap_f3 s).globals.rawHeap = heapUpdate s.globals.rawHeap s.locals.b s.locals.t := by
+  rw [swap_f3_globals_eq]
+
+attribute [local irreducible] heapUpdate in
+@[simp] private theorem swap_f3_locals (s : ProgramState) :
+    (swap_f3 s).locals = s.locals := by
+  show (⟨⟨heapUpdate s.globals.rawHeap s.locals.b s.locals.t⟩,
+    s.locals⟩ : ProgramState).locals = _; rfl
+
+@[simp] private theorem swap_f3_locals_a (s : ProgramState) :
+    (swap_f3 s).locals.a = s.locals.a := by rw [swap_f3_locals]
+@[simp] private theorem swap_f3_locals_b (s : ProgramState) :
+    (swap_f3 s).locals.b = s.locals.b := by rw [swap_f3_locals]
+
+-- heapPtrValid preservation lemmas
+private theorem swap_f1_heapPtrValid_a (s : ProgramState)
+    (h : heapPtrValid s.globals.rawHeap s.locals.a) :
+    heapPtrValid (swap_f1 s).globals.rawHeap (swap_f1 s).locals.a := by
+  simp only [swap_f1_globals, swap_f1_locals_a]; exact h
+
+private theorem swap_f1_heapPtrValid_b (s : ProgramState)
+    (h : heapPtrValid s.globals.rawHeap s.locals.b) :
+    heapPtrValid (swap_f1 s).globals.rawHeap (swap_f1 s).locals.b := by
+  simp only [swap_f1_globals, swap_f1_locals_b]; exact h
+
+private theorem swap_f2_f1_heapPtrValid_b (s : ProgramState)
+    (_h_va : heapPtrValid s.globals.rawHeap s.locals.a)
+    (h_vb : heapPtrValid s.globals.rawHeap s.locals.b) :
+    heapPtrValid (swap_f2 (swap_f1 s)).globals.rawHeap (swap_f2 (swap_f1 s)).locals.b := by
+  simp only [swap_f2_globals_rawHeap, swap_f2_locals_b, swap_f1_globals, swap_f1_locals_a,
+             swap_f1_locals_b]
+  exact heapUpdate_preserves_heapPtrValid s.globals.rawHeap s.locals.a _ s.locals.b h_vb
+
 private theorem l1_swap_body_results (s : ProgramState)
     (h_va : heapPtrValid s.globals.rawHeap s.locals.a)
     (h_vb : heapPtrValid s.globals.rawHeap s.locals.b) :
@@ -95,30 +190,70 @@ private theorem l1_swap_body_results (s : ProgramState)
         s.locals.b (hVal s.globals.rawHeap s.locals.a) ∧
       s'.locals.a = s.locals.a ∧
       s'.locals.b = s.locals.b := by
-  -- l1_swap_body = catch (seq step1 (seq step2 step3)) skip
-  -- Unfold the outermost layer only: l1_swap_body -> L1.catch inner skip
-  unfold l1_swap_body
+  -- Step 1: guard(ptrValid a) >> modify(swap_f1)
   have h1 := L1_guard_modify_result
     (fun s : ProgramState => heapPtrValid s.globals.rawHeap s.locals.a) swap_f1 s h_va
   have h_step1_res : (swap_l1_step1 s).results = {(Except.ok (), swap_f1 s)} := by
     unfold swap_l1_step1; exact h1.1
   have h_step1_nf : ¬(swap_l1_step1 s).failed := by unfold swap_l1_step1; exact h1.2
-  -- BLOCKED: Lean 4 kernel deep recursion (task-0076).
-  -- Even trivial type-checking of proof terms that involve structure projections
-  -- through composed state transformation functions (swap_f1, swap_f2, swap_f3)
-  -- hits the kernel's hardcoded recursion limit. For example, merely stating
-  --   `have : heapPtrValid (swap_f1 s).globals.rawHeap ... := h_va`
-  -- triggers deep recursion because the kernel must reduce (swap_f1 s).globals
-  -- through the CState constructor.
-  --
-  -- The L1corres proof (l1_swap_body_corres) succeeds because it only needs
-  -- to match L1 combinators structurally, not reduce through state projections.
-  --
-  -- Workaround: The HeapLift-level proof (SwapHeapLift.lean) is complete and
-  -- sorry-free, demonstrating the pipeline works at the abstracted level.
-  -- A MetaM-level VCG that builds flat proof terms without structure projections
-  -- is needed to fix this (task-0071).
-  sorry
+  -- Step 2: guard(ptrValid a) >> guard(ptrValid b) >> modify(swap_f2)
+  have h_va1 := swap_f1_heapPtrValid_a s h_va
+  have h_vb1 := swap_f1_heapPtrValid_b s h_vb
+  have h2 := L1_guard_guard_modify_result
+    (fun s : ProgramState => heapPtrValid s.globals.rawHeap s.locals.a)
+    (fun s : ProgramState => heapPtrValid s.globals.rawHeap s.locals.b)
+    swap_f2 (swap_f1 s) h_va1 h_vb1
+  have h_step2_res : (swap_l1_step2 (swap_f1 s)).results =
+      {(Except.ok (), swap_f2 (swap_f1 s))} := by
+    unfold swap_l1_step2; exact h2.1
+  have h_step2_nf : ¬(swap_l1_step2 (swap_f1 s)).failed := by
+    unfold swap_l1_step2; exact h2.2
+  -- Step 3: guard(ptrValid b) >> modify(swap_f3)
+  have h_vb2 := swap_f2_f1_heapPtrValid_b s h_va h_vb
+  have h3 := L1_guard_modify_result
+    (fun s : ProgramState => heapPtrValid s.globals.rawHeap s.locals.b)
+    swap_f3 (swap_f2 (swap_f1 s)) h_vb2
+  have h_step3_res : (swap_l1_step3 (swap_f2 (swap_f1 s))).results =
+      {(Except.ok (), swap_f3 (swap_f2 (swap_f1 s)))} := by
+    unfold swap_l1_step3; exact h3.1
+  have h_step3_nf : ¬(swap_l1_step3 (swap_f2 (swap_f1 s))).failed := by
+    unfold swap_l1_step3; exact h3.2
+  -- Chain: seq step2 step3 at (swap_f1 s)
+  have h_seq23 := L1_seq_singleton_ok h_step2_res h_step2_nf (m₂ := swap_l1_step3)
+  have h_seq23_res : (L1.seq swap_l1_step2 swap_l1_step3 (swap_f1 s)).results =
+      {(Except.ok (), swap_f3 (swap_f2 (swap_f1 s)))} := by
+    rw [h_seq23.1, h_step3_res]
+  have h_seq23_nf : ¬(L1.seq swap_l1_step2 swap_l1_step3 (swap_f1 s)).failed :=
+    fun hf => h_step3_nf (h_seq23.2.mp hf)
+  -- Chain: seq step1 (seq step2 step3) at s
+  have h_inner := L1_seq_singleton_ok h_step1_res h_step1_nf
+    (m₂ := L1.seq swap_l1_step2 swap_l1_step3)
+  have h_inner_res : (L1.seq swap_l1_step1 (L1.seq swap_l1_step2 swap_l1_step3) s).results =
+      {(Except.ok (), swap_f3 (swap_f2 (swap_f1 s)))} := by
+    rw [h_inner.1, h_seq23_res]
+  have h_inner_nf : ¬(L1.seq swap_l1_step1 (L1.seq swap_l1_step2 swap_l1_step3) s).failed :=
+    fun hf => h_seq23_nf (h_inner.2.mp hf)
+  -- Outer catch: catch inner skip
+  have h_catch := L1_catch_singleton_ok h_inner_res h_inner_nf
+  -- Now unfold l1_swap_body and conclude
+  unfold l1_swap_body
+  constructor
+  · exact h_catch.2
+  · intro r s' h_mem
+    rw [h_catch.1] at h_mem
+    have heq := Prod.mk.inj h_mem
+    have hr := heq.1; have hs := heq.2
+    subst hr; subst hs
+    -- Final state projections via simp lemmas
+    refine ⟨rfl, ?_, ?_, ?_⟩
+    · -- s'.globals.rawHeap: chain swap_f3 -> swap_f2 -> swap_f1 projections
+      simp only [swap_f3_globals_rawHeap, swap_f2_globals_rawHeap, swap_f2_locals_b,
+                  swap_f2_locals_t, swap_f1_globals, swap_f1_locals_a, swap_f1_locals_b,
+                  swap_f1_locals_t]
+    · -- s'.locals.a
+      simp only [swap_f3_locals_a, swap_f2_locals_a, swap_f1_locals_a]
+    · -- s'.locals.b
+      simp only [swap_f3_locals_b, swap_f2_locals_b, swap_f1_locals_b]
 
 /-- l1_swap_body does not fail and produces the expected postcondition. -/
 theorem l1_swap_validHoare (va vb : UInt32) :
