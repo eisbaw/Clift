@@ -74,8 +74,20 @@ test-snapshots:
 test-struct-layout:
     python3 test/test_struct_layout.py
 
+# Integer promotion audit tests
+test-int-promotion:
+    python3 -m pytest test/test_int_promotion.py -v
+
+# Memory model UB audit tests
+test-memory-ub:
+    python3 -m pytest test/test_memory_model_ub.py -v
+
+# CImporter fuzz testing (55 random programs)
+test-fuzz:
+    python3 test/fuzz_cimporter.py --count 55 --seed 42
+
 # End-to-end: importer snapshots pass AND all Lean code builds (proofs check)
-e2e: test-importer test-snapshots test-struct-layout build
+e2e: test-importer test-snapshots test-struct-layout test-int-promotion test-memory-ub build
 
 # Dump clang JSON AST for inspection
 clang-dump FILE:

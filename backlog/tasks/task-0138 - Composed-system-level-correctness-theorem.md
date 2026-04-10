@@ -1,9 +1,10 @@
 ---
 id: TASK-0138
 title: Composed system-level correctness theorem
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-10 18:45'
+updated_date: '2026-04-10 19:53'
 labels:
   - phase-l
   - verification

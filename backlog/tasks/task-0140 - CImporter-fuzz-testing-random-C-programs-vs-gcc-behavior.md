@@ -1,9 +1,10 @@
 ---
 id: TASK-0140
 title: 'CImporter fuzz testing: random C programs vs gcc behavior'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-10 18:46'
+updated_date: '2026-04-10 19:53'
 labels:
   - phase-m
   - testing

@@ -54,4 +54,5 @@ lean_lib Examples where
              `Examples.RBExtRefinement,
              `Examples.AxiomAudit,
              `Examples.ExecAudit,
-             `Examples.SorryAudit]
+             `Examples.SorryAudit,
+             `Examples.SystemCorrectness]

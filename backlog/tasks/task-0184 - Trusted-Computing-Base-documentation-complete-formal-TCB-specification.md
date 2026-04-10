@@ -1,9 +1,10 @@
 ---
 id: TASK-0184
 title: 'Trusted Computing Base documentation: complete formal TCB specification'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-10 18:54'
+updated_date: '2026-04-10 19:53'
 labels:
   - phase-l
   - industrial
