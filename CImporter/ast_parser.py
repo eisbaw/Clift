@@ -46,9 +46,10 @@ class VarInfo:
 @dataclass
 class Expr:
     """An expression in the C AST."""
-    kind: str  # "var_ref", "int_literal", "binop", "unop", "ternary", "deref", "member_access"
+    kind: str  # "var_ref", "int_literal", "binop", "unop", "ternary", "deref",
+               # "member_access", "call_expr"
     # Fields depend on kind:
-    var_name: Optional[str] = None       # for var_ref
+    var_name: Optional[str] = None       # for var_ref, call_expr (callee name)
     int_value: Optional[int] = None      # for int_literal
     op: Optional[str] = None             # for binop/unop
     lhs: Optional['Expr'] = None         # for binop, ternary (condition)
@@ -60,6 +61,8 @@ class Expr:
     member_name: Optional[str] = None    # field name
     member_is_arrow: bool = False        # True for p->field (implies deref)
     member_base: Optional['Expr'] = None # the struct/pointer expression
+    # For call_expr:
+    call_args: list['Expr'] = field(default_factory=list)  # function arguments
 
 @dataclass
 class Stmt:
@@ -529,10 +532,22 @@ def _parse_expr(node: dict) -> Expr:
         return Expr(kind="ternary", lhs=cond, rhs=true_expr, third=false_expr)
 
     if kind == "CallExpr":
-        raise StrictCViolation(
-            "Function calls in expressions not yet supported in Phase 1. "
-            "Use standalone call statements."
-        )
+        # Parse function call: first inner is function reference, rest are args
+        inner = node.get("inner", [])
+        if not inner:
+            raise StrictCViolation("CallExpr with no inner nodes")
+        # First child is the callee (function reference, possibly via ImplicitCastExpr)
+        callee_name = _extract_callee_name(inner[0])
+        if callee_name is None:
+            raise StrictCViolation(
+                "Only direct function calls are supported (no function pointers). "
+                f"Callee node kind: {inner[0].get('kind')}"
+            )
+        # Remaining children are arguments
+        args = [_parse_expr(arg) for arg in inner[1:]]
+        result_type = _try_extract_result_type(node)
+        return Expr(kind="call_expr", var_name=callee_name,
+                    result_type=result_type, call_args=args)
 
     raise StrictCViolation(f"Unsupported expression kind: {kind}")
 
@@ -659,6 +674,28 @@ def _extract_deref_target(node: dict) -> Optional[Expr]:
         inner = node.get("inner", [])
         if inner:
             return _extract_deref_target(inner[0])
+    return None
+
+
+def _extract_callee_name(node: dict) -> Optional[str]:
+    """Extract the function name from a callee expression in a CallExpr.
+
+    The callee is typically an ImplicitCastExpr wrapping a DeclRefExpr
+    that references a FunctionDecl.
+    """
+    kind = node.get("kind", "")
+    if kind == "DeclRefExpr":
+        ref = node.get("referencedDecl", {})
+        if ref.get("kind") == "FunctionDecl":
+            return ref.get("name")
+    if kind == "ImplicitCastExpr":
+        inner = node.get("inner", [])
+        if inner:
+            return _extract_callee_name(inner[0])
+    if kind == "ParenExpr":
+        inner = node.get("inner", [])
+        if inner:
+            return _extract_callee_name(inner[0])
     return None
 
 

@@ -13,6 +13,8 @@
 --   .catch c₁ c₂ -> L1corres_catch
 --   .guard p c -> L1corres_guard
 --   .throw     -> L1corres_throw
+--   .dynCom f  -> L1corres_dynCom
+--   .call n    -> L1corres_call (with L1ProcEnv)
 --
 -- Usage:
 --   `corres_auto` — apply one L1corres decomposition step
@@ -40,6 +42,8 @@ macro_rules
     | (apply L1corres_catch <;> corres_auto)
     | (apply L1corres_guard; corres_auto)
     | (apply L1corres_while; corres_auto)
+    | (apply L1corres_dynCom; intro; corres_auto)
+    | (apply L1corres_call <;> (try (intro; intro; intro; simp; constructor <;> rfl)))
     | fail "corres_auto: could not find applicable L1corres rule"
     )
 

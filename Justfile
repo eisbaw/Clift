@@ -31,6 +31,7 @@ import-all:
     just import test/c_sources/for_loop.c ForLoop
     just import test/c_sources/do_while.c DoWhile
     just import test/c_sources/switch_test.c SwitchTest
+    just import test/c_sources/multi_call.c MultiCall
 
 # Run CImporter Python unit tests
 test-importer:

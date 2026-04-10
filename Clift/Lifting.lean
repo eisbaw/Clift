@@ -1,5 +1,6 @@
 import Clift.Lifting.SimplConv
 import Clift.Lifting.L1HoareRules
+import Clift.Lifting.FuncSpec
 import Clift.Lifting.L1Auto
 import Clift.Lifting.LocalVarExtract
 import Clift.Lifting.L2Auto

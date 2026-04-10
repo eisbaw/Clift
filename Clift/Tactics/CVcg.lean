@@ -11,14 +11,17 @@
 --   L1.modify f             -> L1_hoare_modify'
 --   L1.skip                 -> L1_hoare_skip
 --   L1.throw                -> (produces error, handled by seq/catch)
+--   L1.call l1Γ name        -> L1_hoare_call_spec (via function spec)
+--   L1.dynCom f             -> L1_hoare_dynCom
 --
 -- The tactic produces flat proof terms that avoid deep kernel recursion.
 -- Each rule produces `r = Except.ok () ∧ R s` shaped postconditions,
 -- which compose without nesting match expressions.
 --
 -- Reference: L1HoareRules.lean for the underlying theorems.
+-- Reference: FuncSpec.lean for call/dynCom Hoare rules.
 
-import Clift.Lifting.L1HoareRules
+import Clift.Lifting.FuncSpec
 
 /-! # c_vcg tactic: L1 verification condition generator
 
@@ -33,6 +36,7 @@ Usage:
 The remaining leaf goals are typically of the form:
   `∀ s, P s → Q (f s)` — for modify operations
   `∀ s, P s → p s ∧ R s` — for guard operations
+  `validHoare P callBody Q` — for call sites (user provides spec)
 
 These are left for the user or can be closed with `intro; simp; ...` -/
 
@@ -45,7 +49,8 @@ These are left for the user or can be closed with `intro; simp; ...` -/
     5. L1_hoare_catch — for L1.catch body handler (general)
     6. L1_hoare_seq_ok — for L1.seq m₁ m₂ (ok-only m₁)
     7. L1_hoare_seq — for L1.seq m₁ m₂ (general)
-    8. L1_hoare_pre — pre-strengthening -/
+    8. L1_hoare_call_spec — for L1.call (user proves spec lookup + body satisfies spec)
+    9. L1_hoare_dynCom — for L1.dynCom (user proves body spec for each state) -/
 syntax "c_vcg" : tactic
 
 macro_rules
@@ -58,6 +63,8 @@ macro_rules
     | apply L1_hoare_catch
     | apply L1_hoare_seq_ok
     | apply L1_hoare_seq
+    | apply L1_hoare_call_spec
+    | apply L1_hoare_dynCom
     | fail "c_vcg: could not find applicable L1 Hoare rule"
     )
 

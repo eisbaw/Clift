@@ -423,12 +423,16 @@ class LeanEmitter:
 
         elif stmt.kind == "return":
             if stmt.expr is not None and func.return_type != VOID:
-                # return X => guards + .seq (.basic (set ret__val := X)) .throw
-                expr_str = self._emit_expr(stmt.expr, func)
-                guards = self._collect_all_guards(stmt.expr, func)
-                def emit_return():
-                    self._w(f".seq (.basic (fun s => {{ s with locals := {{ s.locals with ret__val := {expr_str} }} }})) .throw")
-                self._emit_with_guards(guards, emit_return)
+                if stmt.expr.kind == "call_expr":
+                    # return f(a, b) => call f, set ret__val from callee ret, throw
+                    self._emit_call_return(stmt.expr, func)
+                else:
+                    # return X => guards + .seq (.basic (set ret__val := X)) .throw
+                    expr_str = self._emit_expr(stmt.expr, func)
+                    guards = self._collect_all_guards(stmt.expr, func)
+                    def emit_return():
+                        self._w(f".seq (.basic (fun s => {{ s with locals := {{ s.locals with ret__val := {expr_str} }} }})) .throw")
+                    self._emit_with_guards(guards, emit_return)
             else:
                 # return; (void) => .throw
                 self._w(".throw")
@@ -463,21 +467,29 @@ class LeanEmitter:
             self._indent -= 1
 
         elif stmt.kind == "assign":
-            field = self._field_name(stmt.target_var, func)
-            expr_str = self._emit_expr(stmt.value, func)
-            guards = self._collect_all_guards(stmt.value, func)
-            def emit_assign():
-                self._w(f".basic (fun s => {{ s with locals := {{ s.locals with {field} := {expr_str} }} }})")
-            self._emit_with_guards(guards, emit_assign)
+            # Check if the value is a function call
+            if stmt.value and stmt.value.kind == "call_expr":
+                self._emit_call_assign(stmt.target_var, stmt.value, func)
+            else:
+                field = self._field_name(stmt.target_var, func)
+                expr_str = self._emit_expr(stmt.value, func)
+                guards = self._collect_all_guards(stmt.value, func)
+                def emit_assign():
+                    self._w(f".basic (fun s => {{ s with locals := {{ s.locals with {field} := {expr_str} }} }})")
+                self._emit_with_guards(guards, emit_assign)
 
         elif stmt.kind == "decl_init":
-            # Variable declaration with initializer: same as assignment
-            field = self._field_name(stmt.target_var, func)
-            expr_str = self._emit_expr(stmt.expr, func)
-            guards = self._collect_all_guards(stmt.expr, func)
-            def emit_decl_init():
-                self._w(f".basic (fun s => {{ s with locals := {{ s.locals with {field} := {expr_str} }} }})")
-            self._emit_with_guards(guards, emit_decl_init)
+            # Check if the initializer is a function call
+            if stmt.expr and stmt.expr.kind == "call_expr":
+                self._emit_call_assign(stmt.target_var, stmt.expr, func)
+            else:
+                # Variable declaration with initializer: same as assignment
+                field = self._field_name(stmt.target_var, func)
+                expr_str = self._emit_expr(stmt.expr, func)
+                guards = self._collect_all_guards(stmt.expr, func)
+                def emit_decl_init():
+                    self._w(f".basic (fun s => {{ s with locals := {{ s.locals with {field} := {expr_str} }} }})")
+                self._emit_with_guards(guards, emit_decl_init)
 
         elif stmt.kind == "deref_write":
             # *p = v  =>  guards for all derefs/div/overflow + .basic (heapUpdate)
@@ -514,10 +526,147 @@ class LeanEmitter:
             self._w(".skip")
 
         elif stmt.kind == "expr":
-            self._w(".skip")
+            # Check if this is a standalone function call (ignoring return value)
+            if stmt.expr and stmt.expr.kind == "call_expr":
+                self._emit_call_standalone(stmt.expr, func)
+            else:
+                self._w(".skip")
 
         else:
             raise ValueError(f"Unhandled statement kind: {stmt.kind}")
+
+    def _find_callee(self, callee_name: str) -> Optional[FuncInfo]:
+        """Find a callee function by name in the translation unit."""
+        for f in self.tu.functions:
+            if f.name == callee_name:
+                return f
+        return None
+
+    def _emit_call_param_setup(self, call_expr: Expr, func: FuncInfo) -> str:
+        """Emit the parameter setup expression for a function call.
+
+        Returns a Lean expression that sets callee parameters from call arguments.
+        The expression is relative to state variable 's'.
+        """
+        callee = self._find_callee(call_expr.var_name)
+        if callee is None:
+            log.warning("Callee '%s' not found in translation unit, emitting bare call",
+                       call_expr.var_name)
+            return None
+
+        # Build field assignments: param1 := arg1_expr, param2 := arg2_expr
+        assignments = []
+        for param, arg in zip(callee.params, call_expr.call_args):
+            field = self._field_name(param.name, callee)
+            arg_str = self._emit_expr(arg, func)
+            assignments.append(f"{field} := {arg_str}")
+
+        if assignments:
+            return ", ".join(assignments)
+        return None
+
+    def _emit_call_assign(self, target_var: str, call_expr: Expr, func: FuncInfo):
+        """Emit CSimpl for: target_var = callee(args)
+
+        Pattern:
+          .dynCom (fun saved =>
+            .seq (.basic (fun s => { s with locals := { s.locals with param := arg }}))
+                 (.seq (.call "callee")
+                       (.basic (fun s => { s with locals :=
+                         { saved.locals with target_var := s.locals.ret__val }}))))
+        """
+        callee_name = call_expr.var_name
+        target_field = self._field_name(target_var, func)
+        param_setup = self._emit_call_param_setup(call_expr, func)
+
+        self._w(f".dynCom (fun saved =>")
+        self._indent += 1
+
+        if param_setup:
+            self._w(f".seq")
+            self._indent += 1
+            self._w(f"(.basic (fun s => {{ s with locals := {{ s.locals with {param_setup} }} }}))")
+            self._w(f"(.seq")
+            self._indent += 1
+            self._w(f'(.call "{callee_name}")')
+            self._w(f"(.basic (fun s => {{ s with locals := {{ saved.locals with {target_field} := s.locals.ret__val }} }}))))")
+            self._indent -= 2
+        else:
+            self._w(f".seq")
+            self._indent += 1
+            self._w(f'(.call "{callee_name}")')
+            self._w(f"(.basic (fun s => {{ s with locals := {{ saved.locals with {target_field} := s.locals.ret__val }} }}))")
+            self._indent -= 1
+
+        self._indent -= 1
+
+    def _emit_call_standalone(self, call_expr: Expr, func: FuncInfo):
+        """Emit CSimpl for a standalone call (ignoring return value): callee(args)
+
+        Pattern:
+          .dynCom (fun saved =>
+            .seq (.basic (fun s => { s with locals := { s.locals with param := arg }}))
+                 (.seq (.call "callee")
+                       (.basic (fun s => { s with locals := saved.locals }))))
+        """
+        callee_name = call_expr.var_name
+        param_setup = self._emit_call_param_setup(call_expr, func)
+
+        self._w(f".dynCom (fun saved =>")
+        self._indent += 1
+
+        if param_setup:
+            self._w(f".seq")
+            self._indent += 1
+            self._w(f"(.basic (fun s => {{ s with locals := {{ s.locals with {param_setup} }} }}))")
+            self._w(f"(.seq")
+            self._indent += 1
+            self._w(f'(.call "{callee_name}")')
+            self._w(f"(.basic (fun s => {{ s with locals := saved.locals }}))))")
+            self._indent -= 2
+        else:
+            self._w(f".seq")
+            self._indent += 1
+            self._w(f'(.call "{callee_name}")')
+            self._w(f"(.basic (fun s => {{ s with locals := saved.locals }}))")
+            self._indent -= 1
+
+        self._indent -= 1
+
+    def _emit_call_return(self, call_expr: Expr, func: FuncInfo):
+        """Emit CSimpl for: return callee(args)
+
+        Pattern:
+          .dynCom (fun saved =>
+            .seq (.basic (fun s => { s with locals := { s.locals with param := arg }}))
+                 (.seq (.call "callee")
+                       (.seq (.basic (fun s => { s with locals :=
+                         { saved.locals with ret__val := s.locals.ret__val }}))
+                             .throw)))
+        """
+        callee_name = call_expr.var_name
+        param_setup = self._emit_call_param_setup(call_expr, func)
+
+        self._w(f".dynCom (fun saved =>")
+        self._indent += 1
+
+        if param_setup:
+            self._w(f".seq")
+            self._indent += 1
+            self._w(f"(.basic (fun s => {{ s with locals := {{ s.locals with {param_setup} }} }}))")
+            self._w(f"(.seq")
+            self._indent += 1
+            self._w(f'(.call "{callee_name}")')
+            self._w(f"(.seq (.basic (fun s => {{ s with locals := {{ saved.locals with ret__val := s.locals.ret__val }} }})) .throw)))")
+            self._indent -= 2
+        else:
+            self._w(f".seq")
+            self._indent += 1
+            self._w(f'(.call "{callee_name}")')
+            self._w(f"(.seq (.basic (fun s => {{ s with locals := {{ saved.locals with ret__val := s.locals.ret__val }} }})) .throw)")
+            self._indent -= 1
+
+        self._indent -= 1
 
     def _emit_seq_chain(self, stmts: list[Stmt], func: FuncInfo):
         """Emit a chain of .seq from a list of statements."""

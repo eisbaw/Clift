@@ -84,6 +84,35 @@ def spec (rel : σ → σ → Prop) : L1Monad σ :=
 def fail : L1Monad σ :=
   fun _ => { results := ∅, failed := True }
 
+/-- L1 procedure environment: maps procedure names to L1 monadic bodies.
+    Parallel to ProcEnv which maps names to CSimpl bodies. -/
+abbrev L1ProcEnv (σ : Type) := ProcName → Option (L1Monad σ)
+
+namespace L1ProcEnv
+
+variable {σ : Type}
+
+/-- Empty L1 procedure environment (no procedures defined). -/
+def empty : L1ProcEnv σ := fun _ => none
+
+/-- Extend an L1 procedure environment with a new binding. -/
+def insert (Γ : L1ProcEnv σ) (name : ProcName) (body : L1Monad σ) : L1ProcEnv σ :=
+  fun n => if n == name then some body else Γ n
+
+end L1ProcEnv
+
+/-- L1.call: look up a procedure in the L1 procedure environment and execute it.
+    Fails if the procedure is not found (matching CSimpl.call → Exec.callUndefined → fault). -/
+def call (l1Γ : L1ProcEnv σ) (name : ProcName) : L1Monad σ :=
+  match l1Γ name with
+  | some body => body
+  | none => L1.fail
+
+/-- L1.dynCom: execute a state-dependent L1 monadic command.
+    Given a function from state to L1Monad, evaluate it at the current state. -/
+def dynCom (f : σ → L1Monad σ) : L1Monad σ :=
+  fun s => f s s
+
 end L1
 
 /-! # L1corres -/
@@ -326,6 +355,83 @@ theorem L1corres_guard {σ : Type} (Γ : ProcEnv σ)
     cases h_exec with
     | guardOk _ _ _ _ _ h_c => exact hm_fault h_c
     | guardFault _ _ _ h_np => exact absurd hp h_np
+
+/-! ## L1corres_call
+
+L1corres for CSimpl.call: if the procedure environment maps `name` to `body`,
+and the L1 procedure environment maps `name` to `l1_body`, and L1corres holds
+for `l1_body` / `body`, then L1.call has L1corres with CSimpl.call.
+
+The key insight: we parametrize over an L1ProcEnv that mirrors the CSimpl ProcEnv.
+The hypothesis requires L1corres for each procedure body looked up. -/
+
+theorem L1corres_call {σ : Type} (Γ : ProcEnv σ) (l1Γ : L1.L1ProcEnv σ) (name : ProcName)
+    (h_env : ∀ (p : ProcName) (body : CSimpl σ),
+      Γ p = some body →
+      ∃ l1_body, l1Γ p = some l1_body ∧ L1corres Γ l1_body body)
+    (h_none : ∀ (p : ProcName), Γ p = none → l1Γ p = none) :
+    L1corres Γ (L1.call l1Γ name) (.call name) := by
+  intro s h_nf
+  refine ⟨?_, ?_, ?_⟩
+  · -- Normal case: Exec Γ (.call name) s (.normal s')
+    intro s' h_exec
+    cases h_exec with
+    | callDefined _ body _ _ h_lookup h_body_exec =>
+      obtain ⟨l1_body, h_l1_lookup, h_corres⟩ := h_env name body h_lookup
+      show (Except.ok (), s') ∈ (L1.call l1Γ name s).results
+      simp only [L1.call, h_l1_lookup]
+      have h_nf' : ¬(l1_body s).failed := by
+        rwa [show L1.call l1Γ name = l1_body from by simp [L1.call, h_l1_lookup]] at h_nf
+      exact (h_corres s h_nf').1 s' h_body_exec
+  · -- Abrupt case: Exec Γ (.call name) s (.abrupt s')
+    intro s' h_exec
+    cases h_exec with
+    | callDefined _ body _ _ h_lookup h_body_exec =>
+      obtain ⟨l1_body, h_l1_lookup, h_corres⟩ := h_env name body h_lookup
+      show (Except.error (), s') ∈ (L1.call l1Γ name s).results
+      simp only [L1.call, h_l1_lookup]
+      have h_nf' : ¬(l1_body s).failed := by
+        rwa [show L1.call l1Γ name = l1_body from by simp [L1.call, h_l1_lookup]] at h_nf
+      exact (h_corres s h_nf').2.1 s' h_body_exec
+  · -- Fault case: Exec Γ (.call name) s .fault
+    intro h_exec
+    cases h_exec with
+    | callDefined _ body _ _ h_lookup h_body_exec =>
+      obtain ⟨l1_body, h_l1_lookup, h_corres⟩ := h_env name body h_lookup
+      have h_nf' : ¬(l1_body s).failed := by
+        rwa [show L1.call l1Γ name = l1_body from by simp [L1.call, h_l1_lookup]] at h_nf
+      exact (h_corres s h_nf').2.2 h_body_exec
+    | callUndefined _ _ h_lookup =>
+      have h_l1_none := h_none name h_lookup
+      exact absurd (show (L1.call l1Γ name s).failed from by simp [L1.call, h_l1_none, L1.fail]) h_nf
+
+/-! ## L1corres_dynCom
+
+L1corres for CSimpl.dynCom: if for all states s, L1corres holds for
+l1_f s / f s, then L1.dynCom l1_f has L1corres with CSimpl.dynCom f. -/
+
+theorem L1corres_dynCom {σ : Type} (Γ : ProcEnv σ) {l1_f : σ → L1Monad σ} {f : σ → CSimpl σ}
+    (h : ∀ s, L1corres Γ (l1_f s) (f s)) :
+    L1corres Γ (L1.dynCom l1_f) (.dynCom f) := by
+  intro s h_nf
+  -- L1.dynCom l1_f at state s = l1_f s s
+  -- h_nf : ¬(L1.dynCom l1_f s).failed = ¬(l1_f s s).failed
+  have h_nf' : ¬(l1_f s s).failed := h_nf
+  obtain ⟨h_ok, h_err, h_fault⟩ := h s s h_nf'
+  refine ⟨?_, ?_, ?_⟩
+  · intro s' h_exec
+    cases h_exec with
+    | dynCom _ _ _ h_body_exec =>
+      -- Exec Γ (f s) s (.normal s')
+      exact h_ok s' h_body_exec
+  · intro s' h_exec
+    cases h_exec with
+    | dynCom _ _ _ h_body_exec =>
+      exact h_err s' h_body_exec
+  · intro h_exec
+    cases h_exec with
+    | dynCom _ _ _ h_body_exec =>
+      exact h_fault h_body_exec
 
 /-! ## L1corres_while
 

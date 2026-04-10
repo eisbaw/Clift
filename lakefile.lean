@@ -15,7 +15,8 @@ lean_lib Clift where
 @[default_target]
 lean_lib Generated where
   roots := #[`Generated.Max, `Generated.Gcd, `Generated.Swap, `Generated.ListLength, `Generated.Rotate3,
-             `Generated.DivTest, `Generated.SignedArith, `Generated.ForLoop, `Generated.DoWhile, `Generated.SwitchTest]
+             `Generated.DivTest, `Generated.SignedArith, `Generated.ForLoop, `Generated.DoWhile, `Generated.SwitchTest,
+             `Generated.MultiCall]
 
 -- User proof examples
 @[default_target]
@@ -28,4 +29,5 @@ lean_lib Examples where
              `Examples.SwapL2,
              `Examples.Rotate3Proof,
              `Examples.L1AutoTest,
-             `Examples.PipelineTest]
+             `Examples.PipelineTest,
+             `Examples.MultiCallProof]
