@@ -1,9 +1,11 @@
 ---
 id: TASK-0174
 title: 'Invariant preservation: prove every operation preserves global invariant'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-04-10 18:53'
+updated_date: '2026-04-10 19:26'
 labels:
   - phase-l
   - seL4-parity
@@ -20,8 +22,18 @@ seL4 reports ~80% of proof effort goes to proving invariant preservation. TASK-0
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 All 40 ring_buffer_ext operations listed
-- [ ] #2 Each proven to preserve global invariant
-- [ ] #3 Composed theorem: invariant preserved under arbitrary operation sequences
-- [ ] #4 Pattern: how to add new operations and prove invariant preservation
+- [x] #1 All 40 ring_buffer_ext operations listed
+- [x] #2 Each proven to preserve global invariant
+- [x] #3 Composed theorem: invariant preserved under arbitrary operation sequences
+- [x] #4 Pattern: how to add new operations and prove invariant preservation
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+- queueInvariant defined (length <= capacity, capacity > 0)
+- ExtQueueOp covers all 40 functions
+- Per-op preservation proofs: 40/40 sorry-free
+- Composition theorem: invariant_preserved_by_sequence sorry-free
+- All at abstract spec level (not C level)
+<!-- SECTION:NOTES:END -->

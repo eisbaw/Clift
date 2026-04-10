@@ -49,4 +49,6 @@ lean_lib Examples where
              `Examples.L1VcgTest,
              `Examples.RingBufferExtProof,
              `Examples.SoundnessCheck,
-             `Examples.TerminationProofs]
+             `Examples.TerminationProofs,
+             `Examples.RBExtFuncSpecs,
+             `Examples.RBExtRefinement]

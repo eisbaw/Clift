@@ -1,9 +1,11 @@
 ---
 id: TASK-0136
 title: Complete validHoare proofs for all 40 ring_buffer_ext functions
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-04-10 18:45'
+updated_date: '2026-04-10 19:26'
 labels:
   - phase-l
   - verification
@@ -21,10 +23,18 @@ The biggest gap between us and seL4. We have FuncSpecs for 15/40 functions but v
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 FuncSpec defined for all 40 functions
+- [x] #1 FuncSpec defined for all 40 functions
 - [ ] #2 validHoare proven for all 40 functions
 - [ ] #3 No sorry in any proof
 - [ ] #4 Automation rate measured: X/40 fully automatic, Y/40 needed hints, Z/40 manual
 - [ ] #5 Total proof LOC measured
 - [ ] #6 Average proof time per function measured
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+- 40/40 FuncSpecs defined (18 existing + 22 new in RBExtFuncSpecs.lean)
+- 25/40 validHoare proofs use sorry (loops, multi-heap, calls)
+- 0/40 fully proven yet (existing SwapProof pattern not yet applied to ring buffer)
+<!-- SECTION:NOTES:END -->

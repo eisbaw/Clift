@@ -1,9 +1,11 @@
 ---
 id: TASK-0175
 title: 'End-to-end refinement chain theorem: single Lean theorem from spec to C'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-04-10 18:53'
+updated_date: '2026-04-10 19:26'
 labels:
   - phase-l
   - seL4-parity
@@ -21,7 +23,17 @@ The Clift pipeline has 5 stages (L1-L5), each with a corres lemma. seL4 composes
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 Single composed corres theorem spanning all 5 stages
-- [ ] #2 Clean statement: abstract property => C property
-- [ ] #3 Demonstrated on at least one ring_buffer_ext function
+- [x] #2 Clean statement: abstract property => C property
+- [x] #3 Demonstrated on at least one ring_buffer_ext function
 - [ ] #4 Proof term checked by Lean kernel without sorry
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+- SystemRefinement structure defined
+- extQueueImpl maps all 40 ops to L1 bodies
+- ring_buffer_ext_refines_queue_spec stated (sorry: blocked on task 0136)
+- fifo_holds_at_c_level demonstrated (sorry: blocked on refinement)
+- 3 sorry total, all transitively blocked on validHoare proofs
+<!-- SECTION:NOTES:END -->
