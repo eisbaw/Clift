@@ -1,9 +1,10 @@
 ---
 id: TASK-0158
 title: 'Example: verify a memory allocator (first-fit, free list)'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-10 18:47'
+updated_date: '2026-04-10 23:02'
 labels:
   - phase-n
   - examples

@@ -44,6 +44,13 @@ import-all:
     just import test/c_sources/sha256_core.c Sha256Core
     just import test/c_sources/uart_driver.c UartDriver
     just import test/c_sources/packet_parser.c PacketParser
+    just import test/c_sources/sel4_cap.c Sel4Cap
+    just import test/c_sources/hash_table.c HashTable
+    just import test/c_sources/mem_alloc.c MemAlloc
+    just import test/c_sources/rbtree.c Rbtree
+    just import test/c_sources/state_machine.c StateMachine
+    just import test/c_sources/priority_queue.c PriorityQueue
+    just import test/c_sources/dma_buffer.c DmaBuffer
 
 # Multi-file import: process multiple .c files into a Lean module set
 # Usage: just multi-import MultiProject test/c_sources/multi_file/helper.c test/c_sources/multi_file/main.c

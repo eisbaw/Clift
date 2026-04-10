@@ -1,9 +1,10 @@
 ---
 id: TASK-0163
 title: 'Example: verify a packet parser (Ethernet/IP header)'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-10 18:47'
+updated_date: '2026-04-10 20:17'
 labels:
   - phase-n
   - examples

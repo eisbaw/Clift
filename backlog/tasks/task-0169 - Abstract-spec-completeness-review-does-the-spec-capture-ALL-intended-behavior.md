@@ -3,9 +3,10 @@ id: TASK-0169
 title: >-
   Abstract spec completeness review: does the spec capture ALL intended
   behavior?
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-10 18:50'
+updated_date: '2026-04-10 23:02'
 labels:
   - phase-l
   - spec-review

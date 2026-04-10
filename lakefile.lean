@@ -29,7 +29,14 @@ lean_lib Generated where
              `Generated.RtosQueue,
              `Generated.Sha256Core,
              `Generated.UartDriver,
-             `Generated.PacketParser]
+             `Generated.PacketParser,
+             `Generated.Sel4Cap,
+             `Generated.HashTable,
+             `Generated.MemAlloc,
+             `Generated.Rbtree,
+             `Generated.StateMachine,
+             `Generated.PriorityQueue,
+             `Generated.DmaBuffer]
 
 -- User proof examples
 @[default_target]
@@ -63,4 +70,13 @@ lean_lib Examples where
              `Examples.RtosQueueProof,
              `Examples.Sha256CoreProof,
              `Examples.UartDriverProof,
-             `Examples.PacketParserProof]
+             `Examples.PacketParserProof,
+             `Examples.Sel4CapProof,
+             `Examples.HashTableProof,
+             `Examples.MemAllocProof,
+             `Examples.RbtreeProof,
+             `Examples.StateMachineProof,
+             `Examples.PriorityQueueProof,
+             `Examples.DmaBufferProof,
+             `Examples.SpecCompletenessReview,
+             `Examples.ArrayBoundsProof]
