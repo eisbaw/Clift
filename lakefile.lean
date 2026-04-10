@@ -27,4 +27,5 @@ lean_lib Examples where
              `Examples.SwapProof, `Examples.SwapHeapLift,
              `Examples.SwapL2,
              `Examples.Rotate3Proof,
-             `Examples.L1AutoTest]
+             `Examples.L1AutoTest,
+             `Examples.PipelineTest]
