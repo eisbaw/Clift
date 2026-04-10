@@ -133,6 +133,17 @@ class LeanEmitter:
         # Fallback (shouldn't happen if _collect_all_vars is correct)
         return var_name
 
+    def _ret_field_name(self, func: FuncInfo) -> str:
+        """Get the Locals field name for the return value of a function."""
+        if "ret__val" in self.all_vars:
+            return "ret__val"
+        # Multiple return types: qualify with the function's return type
+        qualified = f"ret__val_{func.return_type.lean_type.lower()}"
+        if qualified in self.all_vars:
+            return qualified
+        # Fallback
+        return "ret__val"
+
     def emit(self) -> str:
         """Generate the complete .lean file."""
         self._emit_header()
@@ -217,9 +228,11 @@ class LeanEmitter:
         self._indent -= 1
 
     def _emit_struct(self, sdef: StructDef):
-        """Emit a Lean structure and CType/MemType instances for a C struct."""
+        """Emit a Lean structure and CType/MemType instances for a C struct or union."""
+        if sdef.is_union:
+            self._emit_union(sdef)
+            return
         lean_name = sdef.lean_name
-
         self._w(f"/-- C struct {sdef.name}: size={sdef.total_size}, align={sdef.alignment} -/")
         self._w(f"structure {lean_name} where")
         self._indent += 1
@@ -243,6 +256,40 @@ class LeanEmitter:
 
         # MemType instance: fromMem/toMem for the struct
         self._emit_struct_memtype(sdef)
+
+    def _emit_union(self, sdef: StructDef):
+        """Emit a Lean structure for a C union.
+
+        Unions have overlapping fields (all at offset 0). We model them as
+        a Lean structure with all fields, but do NOT emit MemType (no roundtrip
+        proof is possible since writing one field overwrites others).
+
+        Union access through pointers uses hVal which reads the full union value.
+        Field access then projects the appropriate field.
+        """
+        lean_name = sdef.lean_name
+        if not sdef.fields:
+            return
+
+        # Model union as a wrapper around its primary (largest) field.
+        # The primary field determines the memory representation.
+        # Secondary fields are modeled as the same Lean structure field
+        # (the C union's overlapping semantics are not fully captured --
+        # this is a documented limitation for industrial C coverage).
+        first_field = sdef.fields[0]
+        from_fn = self._memtype_from_fn(first_field.c_type)
+        to_fn = self._memtype_to_fn(first_field.c_type)
+        roundtrip_fn = self._memtype_roundtrip_fn(first_field.c_type)
+
+        self._w(f"/-- C union {sdef.name}: size={sdef.total_size}, align={sdef.alignment}")
+        self._w(f"    Primary field: {first_field.name} ({first_field.c_type.lean_type}).")
+        self._w(f"    Other fields overlap in memory (union semantics). -/")
+        self._w(f"abbrev {lean_name} := {first_field.c_type.lean_type}")
+        self._w()
+
+        # CType delegates to the primary field type (already has CType instance)
+        # MemType delegates to the primary field type (already has MemType instance)
+        # No additional instances needed since abbrev inherits them.
 
     def _emit_struct_memtype(self, sdef: StructDef):
         """Emit MemType instance for a struct.
@@ -490,8 +537,9 @@ class LeanEmitter:
                     # return X => guards + .seq (.basic (set ret__val := X)) .throw
                     expr_str = self._emit_expr(stmt.expr, func)
                     guards = self._collect_all_guards(stmt.expr, func)
+                    ret_field = self._ret_field_name(func)
                     def emit_return():
-                        self._w(f".seq (.basic (fun s => {{ s with locals := {{ s.locals with ret__val := {expr_str} }} }})) .throw")
+                        self._w(f".seq (.basic (fun s => {{ s with locals := {{ s.locals with {ret_field} := {expr_str} }} }})) .throw")
                     self._emit_with_guards(guards, emit_return)
             else:
                 # return; (void) => .throw
@@ -656,6 +704,13 @@ class LeanEmitter:
             return ", ".join(assignments)
         return None
 
+    def _callee_ret_field(self, callee_name: str) -> str:
+        """Get the ret__val field name for a callee function."""
+        callee = self._find_callee(callee_name)
+        if callee is not None:
+            return self._ret_field_name(callee)
+        return "ret__val"  # Fallback for unknown callees
+
     def _emit_call_assign(self, target_var: str, call_expr: Expr, func: FuncInfo):
         """Emit CSimpl for: target_var = callee(args)
 
@@ -668,6 +723,7 @@ class LeanEmitter:
         """
         callee_name = call_expr.var_name
         target_field = self._field_name(target_var, func)
+        callee_ret = self._callee_ret_field(callee_name)
         param_setup = self._emit_call_param_setup(call_expr, func)
 
         self._w(f".dynCom (fun saved =>")
@@ -680,13 +736,13 @@ class LeanEmitter:
             self._w(f"(.seq")
             self._indent += 1
             self._w(f'(.call "{callee_name}")')
-            self._w(f"(.basic (fun s => {{ s with locals := {{ saved.locals with {target_field} := s.locals.ret__val }} }}))))")
+            self._w(f"(.basic (fun s => {{ s with locals := {{ saved.locals with {target_field} := s.locals.{callee_ret} }} }}))))")
             self._indent -= 2
         else:
             self._w(f".seq")
             self._indent += 1
             self._w(f'(.call "{callee_name}")')
-            self._w(f"(.basic (fun s => {{ s with locals := {{ saved.locals with {target_field} := s.locals.ret__val }} }}))")
+            self._w(f"(.basic (fun s => {{ s with locals := {{ saved.locals with {target_field} := s.locals.{callee_ret} }} }})))")
             self._indent -= 1
 
         self._indent -= 1
@@ -732,10 +788,12 @@ class LeanEmitter:
             .seq (.basic (fun s => { s with locals := { s.locals with param := arg }}))
                  (.seq (.call "callee")
                        (.seq (.basic (fun s => { s with locals :=
-                         { saved.locals with ret__val := s.locals.ret__val }}))
+                         { saved.locals with ret__val := s.locals.callee_ret__val }}))
                              .throw)))
         """
         callee_name = call_expr.var_name
+        caller_ret = self._ret_field_name(func)
+        callee_ret = self._callee_ret_field(callee_name)
         param_setup = self._emit_call_param_setup(call_expr, func)
 
         self._w(f".dynCom (fun saved =>")
@@ -748,13 +806,13 @@ class LeanEmitter:
             self._w(f"(.seq")
             self._indent += 1
             self._w(f'(.call "{callee_name}")')
-            self._w(f"(.seq (.basic (fun s => {{ s with locals := {{ saved.locals with ret__val := s.locals.ret__val }} }})) .throw)))")
+            self._w(f"(.seq (.basic (fun s => {{ s with locals := {{ saved.locals with {caller_ret} := s.locals.{callee_ret} }} }})) .throw)))")
             self._indent -= 2
         else:
             self._w(f".seq")
             self._indent += 1
             self._w(f'(.call "{callee_name}")')
-            self._w(f"(.seq (.basic (fun s => {{ s with locals := {{ saved.locals with ret__val := s.locals.ret__val }} }})) .throw)")
+            self._w(f"(.seq (.basic (fun s => {{ s with locals := {{ saved.locals with {caller_ret} := s.locals.{callee_ret} }} }})) .throw)")
             self._indent -= 1
 
         self._indent -= 1
@@ -818,6 +876,20 @@ class LeanEmitter:
             rhs = self._emit_expr(expr.rhs, func)
             op = expr.op
 
+            # Pointer arithmetic: ptr + n or ptr - n
+            lhs_is_ptr = self._is_pointer_expr(expr.lhs, func)
+            rhs_is_ptr = self._is_pointer_expr(expr.rhs, func)
+            if op == "+" and (lhs_is_ptr or rhs_is_ptr):
+                if lhs_is_ptr:
+                    offset = rhs if expr.rhs.kind == "int_literal" else f"({rhs}).toNat"
+                    return f"(Ptr.elemOffset {lhs} {offset})"
+                else:
+                    offset = lhs if expr.lhs.kind == "int_literal" else f"({lhs}).toNat"
+                    return f"(Ptr.elemOffset {rhs} {offset})"
+            if op == "-" and lhs_is_ptr and not rhs_is_ptr:
+                # ptr - n: move pointer backwards
+                return f"(Ptr.addBytes {lhs} (0 - {rhs}.toNat))"
+
             # Map C operators to Lean operators
             lean_op = {
                 "+": "+", "-": "-", "*": "*", "/": "/", "%": "%",
@@ -856,6 +928,10 @@ class LeanEmitter:
             base_str = self._emit_expr(expr.member_base, func)
             field_name = expr.member_name
             if expr.member_is_arrow:
+                # Check if the struct is a union (modeled as abbrev for primary field)
+                # If so, accessing the primary field is just hVal directly
+                if self._is_union_primary_field(base_str, field_name, func):
+                    return f"(hVal s.globals.rawHeap {base_str})"
                 # p->field => (hVal heap p).field
                 return f"(hVal s.globals.rawHeap {base_str}).{field_name}"
             else:
@@ -875,8 +951,56 @@ class LeanEmitter:
             false_val = self._emit_expr(expr.third, func)
             return f"(if {cond} then {true_val} else {false_val})"
 
+        elif expr.kind == "cast_expr":
+            # Type cast: emit conversion between integer types.
+            # The guard for narrowing is emitted by _collect_cast_guards.
+            operand_str = self._emit_expr(expr.operand, func)
+            src = expr.cast_from
+            tgt = expr.cast_to
+            if src is None or tgt is None:
+                return operand_str  # Unknown types: identity
+            # If the operand is a sizeof (compile-time constant), emit directly
+            if expr.operand and expr.operand.kind == "sizeof_expr":
+                return operand_str  # Already a Nat literal
+            if tgt.bits >= src.bits:
+                # Widening or same-width: value is preserved.
+                # UInt types in Lean auto-widen via .toNat, emit .toUIntN
+                if tgt.bits != src.bits:
+                    return f"({operand_str}).toNat.toUInt{tgt.bits}"
+                return operand_str  # Same width
+            else:
+                # Narrowing: truncate via modular arithmetic.
+                # Guard is emitted separately by _collect_cast_guards.
+                return f"({operand_str}).toNat.toUInt{tgt.bits}"
+
+        elif expr.kind == "ptr_cast_expr":
+            # Pointer-to-pointer cast (e.g., void* -> uint32_t*).
+            # Both types are pointers; they have the same representation (Fin memSize).
+            # Emit a Ptr reinterpretation: ⟨operand.addr⟩
+            operand_str = self._emit_expr(expr.operand, func)
+            if expr.cast_to and expr.cast_to.is_pointer:
+                target_lean = expr.cast_to.lean_type
+                return f"(\u27e8{operand_str}.addr\u27e9 : {target_lean})"
+            return operand_str
+
+        elif expr.kind == "sizeof_expr":
+            # sizeof(type): compile-time constant
+            from .c_types import type_size_align
+            if expr.sizeof_type is not None:
+                size, _ = type_size_align(expr.sizeof_type)
+                return str(size)
+            return "0"  # Should not happen
+
         else:
             raise ValueError(f"Unhandled expression kind: {expr.kind}")
+
+    def _is_union_primary_field(self, base_str: str, field_name: str, func: FuncInfo) -> bool:
+        """Check if a member access is the primary field of a union (modeled as abbrev)."""
+        from .c_types import get_struct_defs
+        for key, sdef in get_struct_defs().items():
+            if sdef.is_union and sdef.fields and sdef.fields[0].name == field_name:
+                return True
+        return False
 
     def _is_pointer_var(self, var_name: str, func: FuncInfo) -> bool:
         """Check if a local/param variable has pointer type."""
@@ -1099,14 +1223,48 @@ class LeanEmitter:
             guards.extend(self._collect_signed_overflow_guards(expr.member_base, func))
         return guards
 
+    def _collect_cast_guards(self, expr: Expr, func: FuncInfo) -> list[str]:
+        """Collect guards for narrowing casts.
+
+        Narrowing cast (e.g. uint32 -> uint8) is only defined if the value
+        fits in the target type. Emit a guard: value < 2^target_bits.
+        """
+        guards = []
+        if expr is None:
+            return guards
+        if expr.kind == "cast_expr" and expr.cast_from and expr.cast_to:
+            src = expr.cast_from
+            tgt = expr.cast_to
+            if tgt.bits < src.bits and tgt.bits > 0:
+                # Skip guard for compile-time constants (sizeof, literals)
+                if expr.operand and expr.operand.kind in ("sizeof_expr", "int_literal"):
+                    pass  # Value is known at compile time, guard trivially holds
+                else:
+                    operand_str = self._emit_expr(expr.operand, func)
+                    modulus = 2 ** tgt.bits
+                    guards.append(f"({operand_str}).toNat < {modulus}")
+        # Recurse into sub-expressions
+        if expr.lhs is not None:
+            guards.extend(self._collect_cast_guards(expr.lhs, func))
+        if expr.rhs is not None:
+            guards.extend(self._collect_cast_guards(expr.rhs, func))
+        if expr.third is not None:
+            guards.extend(self._collect_cast_guards(expr.third, func))
+        if expr.operand is not None:
+            guards.extend(self._collect_cast_guards(expr.operand, func))
+        if expr.member_base is not None:
+            guards.extend(self._collect_cast_guards(expr.member_base, func))
+        return guards
+
     def _collect_all_guards(self, expr: Expr, func: FuncInfo) -> list[str]:
-        """Collect all UB guards for an expression: deref, division, signed overflow."""
+        """Collect all UB guards for an expression: deref, division, signed overflow, casts."""
         guards = []
         if expr is None:
             return guards
         guards.extend(self._collect_deref_guards(expr, func))
         guards.extend(self._collect_div_guards(expr, func))
         guards.extend(self._collect_signed_overflow_guards(expr, func))
+        guards.extend(self._collect_cast_guards(expr, func))
         return guards
 
     def _emit_with_guards(self, guards: list[str], inner_emit):

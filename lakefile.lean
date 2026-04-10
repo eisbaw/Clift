@@ -18,7 +18,14 @@ lean_lib Generated where
              `Generated.DivTest, `Generated.SignedArith, `Generated.ForLoop, `Generated.DoWhile, `Generated.SwitchTest,
              `Generated.MultiCall, `Generated.RingBuffer, `Generated.SumArray,
              `Generated.EnumTypedefGlobal,
-             `Generated.RingBufferExt]
+             `Generated.RingBufferExt,
+             `Generated.Bitwise,
+             `Generated.CastsSizeof,
+             `Generated.MultiProject.Types,
+             `Generated.MultiProject.Helper,
+             `Generated.MultiProject.Main,
+             `Generated.UnionsVoid,
+             `Generated.Strings]
 
 -- User proof examples
 @[default_target]

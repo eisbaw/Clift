@@ -1,0 +1,6241 @@
+{
+  "id": "0x4ea2f8",
+  "kind": "TranslationUnitDecl",
+  "loc": {},
+  "range": {
+    "begin": {},
+    "end": {}
+  },
+  "inner": [
+    {
+      "id": "0x4eab20",
+      "kind": "TypedefDecl",
+      "loc": {},
+      "range": {
+        "begin": {},
+        "end": {}
+      },
+      "isImplicit": true,
+      "name": "__int128_t",
+      "type": {
+        "qualType": "__int128"
+      },
+      "inner": [
+        {
+          "id": "0x4ea8c0",
+          "kind": "BuiltinType",
+          "type": {
+            "qualType": "__int128"
+          }
+        }
+      ]
+    },
+    {
+      "id": "0x4eab90",
+      "kind": "TypedefDecl",
+      "loc": {},
+      "range": {
+        "begin": {},
+        "end": {}
+      },
+      "isImplicit": true,
+      "name": "__uint128_t",
+      "type": {
+        "qualType": "unsigned __int128"
+      },
+      "inner": [
+        {
+          "id": "0x4ea8e0",
+          "kind": "BuiltinType",
+          "type": {
+            "qualType": "unsigned __int128"
+          }
+        }
+      ]
+    },
+    {
+      "id": "0x4eae98",
+      "kind": "TypedefDecl",
+      "loc": {},
+      "range": {
+        "begin": {},
+        "end": {}
+      },
+      "isImplicit": true,
+      "name": "__NSConstantString",
+      "type": {
+        "qualType": "struct __NSConstantString_tag"
+      },
+      "inner": [
+        {
+          "id": "0x4eac70",
+          "kind": "RecordType",
+          "type": {
+            "qualType": "struct __NSConstantString_tag"
+          },
+          "decl": {
+            "id": "0x4eabe8",
+            "kind": "RecordDecl",
+            "name": "__NSConstantString_tag"
+          }
+        }
+      ]
+    },
+    {
+      "id": "0x4eaf30",
+      "kind": "TypedefDecl",
+      "loc": {},
+      "range": {
+        "begin": {},
+        "end": {}
+      },
+      "isImplicit": true,
+      "name": "__builtin_ms_va_list",
+      "type": {
+        "qualType": "char *"
+      },
+      "inner": [
+        {
+          "id": "0x4eaef0",
+          "kind": "PointerType",
+          "type": {
+            "qualType": "char *"
+          },
+          "inner": [
+            {
+              "id": "0x4ea3a0",
+              "kind": "BuiltinType",
+              "type": {
+                "qualType": "char"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "0x4eb228",
+      "kind": "TypedefDecl",
+      "loc": {},
+      "range": {
+        "begin": {},
+        "end": {}
+      },
+      "isImplicit": true,
+      "name": "__builtin_va_list",
+      "type": {
+        "qualType": "struct __va_list_tag[1]"
+      },
+      "inner": [
+        {
+          "id": "0x4eb1d0",
+          "kind": "ConstantArrayType",
+          "type": {
+            "qualType": "struct __va_list_tag[1]"
+          },
+          "size": 1,
+          "inner": [
+            {
+              "id": "0x4eb010",
+              "kind": "RecordType",
+              "type": {
+                "qualType": "struct __va_list_tag"
+              },
+              "decl": {
+                "id": "0x4eaf88",
+                "kind": "RecordDecl",
+                "name": "__va_list_tag"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "0x4eb298",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 1102,
+        "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/bits/types.h",
+        "line": 31,
+        "col": 23,
+        "tokLen": 8,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "offset": 1080,
+          "col": 1,
+          "tokLen": 7,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        },
+        "end": {
+          "offset": 1102,
+          "col": 23,
+          "tokLen": 8,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "name": "__u_char",
+      "type": {
+        "qualType": "unsigned char"
+      },
+      "inner": [
+        {
+          "id": "0x4ea460",
+          "kind": "BuiltinType",
+          "type": {
+            "qualType": "unsigned char"
+          }
+        }
+      ]
+    },
+    {
+      "id": "0x56a638",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 1139,
+        "line": 32,
+        "col": 28,
+        "tokLen": 9,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "offset": 1112,
+          "col": 1,
+          "tokLen": 7,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        },
+        "end": {
+          "offset": 1139,
+          "col": 28,
+          "tokLen": 9,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "name": "__u_short",
+      "type": {
+        "qualType": "unsigned short"
+      },
+      "inner": [
+        {
+          "id": "0x4ea480",
+          "kind": "BuiltinType",
+          "type": {
+            "qualType": "unsigned short"
+          }
+        }
+      ]
+    },
+    {
+      "id": "0x56a6a8",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 1171,
+        "line": 33,
+        "col": 22,
+        "tokLen": 7,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "offset": 1150,
+          "col": 1,
+          "tokLen": 7,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        },
+        "end": {
+          "offset": 1171,
+          "col": 22,
+          "tokLen": 7,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "name": "__u_int",
+      "type": {
+        "qualType": "unsigned int"
+      },
+      "inner": [
+        {
+          "id": "0x4ea4a0",
+          "kind": "BuiltinType",
+          "type": {
+            "qualType": "unsigned int"
+          }
+        }
+      ]
+    },
+    {
+      "id": "0x56a718",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 1206,
+        "line": 34,
+        "col": 27,
+        "tokLen": 8,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "offset": 1180,
+          "col": 1,
+          "tokLen": 7,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        },
+        "end": {
+          "offset": 1206,
+          "col": 27,
+          "tokLen": 8,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "name": "__u_long",
+      "type": {
+        "qualType": "unsigned long"
+      },
+      "inner": [
+        {
+          "id": "0x4ea4c0",
+          "kind": "BuiltinType",
+          "type": {
+            "qualType": "unsigned long"
+          }
+        }
+      ]
+    },
+    {
+      "id": "0x56a788",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 1313,
+        "line": 37,
+        "col": 21,
+        "tokLen": 8,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "offset": 1293,
+          "col": 1,
+          "tokLen": 7,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        },
+        "end": {
+          "offset": 1313,
+          "col": 21,
+          "tokLen": 8,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "isReferenced": true,
+      "name": "__int8_t",
+      "type": {
+        "qualType": "signed char"
+      },
+      "inner": [
+        {
+          "id": "0x4ea3c0",
+          "kind": "BuiltinType",
+          "type": {
+            "qualType": "signed char"
+          }
+        }
+      ]
+    },
+    {
+      "id": "0x56a7f8",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 1345,
+        "line": 38,
+        "col": 23,
+        "tokLen": 9,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "offset": 1323,
+          "col": 1,
+          "tokLen": 7,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        },
+        "end": {
+          "offset": 1345,
+          "col": 23,
+          "tokLen": 9,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "isReferenced": true,
+      "name": "__uint8_t",
+      "type": {
+        "qualType": "unsigned char"
+      },
+      "inner": [
+        {
+          "id": "0x4ea460",
+          "kind": "BuiltinType",
+          "type": {
+            "qualType": "unsigned char"
+          }
+        }
+      ]
+    },
+    {
+      "id": "0x56a868",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 1381,
+        "line": 39,
+        "col": 26,
+        "tokLen": 9,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "offset": 1356,
+          "col": 1,
+          "tokLen": 7,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        },
+        "end": {
+          "offset": 1381,
+          "col": 26,
+          "tokLen": 9,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "isReferenced": true,
+      "name": "__int16_t",
+      "type": {
+        "qualType": "short"
+      },
+      "inner": [
+        {
+          "id": "0x4ea3e0",
+          "kind": "BuiltinType",
+          "type": {
+            "qualType": "short"
+          }
+        }
+      ]
+    },
+    {
+      "id": "0x56a8d8",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 1419,
+        "line": 40,
+        "col": 28,
+        "tokLen": 10,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "offset": 1392,
+          "col": 1,
+          "tokLen": 7,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        },
+        "end": {
+          "offset": 1419,
+          "col": 28,
+          "tokLen": 10,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "isReferenced": true,
+      "name": "__uint16_t",
+      "type": {
+        "qualType": "unsigned short"
+      },
+      "inner": [
+        {
+          "id": "0x4ea480",
+          "kind": "BuiltinType",
+          "type": {
+            "qualType": "unsigned short"
+          }
+        }
+      ]
+    },
+    {
+      "id": "0x56a948",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 1450,
+        "line": 41,
+        "col": 20,
+        "tokLen": 9,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "offset": 1431,
+          "col": 1,
+          "tokLen": 7,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        },
+        "end": {
+          "offset": 1450,
+          "col": 20,
+          "tokLen": 9,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "isReferenced": true,
+      "name": "__int32_t",
+      "type": {
+        "qualType": "int"
+      },
+      "inner": [
+        {
+          "id": "0x4ea400",
+          "kind": "BuiltinType",
+          "type": {
+            "qualType": "int"
+          }
+        }
+      ]
+    },
+    {
+      "id": "0x56a9b8",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 1482,
+        "line": 42,
+        "col": 22,
+        "tokLen": 10,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "offset": 1461,
+          "col": 1,
+          "tokLen": 7,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        },
+        "end": {
+          "offset": 1482,
+          "col": 22,
+          "tokLen": 10,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "isReferenced": true,
+      "name": "__uint32_t",
+      "type": {
+        "qualType": "unsigned int"
+      },
+      "inner": [
+        {
+          "id": "0x4ea4a0",
+          "kind": "BuiltinType",
+          "type": {
+            "qualType": "unsigned int"
+          }
+        }
+      ]
+    },
+    {
+      "id": "0x56aa28",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 1539,
+        "line": 44,
+        "col": 25,
+        "tokLen": 9,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "offset": 1515,
+          "col": 1,
+          "tokLen": 7,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        },
+        "end": {
+          "offset": 1539,
+          "col": 25,
+          "tokLen": 9,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "isReferenced": true,
+      "name": "__int64_t",
+      "type": {
+        "qualType": "long"
+      },
+      "inner": [
+        {
+          "id": "0x4ea420",
+          "kind": "BuiltinType",
+          "type": {
+            "qualType": "long"
+          }
+        }
+      ]
+    },
+    {
+      "id": "0x56aa98",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 1576,
+        "line": 45,
+        "col": 27,
+        "tokLen": 10,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "offset": 1550,
+          "col": 1,
+          "tokLen": 7,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        },
+        "end": {
+          "offset": 1576,
+          "col": 27,
+          "tokLen": 10,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "isReferenced": true,
+      "name": "__uint64_t",
+      "type": {
+        "qualType": "unsigned long"
+      },
+      "inner": [
+        {
+          "id": "0x4ea4c0",
+          "kind": "BuiltinType",
+          "type": {
+            "qualType": "unsigned long"
+          }
+        }
+      ]
+    },
+    {
+      "id": "0x56ab60",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 1781,
+        "line": 52,
+        "col": 18,
+        "tokLen": 14,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "offset": 1764,
+          "col": 1,
+          "tokLen": 7,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        },
+        "end": {
+          "offset": 1781,
+          "col": 18,
+          "tokLen": 14,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "isReferenced": true,
+      "name": "__int_least8_t",
+      "type": {
+        "desugaredQualType": "signed char",
+        "qualType": "__int8_t",
+        "typeAliasDeclId": "0x56a788"
+      },
+      "inner": [
+        {
+          "id": "0x56ab20",
+          "kind": "ElaboratedType",
+          "type": {
+            "qualType": "__int8_t"
+          },
+          "inner": [
+            {
+              "id": "0x56aaf0",
+              "kind": "TypedefType",
+              "type": {
+                "qualType": "__int8_t"
+              },
+              "decl": {
+                "id": "0x56a788",
+                "kind": "TypedefDecl",
+                "name": "__int8_t"
+              },
+              "inner": [
+                {
+                  "id": "0x4ea3c0",
+                  "kind": "BuiltinType",
+                  "type": {
+                    "qualType": "signed char"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "0x56ac30",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 1815,
+        "line": 53,
+        "col": 19,
+        "tokLen": 15,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "offset": 1797,
+          "col": 1,
+          "tokLen": 7,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        },
+        "end": {
+          "offset": 1815,
+          "col": 19,
+          "tokLen": 15,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "isReferenced": true,
+      "name": "__uint_least8_t",
+      "type": {
+        "desugaredQualType": "unsigned char",
+        "qualType": "__uint8_t",
+        "typeAliasDeclId": "0x56a7f8"
+      },
+      "inner": [
+        {
+          "id": "0x56abf0",
+          "kind": "ElaboratedType",
+          "type": {
+            "qualType": "__uint8_t"
+          },
+          "inner": [
+            {
+              "id": "0x56abc0",
+              "kind": "TypedefType",
+              "type": {
+                "qualType": "__uint8_t"
+              },
+              "decl": {
+                "id": "0x56a7f8",
+                "kind": "TypedefDecl",
+                "name": "__uint8_t"
+              },
+              "inner": [
+                {
+                  "id": "0x4ea460",
+                  "kind": "BuiltinType",
+                  "type": {
+                    "qualType": "unsigned char"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "0x56ad00",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 1850,
+        "line": 54,
+        "col": 19,
+        "tokLen": 15,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "offset": 1832,
+          "col": 1,
+          "tokLen": 7,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        },
+        "end": {
+          "offset": 1850,
+          "col": 19,
+          "tokLen": 15,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "isReferenced": true,
+      "name": "__int_least16_t",
+      "type": {
+        "desugaredQualType": "short",
+        "qualType": "__int16_t",
+        "typeAliasDeclId": "0x56a868"
+      },
+      "inner": [
+        {
+          "id": "0x56acc0",
+          "kind": "ElaboratedType",
+          "type": {
+            "qualType": "__int16_t"
+          },
+          "inner": [
+            {
+              "id": "0x56ac90",
+              "kind": "TypedefType",
+              "type": {
+                "qualType": "__int16_t"
+              },
+              "decl": {
+                "id": "0x56a868",
+                "kind": "TypedefDecl",
+                "name": "__int16_t"
+              },
+              "inner": [
+                {
+                  "id": "0x4ea3e0",
+                  "kind": "BuiltinType",
+                  "type": {
+                    "qualType": "short"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "0x56add0",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 1886,
+        "line": 55,
+        "col": 20,
+        "tokLen": 16,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "offset": 1867,
+          "col": 1,
+          "tokLen": 7,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        },
+        "end": {
+          "offset": 1886,
+          "col": 20,
+          "tokLen": 16,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "isReferenced": true,
+      "name": "__uint_least16_t",
+      "type": {
+        "desugaredQualType": "unsigned short",
+        "qualType": "__uint16_t",
+        "typeAliasDeclId": "0x56a8d8"
+      },
+      "inner": [
+        {
+          "id": "0x56ad90",
+          "kind": "ElaboratedType",
+          "type": {
+            "qualType": "__uint16_t"
+          },
+          "inner": [
+            {
+              "id": "0x56ad60",
+              "kind": "TypedefType",
+              "type": {
+                "qualType": "__uint16_t"
+              },
+              "decl": {
+                "id": "0x56a8d8",
+                "kind": "TypedefDecl",
+                "name": "__uint16_t"
+              },
+              "inner": [
+                {
+                  "id": "0x4ea480",
+                  "kind": "BuiltinType",
+                  "type": {
+                    "qualType": "unsigned short"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "0x56aea0",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 1922,
+        "line": 56,
+        "col": 19,
+        "tokLen": 15,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "offset": 1904,
+          "col": 1,
+          "tokLen": 7,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        },
+        "end": {
+          "offset": 1922,
+          "col": 19,
+          "tokLen": 15,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "isReferenced": true,
+      "name": "__int_least32_t",
+      "type": {
+        "desugaredQualType": "int",
+        "qualType": "__int32_t",
+        "typeAliasDeclId": "0x56a948"
+      },
+      "inner": [
+        {
+          "id": "0x56ae60",
+          "kind": "ElaboratedType",
+          "type": {
+            "qualType": "__int32_t"
+          },
+          "inner": [
+            {
+              "id": "0x56ae30",
+              "kind": "TypedefType",
+              "type": {
+                "qualType": "__int32_t"
+              },
+              "decl": {
+                "id": "0x56a948",
+                "kind": "TypedefDecl",
+                "name": "__int32_t"
+              },
+              "inner": [
+                {
+                  "id": "0x4ea400",
+                  "kind": "BuiltinType",
+                  "type": {
+                    "qualType": "int"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "0x56af70",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 1958,
+        "line": 57,
+        "col": 20,
+        "tokLen": 16,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "offset": 1939,
+          "col": 1,
+          "tokLen": 7,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        },
+        "end": {
+          "offset": 1958,
+          "col": 20,
+          "tokLen": 16,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "isReferenced": true,
+      "name": "__uint_least32_t",
+      "type": {
+        "desugaredQualType": "unsigned int",
+        "qualType": "__uint32_t",
+        "typeAliasDeclId": "0x56a9b8"
+      },
+      "inner": [
+        {
+          "id": "0x56af30",
+          "kind": "ElaboratedType",
+          "type": {
+            "qualType": "__uint32_t"
+          },
+          "inner": [
+            {
+              "id": "0x56af00",
+              "kind": "TypedefType",
+              "type": {
+                "qualType": "__uint32_t"
+              },
+              "decl": {
+                "id": "0x56a9b8",
+                "kind": "TypedefDecl",
+                "name": "__uint32_t"
+              },
+              "inner": [
+                {
+                  "id": "0x4ea4a0",
+                  "kind": "BuiltinType",
+                  "type": {
+                    "qualType": "unsigned int"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "0x56b040",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 1994,
+        "line": 58,
+        "col": 19,
+        "tokLen": 15,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "offset": 1976,
+          "col": 1,
+          "tokLen": 7,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        },
+        "end": {
+          "offset": 1994,
+          "col": 19,
+          "tokLen": 15,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "isReferenced": true,
+      "name": "__int_least64_t",
+      "type": {
+        "desugaredQualType": "long",
+        "qualType": "__int64_t",
+        "typeAliasDeclId": "0x56aa28"
+      },
+      "inner": [
+        {
+          "id": "0x56b000",
+          "kind": "ElaboratedType",
+          "type": {
+            "qualType": "__int64_t"
+          },
+          "inner": [
+            {
+              "id": "0x56afd0",
+              "kind": "TypedefType",
+              "type": {
+                "qualType": "__int64_t"
+              },
+              "decl": {
+                "id": "0x56aa28",
+                "kind": "TypedefDecl",
+                "name": "__int64_t"
+              },
+              "inner": [
+                {
+                  "id": "0x4ea420",
+                  "kind": "BuiltinType",
+                  "type": {
+                    "qualType": "long"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "0x56b110",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 2030,
+        "line": 59,
+        "col": 20,
+        "tokLen": 16,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "offset": 2011,
+          "col": 1,
+          "tokLen": 7,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        },
+        "end": {
+          "offset": 2030,
+          "col": 20,
+          "tokLen": 16,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "isReferenced": true,
+      "name": "__uint_least64_t",
+      "type": {
+        "desugaredQualType": "unsigned long",
+        "qualType": "__uint64_t",
+        "typeAliasDeclId": "0x56aa98"
+      },
+      "inner": [
+        {
+          "id": "0x56b0d0",
+          "kind": "ElaboratedType",
+          "type": {
+            "qualType": "__uint64_t"
+          },
+          "inner": [
+            {
+              "id": "0x56b0a0",
+              "kind": "TypedefType",
+              "type": {
+                "qualType": "__uint64_t"
+              },
+              "decl": {
+                "id": "0x56aa98",
+                "kind": "TypedefDecl",
+                "name": "__uint64_t"
+              },
+              "inner": [
+                {
+                  "id": "0x4ea4c0",
+                  "kind": "BuiltinType",
+                  "type": {
+                    "qualType": "unsigned long"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "0x56b180",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 2118,
+        "line": 63,
+        "col": 18,
+        "tokLen": 8,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "offset": 2101,
+          "col": 1,
+          "tokLen": 7,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        },
+        "end": {
+          "offset": 2118,
+          "col": 18,
+          "tokLen": 8,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "name": "__quad_t",
+      "type": {
+        "qualType": "long"
+      },
+      "inner": [
+        {
+          "id": "0x4ea420",
+          "kind": "BuiltinType",
+          "type": {
+            "qualType": "long"
+          }
+        }
+      ]
+    },
+    {
+      "id": "0x56b1f0",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 2154,
+        "line": 64,
+        "col": 27,
+        "tokLen": 10,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "offset": 2128,
+          "col": 1,
+          "tokLen": 7,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        },
+        "end": {
+          "offset": 2154,
+          "col": 27,
+          "tokLen": 10,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "name": "__u_quad_t",
+      "type": {
+        "qualType": "unsigned long"
+      },
+      "inner": [
+        {
+          "id": "0x4ea4c0",
+          "kind": "BuiltinType",
+          "type": {
+            "qualType": "unsigned long"
+          }
+        }
+      ]
+    },
+    {
+      "id": "0x56b260",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 2352,
+        "line": 72,
+        "col": 18,
+        "tokLen": 10,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "offset": 2335,
+          "col": 1,
+          "tokLen": 7,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        },
+        "end": {
+          "offset": 2352,
+          "col": 18,
+          "tokLen": 10,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "isReferenced": true,
+      "name": "__intmax_t",
+      "type": {
+        "qualType": "long"
+      },
+      "inner": [
+        {
+          "id": "0x4ea420",
+          "kind": "BuiltinType",
+          "type": {
+            "qualType": "long"
+          }
+        }
+      ]
+    },
+    {
+      "id": "0x56b2d0",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 2390,
+        "line": 73,
+        "col": 27,
+        "tokLen": 11,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "offset": 2364,
+          "col": 1,
+          "tokLen": 7,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        },
+        "end": {
+          "offset": 2390,
+          "col": 27,
+          "tokLen": 11,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "isReferenced": true,
+      "name": "__uintmax_t",
+      "type": {
+        "qualType": "unsigned long"
+      },
+      "inner": [
+        {
+          "id": "0x4ea4c0",
+          "kind": "BuiltinType",
+          "type": {
+            "qualType": "unsigned long"
+          }
+        }
+      ]
+    },
+    {
+      "id": "0x56b340",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 5308,
+        "line": 145,
+        "col": 25,
+        "tokLen": 7,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "spellingLoc": {
+            "offset": 5128,
+            "line": 137,
+            "col": 22,
+            "tokLen": 7,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          },
+          "expansionLoc": {
+            "offset": 5284,
+            "line": 145,
+            "col": 1,
+            "tokLen": 10,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          }
+        },
+        "end": {
+          "offset": 5308,
+          "col": 25,
+          "tokLen": 7,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "name": "__dev_t",
+      "type": {
+        "qualType": "unsigned long"
+      },
+      "inner": [
+        {
+          "id": "0x4ea4c0",
+          "kind": "BuiltinType",
+          "type": {
+            "qualType": "unsigned long"
+          }
+        }
+      ]
+    },
+    {
+      "id": "0x56b3b0",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 5372,
+        "line": 146,
+        "col": 25,
+        "tokLen": 7,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "spellingLoc": {
+            "offset": 5128,
+            "line": 137,
+            "col": 22,
+            "tokLen": 7,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          },
+          "expansionLoc": {
+            "offset": 5348,
+            "line": 146,
+            "col": 1,
+            "tokLen": 10,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          }
+        },
+        "end": {
+          "offset": 5372,
+          "col": 25,
+          "tokLen": 7,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "name": "__uid_t",
+      "type": {
+        "qualType": "unsigned int"
+      },
+      "inner": [
+        {
+          "id": "0x4ea4a0",
+          "kind": "BuiltinType",
+          "type": {
+            "qualType": "unsigned int"
+          }
+        }
+      ]
+    },
+    {
+      "id": "0x56b420",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 5442,
+        "line": 147,
+        "col": 25,
+        "tokLen": 7,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "spellingLoc": {
+            "offset": 5128,
+            "line": 137,
+            "col": 22,
+            "tokLen": 7,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          },
+          "expansionLoc": {
+            "offset": 5418,
+            "line": 147,
+            "col": 1,
+            "tokLen": 10,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          }
+        },
+        "end": {
+          "offset": 5442,
+          "col": 25,
+          "tokLen": 7,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "name": "__gid_t",
+      "type": {
+        "qualType": "unsigned int"
+      },
+      "inner": [
+        {
+          "id": "0x4ea4a0",
+          "kind": "BuiltinType",
+          "type": {
+            "qualType": "unsigned int"
+          }
+        }
+      ]
+    },
+    {
+      "id": "0x56b490",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 5513,
+        "line": 148,
+        "col": 25,
+        "tokLen": 7,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "spellingLoc": {
+            "offset": 5128,
+            "line": 137,
+            "col": 22,
+            "tokLen": 7,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          },
+          "expansionLoc": {
+            "offset": 5489,
+            "line": 148,
+            "col": 1,
+            "tokLen": 10,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          }
+        },
+        "end": {
+          "offset": 5513,
+          "col": 25,
+          "tokLen": 7,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "name": "__ino_t",
+      "type": {
+        "qualType": "unsigned long"
+      },
+      "inner": [
+        {
+          "id": "0x4ea4c0",
+          "kind": "BuiltinType",
+          "type": {
+            "qualType": "unsigned long"
+          }
+        }
+      ]
+    },
+    {
+      "id": "0x56b500",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 5584,
+        "line": 149,
+        "col": 27,
+        "tokLen": 9,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "spellingLoc": {
+            "offset": 5128,
+            "line": 137,
+            "col": 22,
+            "tokLen": 7,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          },
+          "expansionLoc": {
+            "offset": 5558,
+            "line": 149,
+            "col": 1,
+            "tokLen": 10,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          }
+        },
+        "end": {
+          "offset": 5584,
+          "col": 27,
+          "tokLen": 9,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "name": "__ino64_t",
+      "type": {
+        "qualType": "unsigned long"
+      },
+      "inner": [
+        {
+          "id": "0x4ea4c0",
+          "kind": "BuiltinType",
+          "type": {
+            "qualType": "unsigned long"
+          }
+        }
+      ]
+    },
+    {
+      "id": "0x56b570",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 5660,
+        "line": 150,
+        "col": 26,
+        "tokLen": 8,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "spellingLoc": {
+            "offset": 5128,
+            "line": 137,
+            "col": 22,
+            "tokLen": 7,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          },
+          "expansionLoc": {
+            "offset": 5635,
+            "line": 150,
+            "col": 1,
+            "tokLen": 10,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          }
+        },
+        "end": {
+          "offset": 5660,
+          "col": 26,
+          "tokLen": 8,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "name": "__mode_t",
+      "type": {
+        "qualType": "unsigned int"
+      },
+      "inner": [
+        {
+          "id": "0x4ea4a0",
+          "kind": "BuiltinType",
+          "type": {
+            "qualType": "unsigned int"
+          }
+        }
+      ]
+    },
+    {
+      "id": "0x56f590",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 5736,
+        "line": 151,
+        "col": 27,
+        "tokLen": 9,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "spellingLoc": {
+            "offset": 5128,
+            "line": 137,
+            "col": 22,
+            "tokLen": 7,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          },
+          "expansionLoc": {
+            "offset": 5710,
+            "line": 151,
+            "col": 1,
+            "tokLen": 10,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          }
+        },
+        "end": {
+          "offset": 5736,
+          "col": 27,
+          "tokLen": 9,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "name": "__nlink_t",
+      "type": {
+        "qualType": "unsigned long"
+      },
+      "inner": [
+        {
+          "id": "0x4ea4c0",
+          "kind": "BuiltinType",
+          "type": {
+            "qualType": "unsigned long"
+          }
+        }
+      ]
+    },
+    {
+      "id": "0x56f600",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 5804,
+        "line": 152,
+        "col": 25,
+        "tokLen": 7,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "spellingLoc": {
+            "offset": 5128,
+            "line": 137,
+            "col": 22,
+            "tokLen": 7,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          },
+          "expansionLoc": {
+            "offset": 5780,
+            "line": 152,
+            "col": 1,
+            "tokLen": 10,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          }
+        },
+        "end": {
+          "offset": 5804,
+          "col": 25,
+          "tokLen": 7,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "name": "__off_t",
+      "type": {
+        "qualType": "long"
+      },
+      "inner": [
+        {
+          "id": "0x4ea420",
+          "kind": "BuiltinType",
+          "type": {
+            "qualType": "long"
+          }
+        }
+      ]
+    },
+    {
+      "id": "0x56f670",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 5878,
+        "line": 153,
+        "col": 27,
+        "tokLen": 9,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "spellingLoc": {
+            "offset": 5128,
+            "line": 137,
+            "col": 22,
+            "tokLen": 7,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          },
+          "expansionLoc": {
+            "offset": 5852,
+            "line": 153,
+            "col": 1,
+            "tokLen": 10,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          }
+        },
+        "end": {
+          "offset": 5878,
+          "col": 27,
+          "tokLen": 9,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "isReferenced": true,
+      "name": "__off64_t",
+      "type": {
+        "qualType": "long"
+      },
+      "inner": [
+        {
+          "id": "0x4ea420",
+          "kind": "BuiltinType",
+          "type": {
+            "qualType": "long"
+          }
+        }
+      ]
+    },
+    {
+      "id": "0x56f6e0",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 5958,
+        "line": 154,
+        "col": 25,
+        "tokLen": 7,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "spellingLoc": {
+            "offset": 5128,
+            "line": 137,
+            "col": 22,
+            "tokLen": 7,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          },
+          "expansionLoc": {
+            "offset": 5934,
+            "line": 154,
+            "col": 1,
+            "tokLen": 10,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          }
+        },
+        "end": {
+          "offset": 5958,
+          "col": 25,
+          "tokLen": 7,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "name": "__pid_t",
+      "type": {
+        "qualType": "int"
+      },
+      "inner": [
+        {
+          "id": "0x4ea400",
+          "kind": "BuiltinType",
+          "type": {
+            "qualType": "int"
+          }
+        }
+      ]
+    },
+    {
+      "id": "0x56f738",
+      "kind": "RecordDecl",
+      "loc": {
+        "spellingLoc": {
+          "offset": 2776,
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/bits/typesizes.h",
+          "line": 73,
+          "col": 24,
+          "tokLen": 6,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/bits/types.h"
+          }
+        },
+        "expansionLoc": {
+          "offset": 6018,
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/bits/types.h",
+          "line": 155,
+          "col": 12,
+          "tokLen": 13,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "range": {
+        "begin": {
+          "spellingLoc": {
+            "offset": 2776,
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/bits/typesizes.h",
+            "line": 73,
+            "col": 24,
+            "tokLen": 6,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/bits/types.h"
+            }
+          },
+          "expansionLoc": {
+            "offset": 6018,
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/bits/types.h",
+            "line": 155,
+            "col": 12,
+            "tokLen": 13,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          }
+        },
+        "end": {
+          "spellingLoc": {
+            "offset": 2799,
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/bits/typesizes.h",
+            "line": 73,
+            "col": 47,
+            "tokLen": 1,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/bits/types.h"
+            }
+          },
+          "expansionLoc": {
+            "offset": 6018,
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/bits/types.h",
+            "line": 155,
+            "col": 12,
+            "tokLen": 13,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          }
+        }
+      },
+      "tagUsed": "struct",
+      "completeDefinition": true,
+      "inner": [
+        {
+          "id": "0x56f880",
+          "kind": "FieldDecl",
+          "loc": {
+            "spellingLoc": {
+              "offset": 2789,
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/bits/typesizes.h",
+              "line": 73,
+              "col": 37,
+              "tokLen": 5,
+              "includedFrom": {
+                "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/bits/types.h"
+              }
+            },
+            "expansionLoc": {
+              "offset": 6018,
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/bits/types.h",
+              "line": 155,
+              "col": 12,
+              "tokLen": 13,
+              "includedFrom": {
+                "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+              }
+            }
+          },
+          "range": {
+            "begin": {
+              "spellingLoc": {
+                "offset": 2785,
+                "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/bits/typesizes.h",
+                "line": 73,
+                "col": 33,
+                "tokLen": 3,
+                "includedFrom": {
+                  "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/bits/types.h"
+                }
+              },
+              "expansionLoc": {
+                "offset": 6018,
+                "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/bits/types.h",
+                "line": 155,
+                "col": 12,
+                "tokLen": 13,
+                "includedFrom": {
+                  "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+                }
+              }
+            },
+            "end": {
+              "spellingLoc": {
+                "offset": 2796,
+                "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/bits/typesizes.h",
+                "line": 73,
+                "col": 44,
+                "tokLen": 1,
+                "includedFrom": {
+                  "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/bits/types.h"
+                }
+              },
+              "expansionLoc": {
+                "offset": 6018,
+                "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/bits/types.h",
+                "line": 155,
+                "col": 12,
+                "tokLen": 13,
+                "includedFrom": {
+                  "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+                }
+              }
+            }
+          },
+          "name": "__val",
+          "type": {
+            "qualType": "int[2]"
+          }
+        }
+      ]
+    },
+    {
+      "id": "0x56f928",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 6032,
+        "col": 26,
+        "tokLen": 8,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "spellingLoc": {
+            "offset": 5128,
+            "line": 137,
+            "col": 22,
+            "tokLen": 7,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          },
+          "expansionLoc": {
+            "offset": 6007,
+            "line": 155,
+            "col": 1,
+            "tokLen": 10,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          }
+        },
+        "end": {
+          "offset": 6032,
+          "col": 26,
+          "tokLen": 8,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "name": "__fsid_t",
+      "type": {
+        "desugaredQualType": "__fsid_t",
+        "qualType": "struct __fsid_t"
+      },
+      "inner": [
+        {
+          "id": "0x56f8d0",
+          "kind": "ElaboratedType",
+          "type": {
+            "qualType": "struct __fsid_t"
+          },
+          "ownedTagDecl": {
+            "id": "0x56f738",
+            "kind": "RecordDecl",
+            "name": ""
+          },
+          "inner": [
+            {
+              "id": "0x56f7c0",
+              "kind": "RecordType",
+              "type": {
+                "qualType": "__fsid_t"
+              },
+              "decl": {
+                "id": "0x56f738",
+                "kind": "RecordDecl",
+                "name": ""
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "0x56f9b0",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 6100,
+        "line": 156,
+        "col": 27,
+        "tokLen": 9,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "spellingLoc": {
+            "offset": 5128,
+            "line": 137,
+            "col": 22,
+            "tokLen": 7,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          },
+          "expansionLoc": {
+            "offset": 6074,
+            "line": 156,
+            "col": 1,
+            "tokLen": 10,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          }
+        },
+        "end": {
+          "offset": 6100,
+          "col": 27,
+          "tokLen": 9,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "name": "__clock_t",
+      "type": {
+        "qualType": "long"
+      },
+      "inner": [
+        {
+          "id": "0x4ea420",
+          "kind": "BuiltinType",
+          "type": {
+            "qualType": "long"
+          }
+        }
+      ]
+    },
+    {
+      "id": "0x56fa20",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 6169,
+        "line": 157,
+        "col": 26,
+        "tokLen": 8,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "spellingLoc": {
+            "offset": 5128,
+            "line": 137,
+            "col": 22,
+            "tokLen": 7,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          },
+          "expansionLoc": {
+            "offset": 6144,
+            "line": 157,
+            "col": 1,
+            "tokLen": 10,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          }
+        },
+        "end": {
+          "offset": 6169,
+          "col": 26,
+          "tokLen": 8,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "name": "__rlim_t",
+      "type": {
+        "qualType": "unsigned long"
+      },
+      "inner": [
+        {
+          "id": "0x4ea4c0",
+          "kind": "BuiltinType",
+          "type": {
+            "qualType": "unsigned long"
+          }
+        }
+      ]
+    },
+    {
+      "id": "0x56fa90",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 6244,
+        "line": 158,
+        "col": 28,
+        "tokLen": 10,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "spellingLoc": {
+            "offset": 5128,
+            "line": 137,
+            "col": 22,
+            "tokLen": 7,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          },
+          "expansionLoc": {
+            "offset": 6217,
+            "line": 158,
+            "col": 1,
+            "tokLen": 10,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          }
+        },
+        "end": {
+          "offset": 6244,
+          "col": 28,
+          "tokLen": 10,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "name": "__rlim64_t",
+      "type": {
+        "qualType": "unsigned long"
+      },
+      "inner": [
+        {
+          "id": "0x4ea4c0",
+          "kind": "BuiltinType",
+          "type": {
+            "qualType": "unsigned long"
+          }
+        }
+      ]
+    },
+    {
+      "id": "0x56fb00",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 6323,
+        "line": 159,
+        "col": 24,
+        "tokLen": 6,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "spellingLoc": {
+            "offset": 5128,
+            "line": 137,
+            "col": 22,
+            "tokLen": 7,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          },
+          "expansionLoc": {
+            "offset": 6300,
+            "line": 159,
+            "col": 1,
+            "tokLen": 10,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          }
+        },
+        "end": {
+          "offset": 6323,
+          "col": 24,
+          "tokLen": 6,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "name": "__id_t",
+      "type": {
+        "qualType": "unsigned int"
+      },
+      "inner": [
+        {
+          "id": "0x4ea4a0",
+          "kind": "BuiltinType",
+          "type": {
+            "qualType": "unsigned int"
+          }
+        }
+      ]
+    },
+    {
+      "id": "0x56fb70",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 6386,
+        "line": 160,
+        "col": 26,
+        "tokLen": 8,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "spellingLoc": {
+            "offset": 5128,
+            "line": 137,
+            "col": 22,
+            "tokLen": 7,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          },
+          "expansionLoc": {
+            "offset": 6361,
+            "line": 160,
+            "col": 1,
+            "tokLen": 10,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          }
+        },
+        "end": {
+          "offset": 6386,
+          "col": 26,
+          "tokLen": 8,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "name": "__time_t",
+      "type": {
+        "qualType": "long"
+      },
+      "inner": [
+        {
+          "id": "0x4ea420",
+          "kind": "BuiltinType",
+          "type": {
+            "qualType": "long"
+          }
+        }
+      ]
+    },
+    {
+      "id": "0x56fbe0",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 6457,
+        "line": 161,
+        "col": 30,
+        "tokLen": 12,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "spellingLoc": {
+            "offset": 5128,
+            "line": 137,
+            "col": 22,
+            "tokLen": 7,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          },
+          "expansionLoc": {
+            "offset": 6428,
+            "line": 161,
+            "col": 1,
+            "tokLen": 10,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          }
+        },
+        "end": {
+          "offset": 6457,
+          "col": 30,
+          "tokLen": 12,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "name": "__useconds_t",
+      "type": {
+        "qualType": "unsigned int"
+      },
+      "inner": [
+        {
+          "id": "0x4ea4a0",
+          "kind": "BuiltinType",
+          "type": {
+            "qualType": "unsigned int"
+          }
+        }
+      ]
+    },
+    {
+      "id": "0x56fc50",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 6531,
+        "line": 162,
+        "col": 31,
+        "tokLen": 13,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "spellingLoc": {
+            "offset": 5128,
+            "line": 137,
+            "col": 22,
+            "tokLen": 7,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          },
+          "expansionLoc": {
+            "offset": 6501,
+            "line": 162,
+            "col": 1,
+            "tokLen": 10,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          }
+        },
+        "end": {
+          "offset": 6531,
+          "col": 31,
+          "tokLen": 13,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "name": "__suseconds_t",
+      "type": {
+        "qualType": "long"
+      },
+      "inner": [
+        {
+          "id": "0x4ea420",
+          "kind": "BuiltinType",
+          "type": {
+            "qualType": "long"
+          }
+        }
+      ]
+    },
+    {
+      "id": "0x56fcc0",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 6615,
+        "line": 163,
+        "col": 33,
+        "tokLen": 15,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "spellingLoc": {
+            "offset": 5128,
+            "line": 137,
+            "col": 22,
+            "tokLen": 7,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          },
+          "expansionLoc": {
+            "offset": 6583,
+            "line": 163,
+            "col": 1,
+            "tokLen": 10,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          }
+        },
+        "end": {
+          "offset": 6615,
+          "col": 33,
+          "tokLen": 15,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "name": "__suseconds64_t",
+      "type": {
+        "qualType": "long"
+      },
+      "inner": [
+        {
+          "id": "0x4ea420",
+          "kind": "BuiltinType",
+          "type": {
+            "qualType": "long"
+          }
+        }
+      ]
+    },
+    {
+      "id": "0x56fd30",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 6659,
+        "line": 165,
+        "col": 27,
+        "tokLen": 9,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "spellingLoc": {
+            "offset": 5128,
+            "line": 137,
+            "col": 22,
+            "tokLen": 7,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          },
+          "expansionLoc": {
+            "offset": 6633,
+            "line": 165,
+            "col": 1,
+            "tokLen": 10,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          }
+        },
+        "end": {
+          "offset": 6659,
+          "col": 27,
+          "tokLen": 9,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "name": "__daddr_t",
+      "type": {
+        "qualType": "int"
+      },
+      "inner": [
+        {
+          "id": "0x4ea400",
+          "kind": "BuiltinType",
+          "type": {
+            "qualType": "int"
+          }
+        }
+      ]
+    },
+    {
+      "id": "0x56fda0",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 6729,
+        "line": 166,
+        "col": 25,
+        "tokLen": 7,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "spellingLoc": {
+            "offset": 5128,
+            "line": 137,
+            "col": 22,
+            "tokLen": 7,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          },
+          "expansionLoc": {
+            "offset": 6705,
+            "line": 166,
+            "col": 1,
+            "tokLen": 10,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          }
+        },
+        "end": {
+          "offset": 6729,
+          "col": 25,
+          "tokLen": 7,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "name": "__key_t",
+      "type": {
+        "qualType": "int"
+      },
+      "inner": [
+        {
+          "id": "0x4ea400",
+          "kind": "BuiltinType",
+          "type": {
+            "qualType": "int"
+          }
+        }
+      ]
+    },
+    {
+      "id": "0x56fe10",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 6845,
+        "line": 169,
+        "col": 29,
+        "tokLen": 11,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "spellingLoc": {
+            "offset": 5128,
+            "line": 137,
+            "col": 22,
+            "tokLen": 7,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          },
+          "expansionLoc": {
+            "offset": 6817,
+            "line": 169,
+            "col": 1,
+            "tokLen": 10,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          }
+        },
+        "end": {
+          "offset": 6845,
+          "col": 29,
+          "tokLen": 11,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "name": "__clockid_t",
+      "type": {
+        "qualType": "int"
+      },
+      "inner": [
+        {
+          "id": "0x4ea400",
+          "kind": "BuiltinType",
+          "type": {
+            "qualType": "int"
+          }
+        }
+      ]
+    },
+    {
+      "id": "0x56fe80",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 6929,
+        "line": 172,
+        "col": 27,
+        "tokLen": 9,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "spellingLoc": {
+            "offset": 5128,
+            "line": 137,
+            "col": 22,
+            "tokLen": 7,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          },
+          "expansionLoc": {
+            "offset": 6903,
+            "line": 172,
+            "col": 1,
+            "tokLen": 10,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          }
+        },
+        "end": {
+          "offset": 6929,
+          "col": 27,
+          "tokLen": 9,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "name": "__timer_t",
+      "type": {
+        "qualType": "void *"
+      },
+      "inner": [
+        {
+          "id": "0x4eaa80",
+          "kind": "PointerType",
+          "type": {
+            "qualType": "void *"
+          },
+          "inner": [
+            {
+              "id": "0x4ea360",
+              "kind": "BuiltinType",
+              "type": {
+                "qualType": "void"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "0x56fef0",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 7006,
+        "line": 175,
+        "col": 29,
+        "tokLen": 11,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "spellingLoc": {
+            "offset": 5128,
+            "line": 137,
+            "col": 22,
+            "tokLen": 7,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          },
+          "expansionLoc": {
+            "offset": 6978,
+            "line": 175,
+            "col": 1,
+            "tokLen": 10,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          }
+        },
+        "end": {
+          "offset": 7006,
+          "col": 29,
+          "tokLen": 11,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "name": "__blksize_t",
+      "type": {
+        "qualType": "long"
+      },
+      "inner": [
+        {
+          "id": "0x4ea420",
+          "kind": "BuiltinType",
+          "type": {
+            "qualType": "long"
+          }
+        }
+      ]
+    },
+    {
+      "id": "0x56ff60",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 7144,
+        "line": 180,
+        "col": 28,
+        "tokLen": 10,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "spellingLoc": {
+            "offset": 5128,
+            "line": 137,
+            "col": 22,
+            "tokLen": 7,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          },
+          "expansionLoc": {
+            "offset": 7117,
+            "line": 180,
+            "col": 1,
+            "tokLen": 10,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          }
+        },
+        "end": {
+          "offset": 7144,
+          "col": 28,
+          "tokLen": 10,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "name": "__blkcnt_t",
+      "type": {
+        "qualType": "long"
+      },
+      "inner": [
+        {
+          "id": "0x4ea420",
+          "kind": "BuiltinType",
+          "type": {
+            "qualType": "long"
+          }
+        }
+      ]
+    },
+    {
+      "id": "0x56ffd0",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 7185,
+        "line": 181,
+        "col": 30,
+        "tokLen": 12,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "spellingLoc": {
+            "offset": 5128,
+            "line": 137,
+            "col": 22,
+            "tokLen": 7,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          },
+          "expansionLoc": {
+            "offset": 7156,
+            "line": 181,
+            "col": 1,
+            "tokLen": 10,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          }
+        },
+        "end": {
+          "offset": 7185,
+          "col": 30,
+          "tokLen": 12,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "name": "__blkcnt64_t",
+      "type": {
+        "qualType": "long"
+      },
+      "inner": [
+        {
+          "id": "0x4ea420",
+          "kind": "BuiltinType",
+          "type": {
+            "qualType": "long"
+          }
+        }
+      ]
+    },
+    {
+      "id": "0x570040",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 7270,
+        "line": 184,
+        "col": 30,
+        "tokLen": 12,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "spellingLoc": {
+            "offset": 5128,
+            "line": 137,
+            "col": 22,
+            "tokLen": 7,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          },
+          "expansionLoc": {
+            "offset": 7241,
+            "line": 184,
+            "col": 1,
+            "tokLen": 10,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          }
+        },
+        "end": {
+          "offset": 7270,
+          "col": 30,
+          "tokLen": 12,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "name": "__fsblkcnt_t",
+      "type": {
+        "qualType": "unsigned long"
+      },
+      "inner": [
+        {
+          "id": "0x4ea4c0",
+          "kind": "BuiltinType",
+          "type": {
+            "qualType": "unsigned long"
+          }
+        }
+      ]
+    },
+    {
+      "id": "0x5700b0",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 7315,
+        "line": 185,
+        "col": 32,
+        "tokLen": 14,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "spellingLoc": {
+            "offset": 5128,
+            "line": 137,
+            "col": 22,
+            "tokLen": 7,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          },
+          "expansionLoc": {
+            "offset": 7284,
+            "line": 185,
+            "col": 1,
+            "tokLen": 10,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          }
+        },
+        "end": {
+          "offset": 7315,
+          "col": 32,
+          "tokLen": 14,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "name": "__fsblkcnt64_t",
+      "type": {
+        "qualType": "unsigned long"
+      },
+      "inner": [
+        {
+          "id": "0x4ea4c0",
+          "kind": "BuiltinType",
+          "type": {
+            "qualType": "unsigned long"
+          }
+        }
+      ]
+    },
+    {
+      "id": "0x570120",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 7401,
+        "line": 188,
+        "col": 30,
+        "tokLen": 12,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "spellingLoc": {
+            "offset": 5128,
+            "line": 137,
+            "col": 22,
+            "tokLen": 7,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          },
+          "expansionLoc": {
+            "offset": 7372,
+            "line": 188,
+            "col": 1,
+            "tokLen": 10,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          }
+        },
+        "end": {
+          "offset": 7401,
+          "col": 30,
+          "tokLen": 12,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "name": "__fsfilcnt_t",
+      "type": {
+        "qualType": "unsigned long"
+      },
+      "inner": [
+        {
+          "id": "0x4ea4c0",
+          "kind": "BuiltinType",
+          "type": {
+            "qualType": "unsigned long"
+          }
+        }
+      ]
+    },
+    {
+      "id": "0x570190",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 7446,
+        "line": 189,
+        "col": 32,
+        "tokLen": 14,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "spellingLoc": {
+            "offset": 5128,
+            "line": 137,
+            "col": 22,
+            "tokLen": 7,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          },
+          "expansionLoc": {
+            "offset": 7415,
+            "line": 189,
+            "col": 1,
+            "tokLen": 10,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          }
+        },
+        "end": {
+          "offset": 7446,
+          "col": 32,
+          "tokLen": 14,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "name": "__fsfilcnt64_t",
+      "type": {
+        "qualType": "unsigned long"
+      },
+      "inner": [
+        {
+          "id": "0x4ea4c0",
+          "kind": "BuiltinType",
+          "type": {
+            "qualType": "unsigned long"
+          }
+        }
+      ]
+    },
+    {
+      "id": "0x570200",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 7539,
+        "line": 192,
+        "col": 28,
+        "tokLen": 10,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "spellingLoc": {
+            "offset": 5128,
+            "line": 137,
+            "col": 22,
+            "tokLen": 7,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          },
+          "expansionLoc": {
+            "offset": 7512,
+            "line": 192,
+            "col": 1,
+            "tokLen": 10,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          }
+        },
+        "end": {
+          "offset": 7539,
+          "col": 28,
+          "tokLen": 10,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "name": "__fsword_t",
+      "type": {
+        "qualType": "long"
+      },
+      "inner": [
+        {
+          "id": "0x4ea420",
+          "kind": "BuiltinType",
+          "type": {
+            "qualType": "long"
+          }
+        }
+      ]
+    },
+    {
+      "id": "0x570270",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 7578,
+        "line": 194,
+        "col": 27,
+        "tokLen": 9,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "spellingLoc": {
+            "offset": 5128,
+            "line": 137,
+            "col": 22,
+            "tokLen": 7,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          },
+          "expansionLoc": {
+            "offset": 7552,
+            "line": 194,
+            "col": 1,
+            "tokLen": 10,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          }
+        },
+        "end": {
+          "offset": 7578,
+          "col": 27,
+          "tokLen": 9,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "name": "__ssize_t",
+      "type": {
+        "qualType": "long"
+      },
+      "inner": [
+        {
+          "id": "0x4ea420",
+          "kind": "BuiltinType",
+          "type": {
+            "qualType": "long"
+          }
+        }
+      ]
+    },
+    {
+      "id": "0x5702e0",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 7707,
+        "line": 197,
+        "col": 33,
+        "tokLen": 17,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "spellingLoc": {
+            "offset": 5128,
+            "line": 137,
+            "col": 22,
+            "tokLen": 7,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          },
+          "expansionLoc": {
+            "offset": 7675,
+            "line": 197,
+            "col": 1,
+            "tokLen": 10,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          }
+        },
+        "end": {
+          "offset": 7707,
+          "col": 33,
+          "tokLen": 17,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "name": "__syscall_slong_t",
+      "type": {
+        "qualType": "long"
+      },
+      "inner": [
+        {
+          "id": "0x4ea420",
+          "kind": "BuiltinType",
+          "type": {
+            "qualType": "long"
+          }
+        }
+      ]
+    },
+    {
+      "id": "0x570350",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 7806,
+        "line": 199,
+        "col": 33,
+        "tokLen": 17,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "spellingLoc": {
+            "offset": 5128,
+            "line": 137,
+            "col": 22,
+            "tokLen": 7,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          },
+          "expansionLoc": {
+            "offset": 7774,
+            "line": 199,
+            "col": 1,
+            "tokLen": 10,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          }
+        },
+        "end": {
+          "offset": 7806,
+          "col": 33,
+          "tokLen": 17,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "name": "__syscall_ulong_t",
+      "type": {
+        "qualType": "unsigned long"
+      },
+      "inner": [
+        {
+          "id": "0x4ea4c0",
+          "kind": "BuiltinType",
+          "type": {
+            "qualType": "unsigned long"
+          }
+        }
+      ]
+    },
+    {
+      "id": "0x570420",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 7951,
+        "line": 203,
+        "col": 19,
+        "tokLen": 8,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "offset": 7933,
+          "col": 1,
+          "tokLen": 7,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        },
+        "end": {
+          "offset": 7951,
+          "col": 19,
+          "tokLen": 8,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "name": "__loff_t",
+      "type": {
+        "desugaredQualType": "long",
+        "qualType": "__off64_t",
+        "typeAliasDeclId": "0x56f670"
+      },
+      "inner": [
+        {
+          "id": "0x5703e0",
+          "kind": "ElaboratedType",
+          "type": {
+            "qualType": "__off64_t"
+          },
+          "inner": [
+            {
+              "id": "0x5703b0",
+              "kind": "TypedefType",
+              "type": {
+                "qualType": "__off64_t"
+              },
+              "decl": {
+                "id": "0x56f670",
+                "kind": "TypedefDecl",
+                "name": "__off64_t"
+              },
+              "inner": [
+                {
+                  "id": "0x4ea420",
+                  "kind": "BuiltinType",
+                  "type": {
+                    "qualType": "long"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "0x570490",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 8020,
+        "line": 204,
+        "col": 15,
+        "tokLen": 9,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "offset": 8006,
+          "col": 1,
+          "tokLen": 7,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        },
+        "end": {
+          "offset": 8020,
+          "col": 15,
+          "tokLen": 9,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "name": "__caddr_t",
+      "type": {
+        "qualType": "char *"
+      },
+      "inner": [
+        {
+          "id": "0x4eaef0",
+          "kind": "PointerType",
+          "type": {
+            "qualType": "char *"
+          },
+          "inner": [
+            {
+              "id": "0x4ea3a0",
+              "kind": "BuiltinType",
+              "type": {
+                "qualType": "char"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "0x570500",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 8123,
+        "line": 207,
+        "col": 25,
+        "tokLen": 10,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "spellingLoc": {
+            "offset": 5128,
+            "line": 137,
+            "col": 22,
+            "tokLen": 7,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          },
+          "expansionLoc": {
+            "offset": 8099,
+            "line": 207,
+            "col": 1,
+            "tokLen": 10,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          }
+        },
+        "end": {
+          "offset": 8123,
+          "col": 25,
+          "tokLen": 10,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "name": "__intptr_t",
+      "type": {
+        "qualType": "long"
+      },
+      "inner": [
+        {
+          "id": "0x4ea420",
+          "kind": "BuiltinType",
+          "type": {
+            "qualType": "long"
+          }
+        }
+      ]
+    },
+    {
+      "id": "0x5705a0",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 8199,
+        "line": 210,
+        "col": 23,
+        "tokLen": 11,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "spellingLoc": {
+            "offset": 5128,
+            "line": 137,
+            "col": 22,
+            "tokLen": 7,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          },
+          "expansionLoc": {
+            "offset": 8177,
+            "line": 210,
+            "col": 1,
+            "tokLen": 10,
+            "includedFrom": {
+              "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+            }
+          }
+        },
+        "end": {
+          "offset": 8199,
+          "col": 23,
+          "tokLen": 11,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "name": "__socklen_t",
+      "type": {
+        "qualType": "unsigned int"
+      },
+      "inner": [
+        {
+          "id": "0x4ea4a0",
+          "kind": "BuiltinType",
+          "type": {
+            "qualType": "unsigned int"
+          }
+        }
+      ]
+    },
+    {
+      "id": "0x570610",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 8413,
+        "line": 215,
+        "col": 13,
+        "tokLen": 14,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "offset": 8401,
+          "col": 1,
+          "tokLen": 7,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        },
+        "end": {
+          "offset": 8413,
+          "col": 13,
+          "tokLen": 14,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "name": "__sig_atomic_t",
+      "type": {
+        "qualType": "int"
+      },
+      "inner": [
+        {
+          "id": "0x4ea400",
+          "kind": "BuiltinType",
+          "type": {
+            "qualType": "int"
+          }
+        }
+      ]
+    },
+    {
+      "id": "0x570678",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 915,
+        "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/bits/stdint-intn.h",
+        "line": 24,
+        "col": 18,
+        "tokLen": 6,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "offset": 898,
+          "col": 1,
+          "tokLen": 7,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        },
+        "end": {
+          "offset": 915,
+          "col": 18,
+          "tokLen": 6,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "name": "int8_t",
+      "type": {
+        "desugaredQualType": "signed char",
+        "qualType": "__int8_t",
+        "typeAliasDeclId": "0x56a788"
+      },
+      "inner": [
+        {
+          "id": "0x56ab20",
+          "kind": "ElaboratedType",
+          "type": {
+            "qualType": "__int8_t"
+          },
+          "inner": [
+            {
+              "id": "0x56aaf0",
+              "kind": "TypedefType",
+              "type": {
+                "qualType": "__int8_t"
+              },
+              "decl": {
+                "id": "0x56a788",
+                "kind": "TypedefDecl",
+                "name": "__int8_t"
+              },
+              "inner": [
+                {
+                  "id": "0x4ea3c0",
+                  "kind": "BuiltinType",
+                  "type": {
+                    "qualType": "signed char"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "0x5706e0",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 941,
+        "line": 25,
+        "col": 19,
+        "tokLen": 7,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "offset": 923,
+          "col": 1,
+          "tokLen": 7,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        },
+        "end": {
+          "offset": 941,
+          "col": 19,
+          "tokLen": 7,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "name": "int16_t",
+      "type": {
+        "desugaredQualType": "short",
+        "qualType": "__int16_t",
+        "typeAliasDeclId": "0x56a868"
+      },
+      "inner": [
+        {
+          "id": "0x56acc0",
+          "kind": "ElaboratedType",
+          "type": {
+            "qualType": "__int16_t"
+          },
+          "inner": [
+            {
+              "id": "0x56ac90",
+              "kind": "TypedefType",
+              "type": {
+                "qualType": "__int16_t"
+              },
+              "decl": {
+                "id": "0x56a868",
+                "kind": "TypedefDecl",
+                "name": "__int16_t"
+              },
+              "inner": [
+                {
+                  "id": "0x4ea3e0",
+                  "kind": "BuiltinType",
+                  "type": {
+                    "qualType": "short"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "0x570748",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 968,
+        "line": 26,
+        "col": 19,
+        "tokLen": 7,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "offset": 950,
+          "col": 1,
+          "tokLen": 7,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        },
+        "end": {
+          "offset": 968,
+          "col": 19,
+          "tokLen": 7,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "name": "int32_t",
+      "type": {
+        "desugaredQualType": "int",
+        "qualType": "__int32_t",
+        "typeAliasDeclId": "0x56a948"
+      },
+      "inner": [
+        {
+          "id": "0x56ae60",
+          "kind": "ElaboratedType",
+          "type": {
+            "qualType": "__int32_t"
+          },
+          "inner": [
+            {
+              "id": "0x56ae30",
+              "kind": "TypedefType",
+              "type": {
+                "qualType": "__int32_t"
+              },
+              "decl": {
+                "id": "0x56a948",
+                "kind": "TypedefDecl",
+                "name": "__int32_t"
+              },
+              "inner": [
+                {
+                  "id": "0x4ea400",
+                  "kind": "BuiltinType",
+                  "type": {
+                    "qualType": "int"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "0x5707b0",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 995,
+        "line": 27,
+        "col": 19,
+        "tokLen": 7,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "offset": 977,
+          "col": 1,
+          "tokLen": 7,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        },
+        "end": {
+          "offset": 995,
+          "col": 19,
+          "tokLen": 7,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "name": "int64_t",
+      "type": {
+        "desugaredQualType": "long",
+        "qualType": "__int64_t",
+        "typeAliasDeclId": "0x56aa28"
+      },
+      "inner": [
+        {
+          "id": "0x56b000",
+          "kind": "ElaboratedType",
+          "type": {
+            "qualType": "__int64_t"
+          },
+          "inner": [
+            {
+              "id": "0x56afd0",
+              "kind": "TypedefType",
+              "type": {
+                "qualType": "__int64_t"
+              },
+              "decl": {
+                "id": "0x56aa28",
+                "kind": "TypedefDecl",
+                "name": "__int64_t"
+              },
+              "inner": [
+                {
+                  "id": "0x4ea420",
+                  "kind": "BuiltinType",
+                  "type": {
+                    "qualType": "long"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "0x570818",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 919,
+        "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/bits/stdint-uintn.h",
+        "line": 24,
+        "col": 19,
+        "tokLen": 7,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "offset": 901,
+          "col": 1,
+          "tokLen": 7,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        },
+        "end": {
+          "offset": 919,
+          "col": 19,
+          "tokLen": 7,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "name": "uint8_t",
+      "type": {
+        "desugaredQualType": "unsigned char",
+        "qualType": "__uint8_t",
+        "typeAliasDeclId": "0x56a7f8"
+      },
+      "inner": [
+        {
+          "id": "0x56abf0",
+          "kind": "ElaboratedType",
+          "type": {
+            "qualType": "__uint8_t"
+          },
+          "inner": [
+            {
+              "id": "0x56abc0",
+              "kind": "TypedefType",
+              "type": {
+                "qualType": "__uint8_t"
+              },
+              "decl": {
+                "id": "0x56a7f8",
+                "kind": "TypedefDecl",
+                "name": "__uint8_t"
+              },
+              "inner": [
+                {
+                  "id": "0x4ea460",
+                  "kind": "BuiltinType",
+                  "type": {
+                    "qualType": "unsigned char"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "0x570880",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 947,
+        "line": 25,
+        "col": 20,
+        "tokLen": 8,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "offset": 928,
+          "col": 1,
+          "tokLen": 7,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        },
+        "end": {
+          "offset": 947,
+          "col": 20,
+          "tokLen": 8,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "name": "uint16_t",
+      "type": {
+        "desugaredQualType": "unsigned short",
+        "qualType": "__uint16_t",
+        "typeAliasDeclId": "0x56a8d8"
+      },
+      "inner": [
+        {
+          "id": "0x56ad90",
+          "kind": "ElaboratedType",
+          "type": {
+            "qualType": "__uint16_t"
+          },
+          "inner": [
+            {
+              "id": "0x56ad60",
+              "kind": "TypedefType",
+              "type": {
+                "qualType": "__uint16_t"
+              },
+              "decl": {
+                "id": "0x56a8d8",
+                "kind": "TypedefDecl",
+                "name": "__uint16_t"
+              },
+              "inner": [
+                {
+                  "id": "0x4ea480",
+                  "kind": "BuiltinType",
+                  "type": {
+                    "qualType": "unsigned short"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "0x5708e8",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 976,
+        "line": 26,
+        "col": 20,
+        "tokLen": 8,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "offset": 957,
+          "col": 1,
+          "tokLen": 7,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        },
+        "end": {
+          "offset": 976,
+          "col": 20,
+          "tokLen": 8,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "isReferenced": true,
+      "name": "uint32_t",
+      "type": {
+        "desugaredQualType": "unsigned int",
+        "qualType": "__uint32_t",
+        "typeAliasDeclId": "0x56a9b8"
+      },
+      "inner": [
+        {
+          "id": "0x56af30",
+          "kind": "ElaboratedType",
+          "type": {
+            "qualType": "__uint32_t"
+          },
+          "inner": [
+            {
+              "id": "0x56af00",
+              "kind": "TypedefType",
+              "type": {
+                "qualType": "__uint32_t"
+              },
+              "decl": {
+                "id": "0x56a9b8",
+                "kind": "TypedefDecl",
+                "name": "__uint32_t"
+              },
+              "inner": [
+                {
+                  "id": "0x4ea4a0",
+                  "kind": "BuiltinType",
+                  "type": {
+                    "qualType": "unsigned int"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "0x570950",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 1005,
+        "line": 27,
+        "col": 20,
+        "tokLen": 8,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "offset": 986,
+          "col": 1,
+          "tokLen": 7,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        },
+        "end": {
+          "offset": 1005,
+          "col": 20,
+          "tokLen": 8,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "name": "uint64_t",
+      "type": {
+        "desugaredQualType": "unsigned long",
+        "qualType": "__uint64_t",
+        "typeAliasDeclId": "0x56aa98"
+      },
+      "inner": [
+        {
+          "id": "0x56b0d0",
+          "kind": "ElaboratedType",
+          "type": {
+            "qualType": "__uint64_t"
+          },
+          "inner": [
+            {
+              "id": "0x56b0a0",
+              "kind": "TypedefType",
+              "type": {
+                "qualType": "__uint64_t"
+              },
+              "decl": {
+                "id": "0x56aa98",
+                "kind": "TypedefDecl",
+                "name": "__uint64_t"
+              },
+              "inner": [
+                {
+                  "id": "0x4ea4c0",
+                  "kind": "BuiltinType",
+                  "type": {
+                    "qualType": "unsigned long"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "0x570a20",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 955,
+        "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/bits/stdint-least.h",
+        "line": 25,
+        "col": 24,
+        "tokLen": 12,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "offset": 932,
+          "col": 1,
+          "tokLen": 7,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        },
+        "end": {
+          "offset": 955,
+          "col": 24,
+          "tokLen": 12,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "name": "int_least8_t",
+      "type": {
+        "desugaredQualType": "signed char",
+        "qualType": "__int_least8_t",
+        "typeAliasDeclId": "0x56ab60"
+      },
+      "inner": [
+        {
+          "id": "0x5709e0",
+          "kind": "ElaboratedType",
+          "type": {
+            "qualType": "__int_least8_t"
+          },
+          "inner": [
+            {
+              "id": "0x5709b0",
+              "kind": "TypedefType",
+              "type": {
+                "qualType": "__int_least8_t"
+              },
+              "decl": {
+                "id": "0x56ab60",
+                "kind": "TypedefDecl",
+                "name": "__int_least8_t"
+              },
+              "inner": [
+                {
+                  "id": "0x56ab20",
+                  "kind": "ElaboratedType",
+                  "type": {
+                    "qualType": "__int8_t"
+                  },
+                  "inner": [
+                    {
+                      "id": "0x56aaf0",
+                      "kind": "TypedefType",
+                      "type": {
+                        "qualType": "__int8_t"
+                      },
+                      "decl": {
+                        "id": "0x56a788",
+                        "kind": "TypedefDecl",
+                        "name": "__int8_t"
+                      },
+                      "inner": [
+                        {
+                          "id": "0x4ea3c0",
+                          "kind": "BuiltinType",
+                          "type": {
+                            "qualType": "signed char"
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "0x570af0",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 993,
+        "line": 26,
+        "col": 25,
+        "tokLen": 13,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "offset": 969,
+          "col": 1,
+          "tokLen": 7,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        },
+        "end": {
+          "offset": 993,
+          "col": 25,
+          "tokLen": 13,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "name": "int_least16_t",
+      "type": {
+        "desugaredQualType": "short",
+        "qualType": "__int_least16_t",
+        "typeAliasDeclId": "0x56ad00"
+      },
+      "inner": [
+        {
+          "id": "0x570ab0",
+          "kind": "ElaboratedType",
+          "type": {
+            "qualType": "__int_least16_t"
+          },
+          "inner": [
+            {
+              "id": "0x570a80",
+              "kind": "TypedefType",
+              "type": {
+                "qualType": "__int_least16_t"
+              },
+              "decl": {
+                "id": "0x56ad00",
+                "kind": "TypedefDecl",
+                "name": "__int_least16_t"
+              },
+              "inner": [
+                {
+                  "id": "0x56acc0",
+                  "kind": "ElaboratedType",
+                  "type": {
+                    "qualType": "__int16_t"
+                  },
+                  "inner": [
+                    {
+                      "id": "0x56ac90",
+                      "kind": "TypedefType",
+                      "type": {
+                        "qualType": "__int16_t"
+                      },
+                      "decl": {
+                        "id": "0x56a868",
+                        "kind": "TypedefDecl",
+                        "name": "__int16_t"
+                      },
+                      "inner": [
+                        {
+                          "id": "0x4ea3e0",
+                          "kind": "BuiltinType",
+                          "type": {
+                            "qualType": "short"
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "0x570bc0",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 1032,
+        "line": 27,
+        "col": 25,
+        "tokLen": 13,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "offset": 1008,
+          "col": 1,
+          "tokLen": 7,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        },
+        "end": {
+          "offset": 1032,
+          "col": 25,
+          "tokLen": 13,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "name": "int_least32_t",
+      "type": {
+        "desugaredQualType": "int",
+        "qualType": "__int_least32_t",
+        "typeAliasDeclId": "0x56aea0"
+      },
+      "inner": [
+        {
+          "id": "0x570b80",
+          "kind": "ElaboratedType",
+          "type": {
+            "qualType": "__int_least32_t"
+          },
+          "inner": [
+            {
+              "id": "0x570b50",
+              "kind": "TypedefType",
+              "type": {
+                "qualType": "__int_least32_t"
+              },
+              "decl": {
+                "id": "0x56aea0",
+                "kind": "TypedefDecl",
+                "name": "__int_least32_t"
+              },
+              "inner": [
+                {
+                  "id": "0x56ae60",
+                  "kind": "ElaboratedType",
+                  "type": {
+                    "qualType": "__int32_t"
+                  },
+                  "inner": [
+                    {
+                      "id": "0x56ae30",
+                      "kind": "TypedefType",
+                      "type": {
+                        "qualType": "__int32_t"
+                      },
+                      "decl": {
+                        "id": "0x56a948",
+                        "kind": "TypedefDecl",
+                        "name": "__int32_t"
+                      },
+                      "inner": [
+                        {
+                          "id": "0x4ea400",
+                          "kind": "BuiltinType",
+                          "type": {
+                            "qualType": "int"
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "0x570c90",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 1071,
+        "line": 28,
+        "col": 25,
+        "tokLen": 13,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "offset": 1047,
+          "col": 1,
+          "tokLen": 7,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        },
+        "end": {
+          "offset": 1071,
+          "col": 25,
+          "tokLen": 13,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "name": "int_least64_t",
+      "type": {
+        "desugaredQualType": "long",
+        "qualType": "__int_least64_t",
+        "typeAliasDeclId": "0x56b040"
+      },
+      "inner": [
+        {
+          "id": "0x570c50",
+          "kind": "ElaboratedType",
+          "type": {
+            "qualType": "__int_least64_t"
+          },
+          "inner": [
+            {
+              "id": "0x570c20",
+              "kind": "TypedefType",
+              "type": {
+                "qualType": "__int_least64_t"
+              },
+              "decl": {
+                "id": "0x56b040",
+                "kind": "TypedefDecl",
+                "name": "__int_least64_t"
+              },
+              "inner": [
+                {
+                  "id": "0x56b000",
+                  "kind": "ElaboratedType",
+                  "type": {
+                    "qualType": "__int64_t"
+                  },
+                  "inner": [
+                    {
+                      "id": "0x56afd0",
+                      "kind": "TypedefType",
+                      "type": {
+                        "qualType": "__int64_t"
+                      },
+                      "decl": {
+                        "id": "0x56aa28",
+                        "kind": "TypedefDecl",
+                        "name": "__int64_t"
+                      },
+                      "inner": [
+                        {
+                          "id": "0x4ea420",
+                          "kind": "BuiltinType",
+                          "type": {
+                            "qualType": "long"
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "0x570d60",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 1128,
+        "line": 31,
+        "col": 25,
+        "tokLen": 13,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "offset": 1104,
+          "col": 1,
+          "tokLen": 7,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        },
+        "end": {
+          "offset": 1128,
+          "col": 25,
+          "tokLen": 13,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "name": "uint_least8_t",
+      "type": {
+        "desugaredQualType": "unsigned char",
+        "qualType": "__uint_least8_t",
+        "typeAliasDeclId": "0x56ac30"
+      },
+      "inner": [
+        {
+          "id": "0x570d20",
+          "kind": "ElaboratedType",
+          "type": {
+            "qualType": "__uint_least8_t"
+          },
+          "inner": [
+            {
+              "id": "0x570cf0",
+              "kind": "TypedefType",
+              "type": {
+                "qualType": "__uint_least8_t"
+              },
+              "decl": {
+                "id": "0x56ac30",
+                "kind": "TypedefDecl",
+                "name": "__uint_least8_t"
+              },
+              "inner": [
+                {
+                  "id": "0x56abf0",
+                  "kind": "ElaboratedType",
+                  "type": {
+                    "qualType": "__uint8_t"
+                  },
+                  "inner": [
+                    {
+                      "id": "0x56abc0",
+                      "kind": "TypedefType",
+                      "type": {
+                        "qualType": "__uint8_t"
+                      },
+                      "decl": {
+                        "id": "0x56a7f8",
+                        "kind": "TypedefDecl",
+                        "name": "__uint8_t"
+                      },
+                      "inner": [
+                        {
+                          "id": "0x4ea460",
+                          "kind": "BuiltinType",
+                          "type": {
+                            "qualType": "unsigned char"
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "0x570e30",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 1168,
+        "line": 32,
+        "col": 26,
+        "tokLen": 14,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "offset": 1143,
+          "col": 1,
+          "tokLen": 7,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        },
+        "end": {
+          "offset": 1168,
+          "col": 26,
+          "tokLen": 14,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "name": "uint_least16_t",
+      "type": {
+        "desugaredQualType": "unsigned short",
+        "qualType": "__uint_least16_t",
+        "typeAliasDeclId": "0x56add0"
+      },
+      "inner": [
+        {
+          "id": "0x570df0",
+          "kind": "ElaboratedType",
+          "type": {
+            "qualType": "__uint_least16_t"
+          },
+          "inner": [
+            {
+              "id": "0x570dc0",
+              "kind": "TypedefType",
+              "type": {
+                "qualType": "__uint_least16_t"
+              },
+              "decl": {
+                "id": "0x56add0",
+                "kind": "TypedefDecl",
+                "name": "__uint_least16_t"
+              },
+              "inner": [
+                {
+                  "id": "0x56ad90",
+                  "kind": "ElaboratedType",
+                  "type": {
+                    "qualType": "__uint16_t"
+                  },
+                  "inner": [
+                    {
+                      "id": "0x56ad60",
+                      "kind": "TypedefType",
+                      "type": {
+                        "qualType": "__uint16_t"
+                      },
+                      "decl": {
+                        "id": "0x56a8d8",
+                        "kind": "TypedefDecl",
+                        "name": "__uint16_t"
+                      },
+                      "inner": [
+                        {
+                          "id": "0x4ea480",
+                          "kind": "BuiltinType",
+                          "type": {
+                            "qualType": "unsigned short"
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "0x570f00",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 1209,
+        "line": 33,
+        "col": 26,
+        "tokLen": 14,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "offset": 1184,
+          "col": 1,
+          "tokLen": 7,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        },
+        "end": {
+          "offset": 1209,
+          "col": 26,
+          "tokLen": 14,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "name": "uint_least32_t",
+      "type": {
+        "desugaredQualType": "unsigned int",
+        "qualType": "__uint_least32_t",
+        "typeAliasDeclId": "0x56af70"
+      },
+      "inner": [
+        {
+          "id": "0x570ec0",
+          "kind": "ElaboratedType",
+          "type": {
+            "qualType": "__uint_least32_t"
+          },
+          "inner": [
+            {
+              "id": "0x570e90",
+              "kind": "TypedefType",
+              "type": {
+                "qualType": "__uint_least32_t"
+              },
+              "decl": {
+                "id": "0x56af70",
+                "kind": "TypedefDecl",
+                "name": "__uint_least32_t"
+              },
+              "inner": [
+                {
+                  "id": "0x56af30",
+                  "kind": "ElaboratedType",
+                  "type": {
+                    "qualType": "__uint32_t"
+                  },
+                  "inner": [
+                    {
+                      "id": "0x56af00",
+                      "kind": "TypedefType",
+                      "type": {
+                        "qualType": "__uint32_t"
+                      },
+                      "decl": {
+                        "id": "0x56a9b8",
+                        "kind": "TypedefDecl",
+                        "name": "__uint32_t"
+                      },
+                      "inner": [
+                        {
+                          "id": "0x4ea4a0",
+                          "kind": "BuiltinType",
+                          "type": {
+                            "qualType": "unsigned int"
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "0x570fd0",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 1250,
+        "line": 34,
+        "col": 26,
+        "tokLen": 14,
+        "includedFrom": {
+          "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "offset": 1225,
+          "col": 1,
+          "tokLen": 7,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        },
+        "end": {
+          "offset": 1250,
+          "col": 26,
+          "tokLen": 14,
+          "includedFrom": {
+            "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h"
+          }
+        }
+      },
+      "name": "uint_least64_t",
+      "type": {
+        "desugaredQualType": "unsigned long",
+        "qualType": "__uint_least64_t",
+        "typeAliasDeclId": "0x56b110"
+      },
+      "inner": [
+        {
+          "id": "0x570f90",
+          "kind": "ElaboratedType",
+          "type": {
+            "qualType": "__uint_least64_t"
+          },
+          "inner": [
+            {
+              "id": "0x570f60",
+              "kind": "TypedefType",
+              "type": {
+                "qualType": "__uint_least64_t"
+              },
+              "decl": {
+                "id": "0x56b110",
+                "kind": "TypedefDecl",
+                "name": "__uint_least64_t"
+              },
+              "inner": [
+                {
+                  "id": "0x56b0d0",
+                  "kind": "ElaboratedType",
+                  "type": {
+                    "qualType": "__uint64_t"
+                  },
+                  "inner": [
+                    {
+                      "id": "0x56b0a0",
+                      "kind": "TypedefType",
+                      "type": {
+                        "qualType": "__uint64_t"
+                      },
+                      "decl": {
+                        "id": "0x56aa98",
+                        "kind": "TypedefDecl",
+                        "name": "__uint64_t"
+                      },
+                      "inner": [
+                        {
+                          "id": "0x4ea4c0",
+                          "kind": "BuiltinType",
+                          "type": {
+                            "qualType": "unsigned long"
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "0x571040",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 1282,
+        "file": "/nix/store/dc9s2cqvwslmx5lsfidnn60v9af044zw-glibc-2.40-66-dev/include/stdint.h",
+        "line": 47,
+        "col": 22,
+        "tokLen": 11,
+        "includedFrom": {
+          "file": "/nix/store/bi9x1czcmy07fhf1hqn1hg53g6drwd0y-clang-wrapper-17.0.6/resource-root/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "offset": 1261,
+          "col": 1,
+          "tokLen": 7,
+          "includedFrom": {
+            "file": "/nix/store/bi9x1czcmy07fhf1hqn1hg53g6drwd0y-clang-wrapper-17.0.6/resource-root/include/stdint.h"
+          }
+        },
+        "end": {
+          "offset": 1282,
+          "col": 22,
+          "tokLen": 11,
+          "includedFrom": {
+            "file": "/nix/store/bi9x1czcmy07fhf1hqn1hg53g6drwd0y-clang-wrapper-17.0.6/resource-root/include/stdint.h"
+          }
+        }
+      },
+      "name": "int_fast8_t",
+      "type": {
+        "qualType": "signed char"
+      },
+      "inner": [
+        {
+          "id": "0x4ea3c0",
+          "kind": "BuiltinType",
+          "type": {
+            "qualType": "signed char"
+          }
+        }
+      ]
+    },
+    {
+      "id": "0x5710b0",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 1334,
+        "line": 49,
+        "col": 19,
+        "tokLen": 12,
+        "includedFrom": {
+          "file": "/nix/store/bi9x1czcmy07fhf1hqn1hg53g6drwd0y-clang-wrapper-17.0.6/resource-root/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "offset": 1316,
+          "col": 1,
+          "tokLen": 7,
+          "includedFrom": {
+            "file": "/nix/store/bi9x1czcmy07fhf1hqn1hg53g6drwd0y-clang-wrapper-17.0.6/resource-root/include/stdint.h"
+          }
+        },
+        "end": {
+          "offset": 1334,
+          "col": 19,
+          "tokLen": 12,
+          "includedFrom": {
+            "file": "/nix/store/bi9x1czcmy07fhf1hqn1hg53g6drwd0y-clang-wrapper-17.0.6/resource-root/include/stdint.h"
+          }
+        }
+      },
+      "name": "int_fast16_t",
+      "type": {
+        "qualType": "long"
+      },
+      "inner": [
+        {
+          "id": "0x4ea420",
+          "kind": "BuiltinType",
+          "type": {
+            "qualType": "long"
+          }
+        }
+      ]
+    },
+    {
+      "id": "0x571120",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 1366,
+        "line": 50,
+        "col": 19,
+        "tokLen": 12,
+        "includedFrom": {
+          "file": "/nix/store/bi9x1czcmy07fhf1hqn1hg53g6drwd0y-clang-wrapper-17.0.6/resource-root/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "offset": 1348,
+          "col": 1,
+          "tokLen": 7,
+          "includedFrom": {
+            "file": "/nix/store/bi9x1czcmy07fhf1hqn1hg53g6drwd0y-clang-wrapper-17.0.6/resource-root/include/stdint.h"
+          }
+        },
+        "end": {
+          "offset": 1366,
+          "col": 19,
+          "tokLen": 12,
+          "includedFrom": {
+            "file": "/nix/store/bi9x1czcmy07fhf1hqn1hg53g6drwd0y-clang-wrapper-17.0.6/resource-root/include/stdint.h"
+          }
+        }
+      },
+      "name": "int_fast32_t",
+      "type": {
+        "qualType": "long"
+      },
+      "inner": [
+        {
+          "id": "0x4ea420",
+          "kind": "BuiltinType",
+          "type": {
+            "qualType": "long"
+          }
+        }
+      ]
+    },
+    {
+      "id": "0x571190",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 1398,
+        "line": 51,
+        "col": 19,
+        "tokLen": 12,
+        "includedFrom": {
+          "file": "/nix/store/bi9x1czcmy07fhf1hqn1hg53g6drwd0y-clang-wrapper-17.0.6/resource-root/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "offset": 1380,
+          "col": 1,
+          "tokLen": 7,
+          "includedFrom": {
+            "file": "/nix/store/bi9x1czcmy07fhf1hqn1hg53g6drwd0y-clang-wrapper-17.0.6/resource-root/include/stdint.h"
+          }
+        },
+        "end": {
+          "offset": 1398,
+          "col": 19,
+          "tokLen": 12,
+          "includedFrom": {
+            "file": "/nix/store/bi9x1czcmy07fhf1hqn1hg53g6drwd0y-clang-wrapper-17.0.6/resource-root/include/stdint.h"
+          }
+        }
+      },
+      "name": "int_fast64_t",
+      "type": {
+        "qualType": "long"
+      },
+      "inner": [
+        {
+          "id": "0x4ea420",
+          "kind": "BuiltinType",
+          "type": {
+            "qualType": "long"
+          }
+        }
+      ]
+    },
+    {
+      "id": "0x571200",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 1573,
+        "line": 60,
+        "col": 24,
+        "tokLen": 12,
+        "includedFrom": {
+          "file": "/nix/store/bi9x1czcmy07fhf1hqn1hg53g6drwd0y-clang-wrapper-17.0.6/resource-root/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "offset": 1550,
+          "col": 1,
+          "tokLen": 7,
+          "includedFrom": {
+            "file": "/nix/store/bi9x1czcmy07fhf1hqn1hg53g6drwd0y-clang-wrapper-17.0.6/resource-root/include/stdint.h"
+          }
+        },
+        "end": {
+          "offset": 1573,
+          "col": 24,
+          "tokLen": 12,
+          "includedFrom": {
+            "file": "/nix/store/bi9x1czcmy07fhf1hqn1hg53g6drwd0y-clang-wrapper-17.0.6/resource-root/include/stdint.h"
+          }
+        }
+      },
+      "name": "uint_fast8_t",
+      "type": {
+        "qualType": "unsigned char"
+      },
+      "inner": [
+        {
+          "id": "0x4ea460",
+          "kind": "BuiltinType",
+          "type": {
+            "qualType": "unsigned char"
+          }
+        }
+      ]
+    },
+    {
+      "id": "0x571270",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 1634,
+        "line": 62,
+        "col": 27,
+        "tokLen": 13,
+        "includedFrom": {
+          "file": "/nix/store/bi9x1czcmy07fhf1hqn1hg53g6drwd0y-clang-wrapper-17.0.6/resource-root/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "offset": 1608,
+          "col": 1,
+          "tokLen": 7,
+          "includedFrom": {
+            "file": "/nix/store/bi9x1czcmy07fhf1hqn1hg53g6drwd0y-clang-wrapper-17.0.6/resource-root/include/stdint.h"
+          }
+        },
+        "end": {
+          "offset": 1634,
+          "col": 27,
+          "tokLen": 13,
+          "includedFrom": {
+            "file": "/nix/store/bi9x1czcmy07fhf1hqn1hg53g6drwd0y-clang-wrapper-17.0.6/resource-root/include/stdint.h"
+          }
+        }
+      },
+      "name": "uint_fast16_t",
+      "type": {
+        "qualType": "unsigned long"
+      },
+      "inner": [
+        {
+          "id": "0x4ea4c0",
+          "kind": "BuiltinType",
+          "type": {
+            "qualType": "unsigned long"
+          }
+        }
+      ]
+    },
+    {
+      "id": "0x5712e0",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 1675,
+        "line": 63,
+        "col": 27,
+        "tokLen": 13,
+        "includedFrom": {
+          "file": "/nix/store/bi9x1czcmy07fhf1hqn1hg53g6drwd0y-clang-wrapper-17.0.6/resource-root/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "offset": 1649,
+          "col": 1,
+          "tokLen": 7,
+          "includedFrom": {
+            "file": "/nix/store/bi9x1czcmy07fhf1hqn1hg53g6drwd0y-clang-wrapper-17.0.6/resource-root/include/stdint.h"
+          }
+        },
+        "end": {
+          "offset": 1675,
+          "col": 27,
+          "tokLen": 13,
+          "includedFrom": {
+            "file": "/nix/store/bi9x1czcmy07fhf1hqn1hg53g6drwd0y-clang-wrapper-17.0.6/resource-root/include/stdint.h"
+          }
+        }
+      },
+      "name": "uint_fast32_t",
+      "type": {
+        "qualType": "unsigned long"
+      },
+      "inner": [
+        {
+          "id": "0x4ea4c0",
+          "kind": "BuiltinType",
+          "type": {
+            "qualType": "unsigned long"
+          }
+        }
+      ]
+    },
+    {
+      "id": "0x571350",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 1716,
+        "line": 64,
+        "col": 27,
+        "tokLen": 13,
+        "includedFrom": {
+          "file": "/nix/store/bi9x1czcmy07fhf1hqn1hg53g6drwd0y-clang-wrapper-17.0.6/resource-root/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "offset": 1690,
+          "col": 1,
+          "tokLen": 7,
+          "includedFrom": {
+            "file": "/nix/store/bi9x1czcmy07fhf1hqn1hg53g6drwd0y-clang-wrapper-17.0.6/resource-root/include/stdint.h"
+          }
+        },
+        "end": {
+          "offset": 1716,
+          "col": 27,
+          "tokLen": 13,
+          "includedFrom": {
+            "file": "/nix/store/bi9x1czcmy07fhf1hqn1hg53g6drwd0y-clang-wrapper-17.0.6/resource-root/include/stdint.h"
+          }
+        }
+      },
+      "name": "uint_fast64_t",
+      "type": {
+        "qualType": "unsigned long"
+      },
+      "inner": [
+        {
+          "id": "0x4ea4c0",
+          "kind": "BuiltinType",
+          "type": {
+            "qualType": "unsigned long"
+          }
+        }
+      ]
+    },
+    {
+      "id": "0x5713c0",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 1983,
+        "line": 76,
+        "col": 19,
+        "tokLen": 8,
+        "includedFrom": {
+          "file": "/nix/store/bi9x1czcmy07fhf1hqn1hg53g6drwd0y-clang-wrapper-17.0.6/resource-root/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "offset": 1965,
+          "col": 1,
+          "tokLen": 7,
+          "includedFrom": {
+            "file": "/nix/store/bi9x1czcmy07fhf1hqn1hg53g6drwd0y-clang-wrapper-17.0.6/resource-root/include/stdint.h"
+          }
+        },
+        "end": {
+          "offset": 1983,
+          "col": 19,
+          "tokLen": 8,
+          "includedFrom": {
+            "file": "/nix/store/bi9x1czcmy07fhf1hqn1hg53g6drwd0y-clang-wrapper-17.0.6/resource-root/include/stdint.h"
+          }
+        }
+      },
+      "name": "intptr_t",
+      "type": {
+        "qualType": "long"
+      },
+      "inner": [
+        {
+          "id": "0x4ea420",
+          "kind": "BuiltinType",
+          "type": {
+            "qualType": "long"
+          }
+        }
+      ]
+    },
+    {
+      "id": "0x571430",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 2056,
+        "line": 79,
+        "col": 27,
+        "tokLen": 9,
+        "includedFrom": {
+          "file": "/nix/store/bi9x1czcmy07fhf1hqn1hg53g6drwd0y-clang-wrapper-17.0.6/resource-root/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "offset": 2030,
+          "col": 1,
+          "tokLen": 7,
+          "includedFrom": {
+            "file": "/nix/store/bi9x1czcmy07fhf1hqn1hg53g6drwd0y-clang-wrapper-17.0.6/resource-root/include/stdint.h"
+          }
+        },
+        "end": {
+          "offset": 2056,
+          "col": 27,
+          "tokLen": 9,
+          "includedFrom": {
+            "file": "/nix/store/bi9x1czcmy07fhf1hqn1hg53g6drwd0y-clang-wrapper-17.0.6/resource-root/include/stdint.h"
+          }
+        }
+      },
+      "name": "uintptr_t",
+      "type": {
+        "qualType": "unsigned long"
+      },
+      "inner": [
+        {
+          "id": "0x4ea4c0",
+          "kind": "BuiltinType",
+          "type": {
+            "qualType": "unsigned long"
+          }
+        }
+      ]
+    },
+    {
+      "id": "0x571500",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 2255,
+        "line": 90,
+        "col": 21,
+        "tokLen": 8,
+        "includedFrom": {
+          "file": "/nix/store/bi9x1czcmy07fhf1hqn1hg53g6drwd0y-clang-wrapper-17.0.6/resource-root/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "offset": 2235,
+          "col": 1,
+          "tokLen": 7,
+          "includedFrom": {
+            "file": "/nix/store/bi9x1czcmy07fhf1hqn1hg53g6drwd0y-clang-wrapper-17.0.6/resource-root/include/stdint.h"
+          }
+        },
+        "end": {
+          "offset": 2255,
+          "col": 21,
+          "tokLen": 8,
+          "includedFrom": {
+            "file": "/nix/store/bi9x1czcmy07fhf1hqn1hg53g6drwd0y-clang-wrapper-17.0.6/resource-root/include/stdint.h"
+          }
+        }
+      },
+      "name": "intmax_t",
+      "type": {
+        "desugaredQualType": "long",
+        "qualType": "__intmax_t",
+        "typeAliasDeclId": "0x56b260"
+      },
+      "inner": [
+        {
+          "id": "0x5714c0",
+          "kind": "ElaboratedType",
+          "type": {
+            "qualType": "__intmax_t"
+          },
+          "inner": [
+            {
+              "id": "0x571490",
+              "kind": "TypedefType",
+              "type": {
+                "qualType": "__intmax_t"
+              },
+              "decl": {
+                "id": "0x56b260",
+                "kind": "TypedefDecl",
+                "name": "__intmax_t"
+              },
+              "inner": [
+                {
+                  "id": "0x4ea420",
+                  "kind": "BuiltinType",
+                  "type": {
+                    "qualType": "long"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "0x573500",
+      "kind": "TypedefDecl",
+      "loc": {
+        "offset": 2286,
+        "line": 91,
+        "col": 22,
+        "tokLen": 9,
+        "includedFrom": {
+          "file": "/nix/store/bi9x1czcmy07fhf1hqn1hg53g6drwd0y-clang-wrapper-17.0.6/resource-root/include/stdint.h"
+        }
+      },
+      "range": {
+        "begin": {
+          "offset": 2265,
+          "col": 1,
+          "tokLen": 7,
+          "includedFrom": {
+            "file": "/nix/store/bi9x1czcmy07fhf1hqn1hg53g6drwd0y-clang-wrapper-17.0.6/resource-root/include/stdint.h"
+          }
+        },
+        "end": {
+          "offset": 2286,
+          "col": 22,
+          "tokLen": 9,
+          "includedFrom": {
+            "file": "/nix/store/bi9x1czcmy07fhf1hqn1hg53g6drwd0y-clang-wrapper-17.0.6/resource-root/include/stdint.h"
+          }
+        }
+      },
+      "name": "uintmax_t",
+      "type": {
+        "desugaredQualType": "unsigned long",
+        "qualType": "__uintmax_t",
+        "typeAliasDeclId": "0x56b2d0"
+      },
+      "inner": [
+        {
+          "id": "0x5734c0",
+          "kind": "ElaboratedType",
+          "type": {
+            "qualType": "__uintmax_t"
+          },
+          "inner": [
+            {
+              "id": "0x571560",
+              "kind": "TypedefType",
+              "type": {
+                "qualType": "__uintmax_t"
+              },
+              "decl": {
+                "id": "0x56b2d0",
+                "kind": "TypedefDecl",
+                "name": "__uintmax_t"
+              },
+              "inner": [
+                {
+                  "id": "0x4ea4c0",
+                  "kind": "BuiltinType",
+                  "type": {
+                    "qualType": "unsigned long"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "0x573558",
+      "kind": "RecordDecl",
+      "loc": {
+        "offset": 73,
+        "file": "test/c_sources/unions_void.c",
+        "line": 4,
+        "col": 7,
+        "tokLen": 5
+      },
+      "range": {
+        "begin": {
+          "offset": 67,
+          "col": 1,
+          "tokLen": 5
+        },
+        "end": {
+          "offset": 100,
+          "line": 6,
+          "col": 1,
+          "tokLen": 1
+        }
+      },
+      "name": "reg32",
+      "tagUsed": "union",
+      "completeDefinition": true,
+      "inner": [
+        {
+          "id": "0x573670",
+          "kind": "FieldDecl",
+          "loc": {
+            "offset": 94,
+            "line": 5,
+            "col": 14,
+            "tokLen": 4
+          },
+          "range": {
+            "begin": {
+              "offset": 85,
+              "col": 5,
+              "tokLen": 8
+            },
+            "end": {
+              "offset": 94,
+              "col": 14,
+              "tokLen": 4
+            }
+          },
+          "isReferenced": true,
+          "name": "word",
+          "type": {
+            "desugaredQualType": "unsigned int",
+            "qualType": "uint32_t",
+            "typeAliasDeclId": "0x5708e8"
+          }
+        }
+      ]
+    },
+    {
+      "id": "0x573868",
+      "kind": "FunctionDecl",
+      "loc": {
+        "offset": 154,
+        "line": 9,
+        "col": 10,
+        "tokLen": 8
+      },
+      "range": {
+        "begin": {
+          "offset": 145,
+          "col": 1,
+          "tokLen": 8
+        },
+        "end": {
+          "offset": 201,
+          "line": 11,
+          "col": 1,
+          "tokLen": 1
+        }
+      },
+      "name": "read_reg",
+      "mangledName": "read_reg",
+      "type": {
+        "qualType": "uint32_t (union reg32 *)"
+      },
+      "inner": [
+        {
+          "id": "0x573770",
+          "kind": "ParmVarDecl",
+          "loc": {
+            "offset": 176,
+            "line": 9,
+            "col": 32,
+            "tokLen": 1
+          },
+          "range": {
+            "begin": {
+              "offset": 163,
+              "col": 19,
+              "tokLen": 5
+            },
+            "end": {
+              "offset": 176,
+              "col": 32,
+              "tokLen": 1
+            }
+          },
+          "isUsed": true,
+          "name": "r",
+          "type": {
+            "qualType": "union reg32 *"
+          }
+        },
+        {
+          "id": "0x5739f0",
+          "kind": "CompoundStmt",
+          "range": {
+            "begin": {
+              "offset": 179,
+              "col": 35,
+              "tokLen": 1
+            },
+            "end": {
+              "offset": 201,
+              "line": 11,
+              "col": 1,
+              "tokLen": 1
+            }
+          },
+          "inner": [
+            {
+              "id": "0x5739e0",
+              "kind": "ReturnStmt",
+              "range": {
+                "begin": {
+                  "offset": 185,
+                  "line": 10,
+                  "col": 5,
+                  "tokLen": 6
+                },
+                "end": {
+                  "offset": 195,
+                  "col": 15,
+                  "tokLen": 4
+                }
+              },
+              "inner": [
+                {
+                  "id": "0x5739c8",
+                  "kind": "ImplicitCastExpr",
+                  "range": {
+                    "begin": {
+                      "offset": 192,
+                      "col": 12,
+                      "tokLen": 1
+                    },
+                    "end": {
+                      "offset": 195,
+                      "col": 15,
+                      "tokLen": 4
+                    }
+                  },
+                  "type": {
+                    "desugaredQualType": "unsigned int",
+                    "qualType": "uint32_t",
+                    "typeAliasDeclId": "0x5708e8"
+                  },
+                  "valueCategory": "prvalue",
+                  "castKind": "LValueToRValue",
+                  "inner": [
+                    {
+                      "id": "0x573998",
+                      "kind": "MemberExpr",
+                      "range": {
+                        "begin": {
+                          "offset": 192,
+                          "col": 12,
+                          "tokLen": 1
+                        },
+                        "end": {
+                          "offset": 195,
+                          "col": 15,
+                          "tokLen": 4
+                        }
+                      },
+                      "type": {
+                        "desugaredQualType": "unsigned int",
+                        "qualType": "uint32_t",
+                        "typeAliasDeclId": "0x5708e8"
+                      },
+                      "valueCategory": "lvalue",
+                      "name": "word",
+                      "isArrow": true,
+                      "referencedMemberDecl": "0x573670",
+                      "inner": [
+                        {
+                          "id": "0x573980",
+                          "kind": "ImplicitCastExpr",
+                          "range": {
+                            "begin": {
+                              "offset": 192,
+                              "col": 12,
+                              "tokLen": 1
+                            },
+                            "end": {
+                              "offset": 192,
+                              "col": 12,
+                              "tokLen": 1
+                            }
+                          },
+                          "type": {
+                            "qualType": "union reg32 *"
+                          },
+                          "valueCategory": "prvalue",
+                          "castKind": "LValueToRValue",
+                          "inner": [
+                            {
+                              "id": "0x573960",
+                              "kind": "DeclRefExpr",
+                              "range": {
+                                "begin": {
+                                  "offset": 192,
+                                  "col": 12,
+                                  "tokLen": 1
+                                },
+                                "end": {
+                                  "offset": 192,
+                                  "col": 12,
+                                  "tokLen": 1
+                                }
+                              },
+                              "type": {
+                                "qualType": "union reg32 *"
+                              },
+                              "valueCategory": "lvalue",
+                              "referencedDecl": {
+                                "id": "0x573770",
+                                "kind": "ParmVarDecl",
+                                "name": "r",
+                                "type": {
+                                  "qualType": "union reg32 *"
+                                }
+                              }
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "0x573b18",
+      "kind": "FunctionDecl",
+      "loc": {
+        "offset": 275,
+        "line": 14,
+        "col": 10,
+        "tokLen": 13
+      },
+      "range": {
+        "begin": {
+          "offset": 266,
+          "col": 1,
+          "tokLen": 8
+        },
+        "end": {
+          "offset": 360,
+          "line": 17,
+          "col": 1,
+          "tokLen": 1
+        }
+      },
+      "name": "read_via_void",
+      "mangledName": "read_via_void",
+      "type": {
+        "qualType": "uint32_t (void *)"
+      },
+      "inner": [
+        {
+          "id": "0x573a20",
+          "kind": "ParmVarDecl",
+          "loc": {
+            "offset": 295,
+            "line": 14,
+            "col": 30,
+            "tokLen": 3
+          },
+          "range": {
+            "begin": {
+              "offset": 289,
+              "col": 24,
+              "tokLen": 4
+            },
+            "end": {
+              "offset": 295,
+              "col": 30,
+              "tokLen": 3
+            }
+          },
+          "isUsed": true,
+          "name": "ptr",
+          "type": {
+            "qualType": "void *"
+          }
+        },
+        {
+          "id": "0x573db0",
+          "kind": "CompoundStmt",
+          "range": {
+            "begin": {
+              "offset": 300,
+              "col": 35,
+              "tokLen": 1
+            },
+            "end": {
+              "offset": 360,
+              "line": 17,
+              "col": 1,
+              "tokLen": 1
+            }
+          },
+          "inner": [
+            {
+              "id": "0x573d20",
+              "kind": "DeclStmt",
+              "range": {
+                "begin": {
+                  "offset": 306,
+                  "line": 15,
+                  "col": 5,
+                  "tokLen": 8
+                },
+                "end": {
+                  "offset": 339,
+                  "col": 38,
+                  "tokLen": 1
+                }
+              },
+              "inner": [
+                {
+                  "id": "0x573c40",
+                  "kind": "VarDecl",
+                  "loc": {
+                    "offset": 316,
+                    "col": 15,
+                    "tokLen": 5
+                  },
+                  "range": {
+                    "begin": {
+                      "offset": 306,
+                      "col": 5,
+                      "tokLen": 8
+                    },
+                    "end": {
+                      "offset": 336,
+                      "col": 35,
+                      "tokLen": 3
+                    }
+                  },
+                  "isUsed": true,
+                  "name": "typed",
+                  "type": {
+                    "qualType": "uint32_t *"
+                  },
+                  "init": "c",
+                  "inner": [
+                    {
+                      "id": "0x573cf8",
+                      "kind": "CStyleCastExpr",
+                      "range": {
+                        "begin": {
+                          "offset": 324,
+                          "col": 23,
+                          "tokLen": 1
+                        },
+                        "end": {
+                          "offset": 336,
+                          "col": 35,
+                          "tokLen": 3
+                        }
+                      },
+                      "type": {
+                        "qualType": "uint32_t *"
+                      },
+                      "valueCategory": "prvalue",
+                      "castKind": "BitCast",
+                      "inner": [
+                        {
+                          "id": "0x573ce0",
+                          "kind": "ImplicitCastExpr",
+                          "range": {
+                            "begin": {
+                              "offset": 336,
+                              "col": 35,
+                              "tokLen": 3
+                            },
+                            "end": {
+                              "offset": 336,
+                              "col": 35,
+                              "tokLen": 3
+                            }
+                          },
+                          "type": {
+                            "qualType": "void *"
+                          },
+                          "valueCategory": "prvalue",
+                          "castKind": "LValueToRValue",
+                          "isPartOfExplicitCast": true,
+                          "inner": [
+                            {
+                              "id": "0x573ca8",
+                              "kind": "DeclRefExpr",
+                              "range": {
+                                "begin": {
+                                  "offset": 336,
+                                  "col": 35,
+                                  "tokLen": 3
+                                },
+                                "end": {
+                                  "offset": 336,
+                                  "col": 35,
+                                  "tokLen": 3
+                                }
+                              },
+                              "type": {
+                                "qualType": "void *"
+                              },
+                              "valueCategory": "lvalue",
+                              "referencedDecl": {
+                                "id": "0x573a20",
+                                "kind": "ParmVarDecl",
+                                "name": "ptr",
+                                "type": {
+                                  "qualType": "void *"
+                                }
+                              }
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "0x573da0",
+              "kind": "ReturnStmt",
+              "range": {
+                "begin": {
+                  "offset": 345,
+                  "line": 16,
+                  "col": 5,
+                  "tokLen": 6
+                },
+                "end": {
+                  "offset": 353,
+                  "col": 13,
+                  "tokLen": 5
+                }
+              },
+              "inner": [
+                {
+                  "id": "0x573d88",
+                  "kind": "ImplicitCastExpr",
+                  "range": {
+                    "begin": {
+                      "offset": 352,
+                      "col": 12,
+                      "tokLen": 1
+                    },
+                    "end": {
+                      "offset": 353,
+                      "col": 13,
+                      "tokLen": 5
+                    }
+                  },
+                  "type": {
+                    "desugaredQualType": "unsigned int",
+                    "qualType": "uint32_t",
+                    "typeAliasDeclId": "0x5708e8"
+                  },
+                  "valueCategory": "prvalue",
+                  "castKind": "LValueToRValue",
+                  "inner": [
+                    {
+                      "id": "0x573d70",
+                      "kind": "UnaryOperator",
+                      "range": {
+                        "begin": {
+                          "offset": 352,
+                          "col": 12,
+                          "tokLen": 1
+                        },
+                        "end": {
+                          "offset": 353,
+                          "col": 13,
+                          "tokLen": 5
+                        }
+                      },
+                      "type": {
+                        "desugaredQualType": "unsigned int",
+                        "qualType": "uint32_t",
+                        "typeAliasDeclId": "0x5708e8"
+                      },
+                      "valueCategory": "lvalue",
+                      "isPostfix": false,
+                      "opcode": "*",
+                      "canOverflow": false,
+                      "inner": [
+                        {
+                          "id": "0x573d58",
+                          "kind": "ImplicitCastExpr",
+                          "range": {
+                            "begin": {
+                              "offset": 353,
+                              "col": 13,
+                              "tokLen": 5
+                            },
+                            "end": {
+                              "offset": 353,
+                              "col": 13,
+                              "tokLen": 5
+                            }
+                          },
+                          "type": {
+                            "qualType": "uint32_t *"
+                          },
+                          "valueCategory": "prvalue",
+                          "castKind": "LValueToRValue",
+                          "inner": [
+                            {
+                              "id": "0x573d38",
+                              "kind": "DeclRefExpr",
+                              "range": {
+                                "begin": {
+                                  "offset": 353,
+                                  "col": 13,
+                                  "tokLen": 5
+                                },
+                                "end": {
+                                  "offset": 353,
+                                  "col": 13,
+                                  "tokLen": 5
+                                }
+                              },
+                              "type": {
+                                "qualType": "uint32_t *"
+                              },
+                              "valueCategory": "lvalue",
+                              "referencedDecl": {
+                                "id": "0x573c40",
+                                "kind": "VarDecl",
+                                "name": "typed",
+                                "type": {
+                                  "qualType": "uint32_t *"
+                                }
+                              }
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

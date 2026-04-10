@@ -47,7 +47,7 @@ class VarInfo:
 class Expr:
     """An expression in the C AST."""
     kind: str  # "var_ref", "int_literal", "binop", "unop", "ternary", "deref",
-               # "member_access", "call_expr"
+               # "member_access", "call_expr", "cast_expr", "sizeof_expr"
     # Fields depend on kind:
     var_name: Optional[str] = None       # for var_ref, call_expr (callee name)
     int_value: Optional[int] = None      # for int_literal
@@ -63,6 +63,11 @@ class Expr:
     member_base: Optional['Expr'] = None # the struct/pointer expression
     # For call_expr:
     call_args: list['Expr'] = field(default_factory=list)  # function arguments
+    # For cast_expr:
+    cast_from: Optional[CType] = None  # source type of cast
+    cast_to: Optional[CType] = None    # target type of cast
+    # For sizeof_expr:
+    sizeof_type: Optional[CType] = None  # type whose size is being taken
 
 @dataclass
 class Stmt:
@@ -358,18 +363,20 @@ def _extract_const_int(node: dict, enum_constants: dict[str, int]) -> Optional[i
 
 
 def _parse_struct(node: dict) -> Optional[StructDef]:
-    """Parse a RecordDecl node into a StructDef.
+    """Parse a RecordDecl node into a StructDef (handles both struct and union).
 
-    Returns None for anonymous structs or incomplete definitions.
+    Returns None for anonymous records or incomplete definitions.
     """
     name = node.get("name")
     if not name:
-        log.debug("Skipping anonymous struct")
+        log.debug("Skipping anonymous struct/union")
         return None
 
     tag = node.get("tagUsed", "struct")
-    if tag != "struct":
-        raise StrictCViolation(f"Only struct is supported, got '{tag}'")
+    if tag not in ("struct", "union"):
+        raise StrictCViolation(f"Only struct and union are supported, got '{tag}'")
+
+    is_union = (tag == "union")
 
     fields = []
     for child in node.get("inner", []):
@@ -378,7 +385,7 @@ def _parse_struct(node: dict) -> Optional[StructDef]:
             ftype = parse_clang_type(child["type"])
             fields.append(StructField(name=fname, c_type=ftype))
 
-    sdef = StructDef(name=name, fields=fields)
+    sdef = StructDef(name=name, fields=fields, is_union=is_union)
 
     # Assign a unique type tag id (starting from 200 to avoid collisions with scalars)
     sdef.type_tag_id = 200 + len(get_struct_defs())
@@ -387,8 +394,9 @@ def _parse_struct(node: dict) -> Optional[StructDef]:
     compute_struct_layout(sdef)
     register_struct(sdef)
 
-    log.info("Parsed struct %s: %d fields, size=%d, align=%d",
-             name, len(fields), sdef.total_size, sdef.alignment)
+    kind_str = "union" if is_union else "struct"
+    log.info("Parsed %s %s: %d fields, size=%d, align=%d",
+             kind_str, name, len(fields), sdef.total_size, sdef.alignment)
     for f in fields:
         log.info("  field %s: type=%s, offset=%d, size=%d, align=%d",
                  f.name, f.c_type.name, f.offset, f.size, f.align)
@@ -654,12 +662,56 @@ def _parse_expr(node: dict) -> Expr:
             return _parse_expr(inner[0])
         raise StrictCViolation(f"ImplicitCastExpr with no inner node")
 
-    # Explicit casts -- also look through for now (Phase 1: same-width integers)
+    # Explicit casts: extract source and target types, emit conversion
     if kind == "CStyleCastExpr":
         inner = node.get("inner", [])
-        if inner:
-            return _parse_expr(inner[-1])  # Last child is the operand
-        raise StrictCViolation(f"CStyleCastExpr with no inner node")
+        if not inner:
+            raise StrictCViolation(f"CStyleCastExpr with no inner node")
+        cast_kind = node.get("castKind", "")
+        # NoOp casts (same type): pass through
+        if cast_kind == "NoOp":
+            return _parse_expr(inner[-1])
+        # Pointer casts
+        if cast_kind == "NullToPointer":
+            return _parse_expr(inner[-1])
+        if cast_kind in ("PointerToBoolean", "PointerToIntegral"):
+            return _parse_expr(inner[-1])
+        if cast_kind == "IntegralToPointer":
+            return _parse_expr(inner[-1])
+        if cast_kind == "BitCast":
+            # Pointer-to-pointer cast (e.g., void* -> uint32_t*).
+            # Both types are pointers with the same representation.
+            # Emit a ptr_cast_expr so the emitter can insert a type coercion.
+            target_type = _try_extract_result_type(node)
+            operand = _parse_expr(inner[-1])
+            if target_type is not None and target_type.is_pointer:
+                return Expr(kind="ptr_cast_expr", operand=operand,
+                           cast_from=operand.result_type, cast_to=target_type,
+                           result_type=target_type)
+            return operand
+        # IntegralCast: widening/narrowing between integer types
+        target_type = _try_extract_result_type(node)
+        operand = _parse_expr(inner[-1])
+        source_type = operand.result_type
+        # If we can determine both types, emit a cast_expr
+        if target_type is not None and source_type is not None:
+            # Same width or unknown: pass through (identity cast)
+            if target_type.bits == source_type.bits and target_type.signed == source_type.signed:
+                return Expr(kind=operand.kind, var_name=operand.var_name,
+                           int_value=operand.int_value, op=operand.op,
+                           lhs=operand.lhs, rhs=operand.rhs, third=operand.third,
+                           operand=operand.operand, result_type=target_type,
+                           member_name=operand.member_name,
+                           member_is_arrow=operand.member_is_arrow,
+                           member_base=operand.member_base,
+                           call_args=operand.call_args)
+            return Expr(kind="cast_expr", operand=operand,
+                       cast_from=source_type, cast_to=target_type,
+                       result_type=target_type)
+        # Fallback: pass through with target type
+        if target_type is not None:
+            operand.result_type = target_type
+        return operand
 
     if kind == "ParenExpr":
         inner = node.get("inner", [])
@@ -685,6 +737,11 @@ def _parse_expr(node: dict) -> Expr:
 
     if kind == "IntegerLiteral":
         return Expr(kind="int_literal", int_value=int(node.get("value", "0")))
+
+    if kind == "CharacterLiteral":
+        # Character literal: 'a' -> its integer value
+        return Expr(kind="int_literal", int_value=int(node.get("value", 0)),
+                    result_type=_try_extract_result_type(node))
 
     if kind == "ConstantExpr":
         # ConstantExpr is a wrapper around a compile-time constant.
@@ -801,6 +858,31 @@ def _parse_expr(node: dict) -> Expr:
         result_type = _try_extract_result_type(node)
         return Expr(kind="call_expr", var_name=callee_name,
                     result_type=result_type, call_args=args)
+
+    if kind == "UnaryExprOrTypeTraitExpr":
+        # sizeof(type) or sizeof(expr)
+        name = node.get("name", "")
+        if name == "sizeof":
+            # sizeof(type): has argType field
+            arg_type_node = node.get("argType")
+            if arg_type_node:
+                try:
+                    sizeof_ctype = parse_clang_type(arg_type_node)
+                    return Expr(kind="sizeof_expr", sizeof_type=sizeof_ctype,
+                               result_type=_try_extract_result_type(node))
+                except UnsupportedTypeError:
+                    pass
+            # sizeof(expr): determine type from inner expression
+            inner = node.get("inner", [])
+            if inner:
+                operand = _parse_expr(inner[0])
+                if operand.result_type:
+                    return Expr(kind="sizeof_expr", sizeof_type=operand.result_type,
+                                result_type=_try_extract_result_type(node))
+            raise StrictCViolation(
+                f"sizeof with unresolvable type: {node.get('argType', {})}"
+            )
+        raise StrictCViolation(f"Unsupported UnaryExprOrTypeTraitExpr: {name}")
 
     raise StrictCViolation(f"Unsupported expression kind: {kind}")
 

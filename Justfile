@@ -36,6 +36,29 @@ import-all:
     just import test/c_sources/sum_array.c SumArray
     just import test/c_sources/enum_typedef_global.c EnumTypedefGlobal
     just import test/c_sources/ring_buffer_ext.c RingBufferExt
+    just import test/c_sources/bitwise.c Bitwise
+    just import test/c_sources/casts_sizeof.c CastsSizeof
+    just import test/c_sources/unions_void.c UnionsVoid
+    just import test/c_sources/strings.c Strings
+
+# Multi-file import: process multiple .c files into a Lean module set
+# Usage: just multi-import MultiProject test/c_sources/multi_file/helper.c test/c_sources/multi_file/main.c
+multi-import PROJECT *FILES:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    mkdir -p test/clang_json Generated/{{PROJECT}}
+    json_args=""
+    for f in {{FILES}}; do
+        name=$(basename "$f" .c)
+        name="$(tr '[:lower:]' '[:upper:]' <<< ${name:0:1})${name:1}"
+        clang -Xclang -ast-dump=json -fsyntax-only -I "$(dirname "$f")" "$f" 2>/dev/null > "test/clang_json/${name}.json"
+        json_args="$json_args test/clang_json/${name}.json"
+    done
+    python3 CImporter/multi_import.py --project {{PROJECT}} $json_args -o Generated/{{PROJECT}}
+
+# Import the multi-file test project
+import-multi-test:
+    just multi-import MultiProject test/c_sources/multi_file/helper.c test/c_sources/multi_file/main.c
 
 # Run CImporter Python unit tests
 test-importer:

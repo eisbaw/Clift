@@ -87,13 +87,14 @@ class StructField:
 
 @dataclass
 class StructDef:
-    """A C struct definition with computed layout."""
+    """A C struct or union definition with computed layout."""
     name: str           # e.g. "node"
     fields: list[StructField] = field(default_factory=list)
     # Computed by layout algorithm:
     total_size: int = 0
     alignment: int = 1
     type_tag_id: int = 0  # Unique TypeTag id for this struct
+    is_union: bool = False  # True for union types (all fields at offset 0)
 
     @property
     def lean_name(self) -> str:
@@ -137,6 +138,7 @@ _CLANG_TYPE_MAP: dict[str, CType] = {
     "unsigned long": UINT64,
     "unsigned long long": UINT64,
     "signed char": INT8,
+    "char": INT8,  # char is signed on x86-64 Linux (gcc default)
     "short": INT16,
     "int": INT32,
     "long": INT64,
@@ -161,10 +163,11 @@ _STRUCT_DEFS: dict[str, StructDef] = {}
 
 
 def register_struct(sdef: StructDef):
-    """Register a parsed struct definition so pointer types can reference it."""
-    key = f"struct {sdef.name}"
+    """Register a parsed struct or union definition so pointer types can reference it."""
+    tag = "union" if sdef.is_union else "struct"
+    key = f"{tag} {sdef.name}"
     _STRUCT_DEFS[key] = sdef
-    log.info("Registered struct: %s (size=%d, align=%d)", key, sdef.total_size, sdef.alignment)
+    log.info("Registered %s: %s (size=%d, align=%d)", tag, key, sdef.total_size, sdef.alignment)
 
 
 def get_struct_defs() -> dict[str, StructDef]:
@@ -231,27 +234,27 @@ def parse_clang_type(type_node: dict) -> CType:
 
 
 def _match_struct_type(type_str: str) -> Optional[CType]:
-    """Check if a type string is a known struct type.
+    """Check if a type string is a known struct or union type.
 
     Returns CType if it matches, None otherwise.
     """
     if not type_str:
         return None
-    # Match "struct <name>" exactly
-    m = re.match(r'^struct\s+(\w+)$', type_str)
+    # Match "struct <name>" or "union <name>" exactly
+    m = re.match(r'^(struct|union)\s+(\w+)$', type_str)
     if m:
-        struct_name = m.group(1)
-        key = f"struct {struct_name}"
+        tag = m.group(1)
+        record_name = m.group(2)
+        key = f"{tag} {record_name}"
         if key in _STRUCT_DEFS:
             return _STRUCT_DEFS[key].c_type
-        # Struct not yet registered -- create a forward reference CType.
-        # This handles self-referential structs (e.g. struct node *next).
+        # Not yet registered -- create a forward reference CType.
         return CType(
-            name=key,
+            name=f"{tag} {record_name}",
             signed=False,
             bits=0,
             is_struct=True,
-            struct_name=struct_name,
+            struct_name=record_name,
         )
     return None
 
@@ -267,6 +270,9 @@ def _parse_pointer_type(type_node: dict) -> CType:
 
     # Strip the pointer: "unsigned int *" -> "unsigned int"
     pointee_str = desugared.rstrip("* ").strip() if desugared else qual.rstrip("* ").strip()
+    # Strip CV qualifiers: "const char" -> "char", "volatile int" -> "int"
+    for cv in ("const ", "volatile ", "restrict "):
+        pointee_str = pointee_str.replace(cv, "").strip()
 
     # Try scalar types first
     if pointee_str in _CLANG_TYPE_MAP:
@@ -364,12 +370,14 @@ def type_size_align(ctype: CType) -> tuple[int, int]:
     if ctype.is_pointer:
         return (8, 8)  # All pointers are 8 bytes on LP64
     if ctype.is_struct:
-        key = f"struct {ctype.struct_name}"
-        if key in _STRUCT_DEFS:
-            sdef = _STRUCT_DEFS[key]
-            return (sdef.total_size, sdef.alignment)
+        # Try both struct and union keys
+        for tag in ("struct", "union"):
+            key = f"{tag} {ctype.struct_name}"
+            if key in _STRUCT_DEFS:
+                sdef = _STRUCT_DEFS[key]
+                return (sdef.total_size, sdef.alignment)
         raise UnsupportedTypeError(
-            f"Struct '{key}' not yet defined. Structs must be defined before use."
+            f"Record type '{ctype.struct_name}' not yet defined. Must be defined before use."
         )
     if ctype.name in _SCALAR_SIZE_ALIGN:
         return _SCALAR_SIZE_ALIGN[ctype.name]
@@ -377,31 +385,48 @@ def type_size_align(ctype: CType) -> tuple[int, int]:
 
 
 def compute_struct_layout(sdef: StructDef):
-    """Compute field offsets, total size, and alignment for a struct.
+    """Compute field offsets, total size, and alignment for a struct or union.
 
     Follows gcc x86-64 LP64 ABI rules:
-    - Each field aligned to its natural alignment
-    - Struct alignment = max alignment of all fields
-    - Struct size padded to multiple of struct alignment
+    - Struct: each field aligned to its natural alignment, placed sequentially
+    - Union: all fields at offset 0, size = max field size
+    - Alignment = max alignment of all fields
+    - Size padded to multiple of alignment
 
     Mutates sdef in place.
     """
-    offset = 0
-    max_align = 1
-
-    for f in sdef.fields:
-        sz, al = type_size_align(f.c_type)
-        f.size = sz
-        f.align = al
-        # Align the current offset
-        if al > 0 and offset % al != 0:
-            offset = ((offset + al - 1) // al) * al
-        f.offset = offset
-        offset += sz
-        max_align = max(max_align, al)
-
-    sdef.alignment = max_align
-    # Pad to alignment
-    if max_align > 0 and offset % max_align != 0:
-        offset = ((offset + max_align - 1) // max_align) * max_align
-    sdef.total_size = offset
+    if sdef.is_union:
+        # Union: all fields at offset 0, size = max field size
+        max_size = 0
+        max_align = 1
+        for f in sdef.fields:
+            sz, al = type_size_align(f.c_type)
+            f.size = sz
+            f.align = al
+            f.offset = 0  # All union fields overlap at offset 0
+            max_size = max(max_size, sz)
+            max_align = max(max_align, al)
+        sdef.alignment = max_align
+        # Pad to alignment
+        if max_align > 0 and max_size % max_align != 0:
+            max_size = ((max_size + max_align - 1) // max_align) * max_align
+        sdef.total_size = max_size
+    else:
+        # Struct: sequential layout
+        offset = 0
+        max_align = 1
+        for f in sdef.fields:
+            sz, al = type_size_align(f.c_type)
+            f.size = sz
+            f.align = al
+            # Align the current offset
+            if al > 0 and offset % al != 0:
+                offset = ((offset + al - 1) // al) * al
+            f.offset = offset
+            offset += sz
+            max_align = max(max_align, al)
+        sdef.alignment = max_align
+        # Pad to alignment
+        if max_align > 0 and offset % max_align != 0:
+            offset = ((offset + max_align - 1) // max_align) * max_align
+        sdef.total_size = offset
