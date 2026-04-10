@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-04-10 18:45'
-updated_date: '2026-04-10 19:26'
+updated_date: '2026-04-10 19:27'
 labels:
   - phase-l
   - verification
@@ -38,3 +38,19 @@ The biggest gap between us and seL4. We have FuncSpecs for 15/40 functions but v
 - 25/40 validHoare proofs use sorry (loops, multi-heap, calls)
 - 0/40 fully proven yet (existing SwapProof pattern not yet applied to ring buffer)
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+All 40 FuncSpecs defined (18 existing + 22 new). 25 validHoare theorems stated with sorry.
+
+New file: Examples/RBExtFuncSpecs.lean
+- 22 new FuncSpec definitions (no sorry in any spec)
+- 25 validHoare theorems with sorry, categorized:
+  - 15 loop functions (need loop invariant + termination)
+  - 4 multi-heap (need projection lemma suites)
+  - 4 inter-procedural (need call spec composition)
+  - 2 heap+loop (need both)
+
+AC#1 (specs defined): DONE. AC#2-6 (proofs): blocked on sorry elimination.
+<!-- SECTION:FINAL_SUMMARY:END -->

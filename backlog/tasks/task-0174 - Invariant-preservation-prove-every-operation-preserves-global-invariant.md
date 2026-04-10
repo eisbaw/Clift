@@ -1,7 +1,7 @@
 ---
 id: TASK-0174
 title: 'Invariant preservation: prove every operation preserves global invariant'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-10 18:53'
@@ -37,3 +37,14 @@ seL4 reports ~80% of proof effort goes to proving invariant preservation. TASK-0
 - Composition theorem: invariant_preserved_by_sequence sorry-free
 - All at abstract spec level (not C level)
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Defined queueInvariant and proved preservation for all 40 ring_buffer_ext operations at the abstract spec level. All proofs are sorry-free.
+
+Changes:
+- RBExtRefinement.lean: queueInvariant, ExtQueueOp (40 ops), per-op preservation theorems, composition theorem
+- All proofs at abstract level (List operations), not C level
+- Pattern documented: new operations just need a case in all_ops_preserve_invariant
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-04-10 18:53'
-updated_date: '2026-04-10 19:26'
+updated_date: '2026-04-10 19:27'
 labels:
   - phase-l
   - seL4-parity
@@ -37,3 +37,18 @@ The Clift pipeline has 5 stages (L1-L5), each with a corres lemma. seL4 composes
 - fifo_holds_at_c_level demonstrated (sorry: blocked on refinement)
 - 3 sorry total, all transitively blocked on validHoare proofs
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Stated ring_buffer_ext_refines_queue_spec and built SystemRefinement structure.
+
+Changes:
+- RBExtRefinement.lean: extQueueImpl (40 ops -> L1 bodies), SystemRefinement record
+- End-to-end theorem stated but uses sorry (blocked on task 0136 validHoare proofs)
+- fifo_holds_at_c_level demonstrates property transfer pattern
+- 3 sorry total, all transitively blocked on the same root cause
+
+AC#1 (composed corres) and AC#4 (no sorry) blocked on task 0136.
+AC#2 (clean statement) and AC#3 (demonstrated) are met.
+<!-- SECTION:FINAL_SUMMARY:END -->

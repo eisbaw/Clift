@@ -51,4 +51,7 @@ lean_lib Examples where
              `Examples.SoundnessCheck,
              `Examples.TerminationProofs,
              `Examples.RBExtFuncSpecs,
-             `Examples.RBExtRefinement]
+             `Examples.RBExtRefinement,
+             `Examples.AxiomAudit,
+             `Examples.ExecAudit,
+             `Examples.SorryAudit]
