@@ -1,9 +1,11 @@
 ---
 id: TASK-0111
 title: 'Scalability: measure and optimize RAM usage during proof checking'
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-04-10 12:58'
+updated_date: '2026-04-10 14:22'
 labels:
   - scalability
   - performance
@@ -19,8 +21,31 @@ Lean 4 processes used 9GB+ with Mathlib and 21GB during deep kernel reduction. A
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Peak RAM measured for: SwapProof, GcdPhase2, ListLengthProof, RingBufferProof
-- [ ] #2 RAM-hungry patterns identified
-- [ ] #3 Optimization strategy documented
-- [ ] #4 Estimated RAM for 150-function verification documented
+- [x] #1 Peak RAM measured for: SwapProof, GcdPhase2, ListLengthProof, RingBufferProof
+- [x] #2 RAM-hungry patterns identified
+- [x] #3 Optimization strategy documented
+- [x] #4 Estimated RAM for 150-function verification documented
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Measured peak RAM for all key targets.
+
+Results:
+- SwapProof: 778MB, RingBufferProof: 1502MB, ListLengthProof: 779MB
+- RingBufferExtProof (40 funcs): 1543MB
+- Full clean build: 1503MB
+- Per Lean worker process: ~200-300MB
+- Peak determined by Lake parallelism (N cores * 300MB), not function count
+
+RAM-hungry patterns: large state records, MetaM allocation during clift.
+Optimization: already using [local irreducible]; no Mathlib = huge win.
+
+Verdict:
+- 32GB: 500+ functions with no concern
+- 16GB: 150+ functions comfortably
+- 8GB: marginal, limit parallelism
+
+See notes/scalability-measurements.md for full data.
+<!-- SECTION:FINAL_SUMMARY:END -->

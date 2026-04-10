@@ -541,7 +541,8 @@ class LeanEmitter:
                 self._emit_call_assign(stmt.target_var, stmt.value, func)
             else:
                 field = self._field_name(stmt.target_var, func)
-                expr_str = self._emit_expr(stmt.value, func)
+                is_ptr = self._is_pointer_var(stmt.target_var, func)
+                expr_str = self._emit_ptr_aware_expr(stmt.value, func, is_ptr)
                 guards = self._collect_all_guards(stmt.value, func)
                 def emit_assign():
                     self._w(f".basic (fun s => {{ s with locals := {{ s.locals with {field} := {expr_str} }} }})")
@@ -554,7 +555,8 @@ class LeanEmitter:
             else:
                 # Variable declaration with initializer: same as assignment
                 field = self._field_name(stmt.target_var, func)
-                expr_str = self._emit_expr(stmt.expr, func)
+                is_ptr = self._is_pointer_var(stmt.target_var, func)
+                expr_str = self._emit_ptr_aware_expr(stmt.expr, func, is_ptr)
                 guards = self._collect_all_guards(stmt.expr, func)
                 def emit_decl_init():
                     self._w(f".basic (fun s => {{ s with locals := {{ s.locals with {field} := {expr_str} }} }})")
@@ -875,6 +877,19 @@ class LeanEmitter:
 
         else:
             raise ValueError(f"Unhandled expression kind: {expr.kind}")
+
+    def _is_pointer_var(self, var_name: str, func: FuncInfo) -> bool:
+        """Check if a local/param variable has pointer type."""
+        field = self._field_name(var_name, func)
+        if field in self.all_vars:
+            return self.all_vars[field].is_pointer
+        for p in func.params:
+            if p.name == var_name:
+                return p.c_type.is_pointer
+        for v in func.locals:
+            if v.name == var_name:
+                return v.c_type.is_pointer
+        return False
 
     def _is_pointer_expr(self, expr: Expr, func: FuncInfo) -> bool:
         """Check if an expression has pointer type (heuristic based on variable types)."""

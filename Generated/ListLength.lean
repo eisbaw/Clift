@@ -59,7 +59,7 @@ theorem C_node.fromBytes_toBytes (v : C_node) :
     show C_node.fromBytes (C_node.toBytes v) = v
     unfold C_node.fromBytes
     rw [h_val, h_next, UInt32.fromBytes_toBytes' v.val, Ptr.fromBytes_toBytes' v.next]
-    cases v; rfl
+    try { cases v; rfl }
 
 instance : MemType C_node where
   size := 16

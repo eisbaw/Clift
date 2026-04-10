@@ -59,7 +59,7 @@ theorem C_rb_node.fromBytes_toBytes (v : C_rb_node) :
     show C_rb_node.fromBytes (C_rb_node.toBytes v) = v
     unfold C_rb_node.fromBytes
     rw [h_value, h_next, UInt32.fromBytes_toBytes' v.value, Ptr.fromBytes_toBytes' v.next]
-    cases v; rfl
+    try { cases v; rfl }
 
 instance : MemType C_rb_node where
   size := 16
@@ -151,6 +151,7 @@ theorem C_rb_state.fromBytes_toBytes (v : C_rb_state) :
     show C_rb_state.fromBytes (C_rb_state.toBytes v) = v
     unfold C_rb_state.fromBytes
     rw [h_head, h_tail, h_count, h_capacity, Ptr.fromBytes_toBytes' v.head, Ptr.fromBytes_toBytes' v.tail, UInt32.fromBytes_toBytes' v.count, UInt32.fromBytes_toBytes' v.capacity]
+    try { cases v; rfl }
 
 instance : MemType C_rb_state where
   size := 24

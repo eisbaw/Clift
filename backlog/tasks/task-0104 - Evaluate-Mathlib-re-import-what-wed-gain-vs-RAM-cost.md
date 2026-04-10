@@ -1,9 +1,10 @@
 ---
 id: TASK-0104
 title: 'Evaluate Mathlib re-import: what we''d gain vs RAM cost'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-10 12:58'
+updated_date: '2026-04-10 13:05'
 labels:
   - infrastructure
   - scalability
@@ -25,3 +26,20 @@ We dropped Mathlib (ADR-002) to reduce RAM from 9GB to <500MB per Lean process. 
 - [ ] #4 Decision documented as ADR update or new ADR
 - [ ] #5 If re-importing: all existing proofs still compile
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Decision: keep Mathlib out. Re-evaluate after tasks 0105 (MetaM VCG) and 0112 (Claude benchmark).
+
+Rationale:
+- Current build: 0.4s, ~500MB RAM. With Mathlib: ~60s, 2-4GB (cached) or 9GB (from source).
+- Mathlib helps with ~20 manual lemmas (UInt ext, Set basics) — already solved in 200 LOC.
+- Mathlib does NOT help with the bottleneck (mechanical L1 stepping — 80% of proof effort).
+- Version churn risk is real for a 40+ week project.
+
+When to re-import:
+- If MetaM VCG (0105) eliminates L1 stepping, remaining effort shifts to arithmetic/data structures where Mathlib helps.
+- If Claude benchmark (0112) shows Claude needs Mathlib lemmas for proof generation.
+- If grind + Mathlib @[grind] lemmas would close goals our custom tactics can't.
+<!-- SECTION:FINAL_SUMMARY:END -->

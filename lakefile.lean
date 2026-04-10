@@ -17,7 +17,8 @@ lean_lib Generated where
   roots := #[`Generated.Max, `Generated.Gcd, `Generated.Swap, `Generated.ListLength, `Generated.Rotate3,
              `Generated.DivTest, `Generated.SignedArith, `Generated.ForLoop, `Generated.DoWhile, `Generated.SwitchTest,
              `Generated.MultiCall, `Generated.RingBuffer, `Generated.SumArray,
-             `Generated.EnumTypedefGlobal]
+             `Generated.EnumTypedefGlobal,
+             `Generated.RingBufferExt]
 
 -- User proof examples
 @[default_target]
@@ -38,4 +39,5 @@ lean_lib Examples where
              `Examples.AIStructInvariantTest,
              `Examples.AISpecTest,
              `Examples.PhaseEMilestone,
-             `Examples.L1VcgTest]
+             `Examples.L1VcgTest,
+             `Examples.RingBufferExtProof]
