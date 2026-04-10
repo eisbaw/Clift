@@ -5,3 +5,4 @@ import Clift.CSemantics.State
 import Clift.CSemantics.TypeTag
 import Clift.CSemantics.ProcEnv
 import Clift.CSemantics.HoareDef
+import Clift.CSemantics.TerminatesProps

@@ -47,4 +47,6 @@ lean_lib Examples where
              `Examples.AISpecTest,
              `Examples.PhaseEMilestone,
              `Examples.L1VcgTest,
-             `Examples.RingBufferExtProof]
+             `Examples.RingBufferExtProof,
+             `Examples.SoundnessCheck,
+             `Examples.TerminationProofs]
