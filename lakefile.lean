@@ -16,7 +16,7 @@ lean_lib Clift where
 lean_lib Generated where
   roots := #[`Generated.Max, `Generated.Gcd, `Generated.Swap, `Generated.ListLength, `Generated.Rotate3,
              `Generated.DivTest, `Generated.SignedArith, `Generated.ForLoop, `Generated.DoWhile, `Generated.SwitchTest,
-             `Generated.MultiCall]
+             `Generated.MultiCall, `Generated.RingBuffer]
 
 -- User proof examples
 @[default_target]
@@ -31,4 +31,5 @@ lean_lib Examples where
              `Examples.L1AutoTest,
              `Examples.PipelineTest,
              `Examples.MultiCallProof,
-             `Examples.ListLengthProof]
+             `Examples.ListLengthProof,
+             `Examples.RingBufferProof]

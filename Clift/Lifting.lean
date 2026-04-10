@@ -8,3 +8,5 @@ import Clift.Lifting.TypeStrengthen
 import Clift.Lifting.HeapLift
 import Clift.Lifting.WordAbstract
 import Clift.Lifting.WP
+import Clift.Lifting.AbstractSpec
+import Clift.Lifting.GlobalInvariant

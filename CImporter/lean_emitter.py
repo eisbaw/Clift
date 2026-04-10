@@ -288,7 +288,7 @@ class LeanEmitter:
             for f in sdef.fields
         )
         self._w(f"rw [{rewrites}, {roundtrips}]")
-        self._w(f"cases v; rfl")
+        self._w(f"try {{ cases v; rfl }}")
         self._indent -= 2
         self._w()
 
@@ -505,7 +505,15 @@ class LeanEmitter:
             # p->field = val or s.field = val
             if stmt.member_is_arrow:
                 ptr_str = self._emit_expr(stmt.member_base_expr, func)
-                val_str = self._emit_expr(stmt.value, func)
+                # Check if the target field is a pointer type (for NULL -> Ptr.null conversion)
+                field_is_ptr = False
+                if stmt.member_name:
+                    for sdef in self.tu.structs:
+                        for sf in sdef.fields:
+                            if sf.name == stmt.member_name and sf.c_type.is_pointer:
+                                field_is_ptr = True
+                                break
+                val_str = self._emit_ptr_aware_expr(stmt.value, func, field_is_ptr)
                 guards = [f"heapPtrValid s.globals.rawHeap {ptr_str}"]
                 guards.extend(self._collect_all_guards(stmt.value, func))
                 def emit_member_write():
@@ -788,7 +796,14 @@ class LeanEmitter:
                     return p.c_type.is_pointer
             return False
         if expr.kind == "member_access":
-            return False  # Could be pointer, but we'd need type info
+            # Look up struct field type to determine if it's a pointer
+            field_name = expr.member_name
+            if field_name:
+                for sdef in self.tu.structs:
+                    for sf in sdef.fields:
+                        if sf.name == field_name and sf.c_type.is_pointer:
+                            return True
+            return False
         if expr.kind == "int_literal":
             return False
         return False
