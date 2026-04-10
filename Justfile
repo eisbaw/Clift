@@ -58,6 +58,15 @@ e2e: test-importer test-snapshots test-struct-layout build
 clang-dump FILE:
     clang -Xclang -ast-dump=json -fsyntax-only {{FILE}} | jq .
 
+# Run proof engine (extract sorry, attempt automated proof)
+# Usage: just prove Examples/RingBufferProof.lean
+prove FILE:
+    python3 clift-prove-by-claudecode {{FILE}} --project-dir . -v
+
+# Dry-run proof engine (extract only, no proof attempts)
+prove-dry FILE:
+    python3 clift-prove-by-claudecode {{FILE}} --project-dir . --dry-run -v
+
 # Clean Lake build artifacts
 clean:
     lake clean
