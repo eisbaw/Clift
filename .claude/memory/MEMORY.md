@@ -1,0 +1,2 @@
+- [Lean 4 kernel depth workaround](feedback_lean4_kernel_depth.md) — mark hVal/heapUpdate irreducible + simp projection lemmas to avoid kernel deep recursion in L1 proofs
+- [Clift project status](project_clift_status.md) — C-to-Lean4 verification pipeline, zero sorry, Phases 0-4 complete
