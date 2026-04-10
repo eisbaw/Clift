@@ -1,0 +1,69 @@
+-- Task 0149: Proof maintenance test
+--
+-- Experiment: Make 3 changes to ring_buffer_ext.c, re-import, measure what breaks.
+--
+-- Changes made (in test/c_sources/ring_buffer_ext_modified.c):
+--   1. Added `version` field to struct rb_state
+--   2. Changed rb_contains algorithm: added early-exit on empty + count-bounded traversal
+--   3. Added new function rb_average (sum / count)
+--
+-- Import results:
+--   Original: 40 functions, 2460 lines Generated Lean
+--   Modified: 41 functions, 2570 lines Generated Lean
+--
+-- Impact analysis (measured by diff):
+--
+-- CHANGE 1: Added struct field (version)
+--   - C_rb_state structure: gained 1 field
+--   - C_rb_state size: 24 -> 32 bytes (alignment padding)
+--   - fromBytes/toBytes: additional field read/write
+--   - Roundtrip proof: additional rewrite step
+--   - MemType instance: size changed
+--   - ALL existing proofs about rb_state are potentially broken because:
+--     * Struct size changed (affects MemType, CType)
+--     * New field means different Lean structure constructor
+--     * Any proof that pattern-matches on rb_state needs updating
+--   Impact: HIGH -- every function that touches rb_state is affected
+--
+-- CHANGE 2: Changed algorithm (rb_contains)
+--   - Locals structure: gained `checked` field (new local variable)
+--   - rb_contains_body: completely different CSimpl term
+--   - ALL 40 functions share a single Locals record, so adding `checked`
+--     field changes Locals for EVERY function, not just rb_contains
+--   Impact: VERY HIGH -- the single Locals record design means ANY
+--     local variable change affects ALL functions' types
+--
+-- CHANGE 3: Added function (rb_average)
+--   - New function body added to procEnv
+--   - No impact on existing function bodies (additive change)
+--   - Existing proofs unaffected IF they don't depend on procEnv exhaustiveness
+--   Impact: LOW -- purely additive
+--
+-- Fragility ranking:
+--   1. MOST FRAGILE: Any change to Locals (new local vars, renamed vars)
+--      breaks ALL function specs because ProgramState = CState Locals
+--   2. FRAGILE: Struct field changes break all proofs using that struct
+--   3. ROBUST: Adding new functions (purely additive)
+--   4. ROBUST: Changes isolated to a single function body, IF Locals unchanged
+--
+-- Recommendations:
+--   1. The single-Locals-record design (following seL4) is the main fragility source.
+--      LocalVarExtract (L2) mitigates this by lifting locals to lambda-bound vars.
+--      After L2, proofs should be written against the L2 form, not L1.
+--   2. FuncSpecs should be written against the ABSTRACT spec (Specs/Queue.lean etc),
+--      not against the concrete Lean state. Refinement theorems absorb struct changes.
+--   3. Proof repair for struct changes could be partially automated:
+--      re-run CImporter, re-run clift, existing specs need manual review.
+--   4. CI should run `just regression` to detect breakage immediately.
+
+-- This file intentionally has no Lean code to compile -- it is documentation
+-- of the experiment results. The actual experiment artifacts are:
+--   - test/c_sources/ring_buffer_ext_modified.c (the 3 changes)
+--   - Generated/RingBufferExtModified.lean (re-imported)
+
+-- Quantitative summary:
+-- | Change | Lines changed (C) | Lines changed (Lean) | Functions affected | Proof impact |
+-- |--------|------------------|---------------------|-------------------|-------------|
+-- | Add field | +1 line | +110 lines | ALL 40 | All specs broken |
+-- | Algorithm | +8 lines | +20 lines CSimpl + Locals | ALL 40 (via Locals) | All specs broken |
+-- | Add function | +13 lines | +45 lines | 0 existing | None (additive) |

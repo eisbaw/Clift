@@ -3,9 +3,10 @@ id: TASK-0166
 title: >-
   Regression suite: comprehensive test infrastructure for continuous
   verification
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-10 18:50'
+updated_date: '2026-04-10 20:13'
 labels:
   - phase-o
   - testing

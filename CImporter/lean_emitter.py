@@ -105,7 +105,7 @@ class LeanEmitter:
             else:
                 # Multiple types -- qualify with type suffix
                 for lean_type, ctype in name_to_ctype[var_name].items():
-                    qualified = f"{var_name}_{lean_type.lower()}"
+                    qualified = f"{var_name}_{lean_type.lower().replace(' ', '_')}"
                     self.all_vars[qualified] = ctype
                     log.warning(
                         "Variable '%s' has multiple types, using qualified name '%s'",
@@ -127,7 +127,7 @@ class LeanEmitter:
         # Must be a type-qualified name -- find the type from this function's context
         for var in func.params + func.locals:
             if var.name == var_name:
-                qualified = f"{var_name}_{var.c_type.lean_type.lower()}"
+                qualified = f"{var_name}_{var.c_type.lean_type.lower().replace(' ', '_')}"
                 if qualified in self.all_vars:
                     return qualified
         # Fallback (shouldn't happen if _collect_all_vars is correct)
@@ -138,7 +138,7 @@ class LeanEmitter:
         if "ret__val" in self.all_vars:
             return "ret__val"
         # Multiple return types: qualify with the function's return type
-        qualified = f"ret__val_{func.return_type.lean_type.lower()}"
+        qualified = f"ret__val_{func.return_type.lean_type.lower().replace(' ', '_')}"
         if qualified in self.all_vars:
             return qualified
         # Fallback

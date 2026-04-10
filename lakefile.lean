@@ -25,7 +25,11 @@ lean_lib Generated where
              `Generated.MultiProject.Helper,
              `Generated.MultiProject.Main,
              `Generated.UnionsVoid,
-             `Generated.Strings]
+             `Generated.Strings,
+             `Generated.RtosQueue,
+             `Generated.Sha256Core,
+             `Generated.UartDriver,
+             `Generated.PacketParser]
 
 -- User proof examples
 @[default_target]
@@ -55,4 +59,8 @@ lean_lib Examples where
              `Examples.AxiomAudit,
              `Examples.ExecAudit,
              `Examples.SorryAudit,
-             `Examples.SystemCorrectness]
+             `Examples.SystemCorrectness,
+             `Examples.RtosQueueProof,
+             `Examples.Sha256CoreProof,
+             `Examples.UartDriverProof,
+             `Examples.PacketParserProof]

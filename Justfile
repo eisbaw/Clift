@@ -40,6 +40,10 @@ import-all:
     just import test/c_sources/casts_sizeof.c CastsSizeof
     just import test/c_sources/unions_void.c UnionsVoid
     just import test/c_sources/strings.c Strings
+    just import test/c_sources/rtos_queue.c RtosQueue
+    just import test/c_sources/sha256_core.c Sha256Core
+    just import test/c_sources/uart_driver.c UartDriver
+    just import test/c_sources/packet_parser.c PacketParser
 
 # Multi-file import: process multiple .c files into a Lean module set
 # Usage: just multi-import MultiProject test/c_sources/multi_file/helper.c test/c_sources/multi_file/main.c
@@ -169,3 +173,80 @@ status:
     @echo ""
     @echo "=== Build ==="
     lake build 2>&1 | tail -5
+
+# Regression suite: comprehensive CI check (task 0166)
+# Runs: sorry count, axiom audit, CImporter tests, snapshot tests,
+#        fuzz tests, struct layout, int promotion, memory UB, lake build
+regression:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    PASS=0
+    FAIL=0
+    TOTAL=0
+
+    run_check() {
+      local name="$1"
+      shift
+      TOTAL=$((TOTAL + 1))
+      echo ""
+      echo "=== [$TOTAL] $name ==="
+      if "$@" 2>&1; then
+        echo "  PASS: $name"
+        PASS=$((PASS + 1))
+      else
+        echo "  FAIL: $name"
+        FAIL=$((FAIL + 1))
+      fi
+    }
+
+    echo "========================================="
+    echo "  Clift Regression Suite"
+    echo "========================================="
+
+    # 1. Sorry count (informational, does not block)
+    run_check "Sorry count" just sorry-count
+
+    # 2. Axiom audit: check no sorry-based axioms in core library
+    TOTAL=$((TOTAL + 1))
+    echo ""
+    echo "=== [$TOTAL] Axiom audit (no sorryAx in Clift/) ==="
+    AXIOM_SORRY=$(grep -rn "sorryAx" Clift/ --include="*.lean" | grep -v "^.*:.*--" | wc -l || true)
+    if [ "$AXIOM_SORRY" -eq 0 ]; then
+      echo "  PASS: No sorryAx in library code"
+      PASS=$((PASS + 1))
+    else
+      echo "  FAIL: Found $AXIOM_SORRY sorryAx references"
+      FAIL=$((FAIL + 1))
+    fi
+
+    # 3. CImporter unit tests
+    run_check "CImporter unit tests" python3 -m pytest CImporter/tests/ -v
+
+    # 4. Snapshot tests
+    run_check "Snapshot tests" just test-snapshots
+
+    # 5. Struct layout tests
+    run_check "Struct layout tests" just test-struct-layout
+
+    # 6. Integer promotion tests
+    run_check "Int promotion tests" just test-int-promotion
+
+    # 7. Memory model UB tests
+    run_check "Memory UB tests" just test-memory-ub
+
+    # 8. Fuzz tests
+    run_check "Fuzz tests (55 programs)" just test-fuzz
+
+    # 9. Lake build (the big one -- checks all proofs)
+    run_check "Lake build (full)" lake build
+
+    echo ""
+    echo "========================================="
+    echo "  Results: $PASS/$TOTAL passed, $FAIL failed"
+    echo "========================================="
+
+    if [ "$FAIL" -gt 0 ]; then
+      echo "REGRESSION DETECTED"
+      exit 1
+    fi
+    echo "ALL CHECKS PASSED"
