@@ -32,4 +32,8 @@ lean_lib Examples where
              `Examples.PipelineTest,
              `Examples.MultiCallProof,
              `Examples.ListLengthProof,
-             `Examples.RingBufferProof]
+             `Examples.RingBufferProof,
+             `Examples.AIInvariantTest,
+             `Examples.AIStructInvariantTest,
+             `Examples.AISpecTest,
+             `Examples.PhaseEMilestone]
