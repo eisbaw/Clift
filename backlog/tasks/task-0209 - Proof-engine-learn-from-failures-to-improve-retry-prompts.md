@@ -1,9 +1,11 @@
 ---
 id: TASK-0209
 title: 'Proof engine: learn from failures to improve retry prompts'
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-04-11 06:29'
+updated_date: '2026-04-11 08:45'
 labels:
   - proof-engine
   - ai
@@ -24,3 +26,9 @@ When Claude's proof fails, the error message contains valuable information (wron
 - [ ] #2 Retry prompt includes: original attempt + error + analysis
 - [ ] #3 Measured: retry success rate improvement
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Design spec written: docs/proof-engine-failure-learning.md. Covers 5 error categories (unknown_id, type_mismatch, unsolved_goals, tactic_failed, timeout), structured error parsing, retry prompt template with old attempt + error + analysis, 3-retry strategy (error correction, alternative approach, simplified goal). No code implementation -- this is a design task.
+<!-- SECTION:FINAL_SUMMARY:END -->

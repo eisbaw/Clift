@@ -4,6 +4,7 @@ title: Eliminate 3 sorry in RBExtRefinement.lean (refinement proofs)
 status: To Do
 assignee: []
 created_date: '2026-04-10 20:49'
+updated_date: '2026-04-11 08:44'
 labels:
   - sorry-elimination
   - ring-buffer
@@ -24,3 +25,9 @@ priority: high
 - [ ] #3 Transfer theorem proven
 - [ ] #4 All proofs kernel-checked
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Not achievable this session. All 3 sorry in RBExtRefinement.lean are transitively blocked on the 25 validHoare sorry in RBExtFuncSpecs.lean. ring_buffer_ext_refines_queue_spec requires all 40 validHoare proofs. Only 4 of 40 are proven. The remaining 25 sorry need loop invariants, multi-heap projection lemma suites, and inter-procedural spec composition -- each 50-300 lines of proof infrastructure per function.
+<!-- SECTION:FINAL_SUMMARY:END -->

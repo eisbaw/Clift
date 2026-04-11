@@ -2,8 +2,10 @@
 id: TASK-0205
 title: 'Batch sorry elimination: run proof engine on all 57 sorry'
 status: To Do
-assignee: []
+assignee:
+  - '@claude'
 created_date: '2026-04-11 06:28'
+updated_date: '2026-04-11 08:44'
 labels:
   - critical-path
   - ai
@@ -28,3 +30,9 @@ Run clift-prove-by-claudecode --batch on every file with sorry. For each: extrac
 - [ ] #5 Remaining sorry categorized: why Claude failed, what's needed
 - [ ] #6 Total API cost measured
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Framework complete, awaiting API key. The clift-prove-by-claudecode script exists and implements the batch sorry elimination pipeline: extract goal, build prompt with [local irreducible] hint + projection lemma pattern + similar proofs from ProofIndex, call Claude API, apply result, check with lake build. Cannot execute without Claude API key configured. Current sorry count is 31 in RBExtFuncSpecs + 3 in RBExtRefinement + others scattered across proof files.
+<!-- SECTION:FINAL_SUMMARY:END -->

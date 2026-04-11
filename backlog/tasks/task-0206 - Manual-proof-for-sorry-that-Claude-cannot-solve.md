@@ -4,6 +4,7 @@ title: Manual proof for sorry that Claude cannot solve
 status: To Do
 assignee: []
 created_date: '2026-04-11 06:28'
+updated_date: '2026-04-11 08:45'
 labels:
   - sorry-elimination
   - proof-depth
@@ -25,3 +26,9 @@ After the batch sorry elimination (task-0205), ~12 sorry will likely remain. The
 - [ ] #3 Case studies written: what made each proof hard for Claude
 - [ ] #4 Proof engine improvement suggestions filed as tasks
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Blocked on task 0205 (batch sorry elimination run). Cannot assess which sorry Claude fails on without running the batch first. The manual proof methodology is established: guard-modify-throw-catch-skip for simple accessors, multi-guard helper for repeated guards, conditional pattern for if-then-else returns. Each remaining sorry category (loop, multi-heap, inter-proc) needs different infrastructure.
+<!-- SECTION:FINAL_SUMMARY:END -->

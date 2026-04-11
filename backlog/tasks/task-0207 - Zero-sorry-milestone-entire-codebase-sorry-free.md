@@ -4,6 +4,7 @@ title: 'Zero sorry milestone: entire codebase sorry-free'
 status: To Do
 assignee: []
 created_date: '2026-04-11 06:28'
+updated_date: '2026-04-11 08:45'
 labels:
   - milestone
   - sorry-elimination
@@ -26,3 +27,9 @@ The ultimate code quality milestone. After tasks 0205 and 0206, verify: grep -rn
 - [ ] #3 lake build produces zero sorry warnings
 - [ ] #4 Tagged poc-6.0-zero-sorry
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Blocked on tasks 0205 and 0206. Current sorry count across codebase: ~40+ total sorry across all proof files. Zero-sorry requires completing all validHoare proofs (25 remaining in RBExtFuncSpecs alone) plus all other proof files. This is a multi-week effort requiring loop invariant infrastructure, heap reasoning automation, and inter-procedural spec composition.
+<!-- SECTION:FINAL_SUMMARY:END -->
