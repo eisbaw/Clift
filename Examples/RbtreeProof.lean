@@ -96,11 +96,95 @@ def rbt_count_spec : FuncSpec ProgramState where
     r = Except.ok () →
     s.locals.ret__val = (hVal s.globals.rawHeap s.locals.t).count
 
-/-- rbt_lookup: BST search. Returns value if found, sets *found. -/
+/-- All nodes reachable from `idx` in the parallel-array BST have valid array entries.
+    Arena-based analog of LinkedListValid. -/
+inductive RbtNodeValid (heap : HeapRawState)
+    (keys vals lefts rights : Ptr UInt32) : UInt32 → Prop where
+  | null : RbtNodeValid heap keys vals lefts rights 4294967295
+  | node (idx : UInt32) (h_ne : idx ≠ 4294967295)
+         (h_keys : heapPtrValid heap (Ptr.elemOffset keys idx.toNat))
+         (h_vals : heapPtrValid heap (Ptr.elemOffset vals idx.toNat))
+         (h_lefts : heapPtrValid heap (Ptr.elemOffset lefts idx.toNat))
+         (h_rights : heapPtrValid heap (Ptr.elemOffset rights idx.toNat))
+         (h_left : RbtNodeValid heap keys vals lefts rights
+                     (hVal heap (Ptr.elemOffset lefts idx.toNat)))
+         (h_right : RbtNodeValid heap keys vals lefts rights
+                      (hVal heap (Ptr.elemOffset rights idx.toNat))) :
+    RbtNodeValid heap keys vals lefts rights idx
+
+theorem RbtNodeValid.keys_valid {heap keys vals lefts rights idx}
+    (h : RbtNodeValid heap keys vals lefts rights idx) (h_ne : idx ≠ 4294967295) :
+    heapPtrValid heap (Ptr.elemOffset keys idx.toNat) := by
+  cases h with | null => exact absurd rfl h_ne | node _ _ hk _ _ _ _ _ => exact hk
+
+theorem RbtNodeValid.vals_valid {heap keys vals lefts rights idx}
+    (h : RbtNodeValid heap keys vals lefts rights idx) (h_ne : idx ≠ 4294967295) :
+    heapPtrValid heap (Ptr.elemOffset vals idx.toNat) := by
+  cases h with | null => exact absurd rfl h_ne | node _ _ _ hv _ _ _ _ => exact hv
+
+theorem RbtNodeValid.lefts_valid {heap keys vals lefts rights idx}
+    (h : RbtNodeValid heap keys vals lefts rights idx) (h_ne : idx ≠ 4294967295) :
+    heapPtrValid heap (Ptr.elemOffset lefts idx.toNat) := by
+  cases h with | null => exact absurd rfl h_ne | node _ _ _ _ hl _ _ _ => exact hl
+
+theorem RbtNodeValid.rights_valid {heap keys vals lefts rights idx}
+    (h : RbtNodeValid heap keys vals lefts rights idx) (h_ne : idx ≠ 4294967295) :
+    heapPtrValid heap (Ptr.elemOffset rights idx.toNat) := by
+  cases h with | null => exact absurd rfl h_ne | node _ _ _ _ _ hr _ _ => exact hr
+
+theorem RbtNodeValid.left_child {heap keys vals lefts rights idx}
+    (h : RbtNodeValid heap keys vals lefts rights idx) (h_ne : idx ≠ 4294967295) :
+    RbtNodeValid heap keys vals lefts rights
+      (hVal heap (Ptr.elemOffset lefts idx.toNat)) := by
+  cases h with | null => exact absurd rfl h_ne | node _ _ _ _ _ _ hl _ => exact hl
+
+theorem RbtNodeValid.right_child {heap keys vals lefts rights idx}
+    (h : RbtNodeValid heap keys vals lefts rights idx) (h_ne : idx ≠ 4294967295) :
+    RbtNodeValid heap keys vals lefts rights
+      (hVal heap (Ptr.elemOffset rights idx.toNat)) := by
+  cases h with | null => exact absurd rfl h_ne | node _ _ _ _ _ _ _ hr => exact hr
+
+/-- heapUpdate at a disjoint pointer preserves RbtNodeValid.
+    Since lookup only writes to `found` (a UInt32 scalar), and the tree arrays are
+    Ptr UInt32 arrays at different addresses, we need this for the abrupt-exit case. -/
+theorem RbtNodeValid.of_heapUpdate_found {heap : HeapRawState}
+    {keys vals lefts rights : Ptr UInt32} {found : Ptr UInt32} {v : UInt32} {idx : UInt32}
+    (h : RbtNodeValid heap keys vals lefts rights idx)
+    (h_bound_f : found.addr.val + CType.size UInt32 ≤ memSize)
+    (h_disj_keys : ∀ i, ptrDisjoint found (Ptr.elemOffset keys i))
+    (h_disj_vals : ∀ i, ptrDisjoint found (Ptr.elemOffset vals i))
+    (h_disj_lefts : ∀ i, ptrDisjoint found (Ptr.elemOffset lefts i))
+    (h_disj_rights : ∀ i, ptrDisjoint found (Ptr.elemOffset rights i)) :
+    RbtNodeValid (heapUpdate heap found v) keys vals lefts rights idx := by
+  induction h with
+  | null => exact .null
+  | node idx h_ne hk hv hl hr h_left h_right ih_l ih_r =>
+    have hk' := heapUpdate_preserves_heapPtrValid heap found v _ hk
+    have hv' := heapUpdate_preserves_heapPtrValid heap found v _ hv
+    have hl' := heapUpdate_preserves_heapPtrValid heap found v _ hl
+    have hr' := heapUpdate_preserves_heapPtrValid heap found v _ hr
+    have h_bl := heapPtrValid_bound hl
+    have h_br := heapPtrValid_bound hr
+    have h_left_eq := hVal_heapUpdate_disjoint heap found (Ptr.elemOffset lefts idx.toNat) v h_bound_f h_bl (h_disj_lefts _)
+    have h_right_eq := hVal_heapUpdate_disjoint heap found (Ptr.elemOffset rights idx.toNat) v h_bound_f h_br (h_disj_rights _)
+    refine .node idx h_ne hk' hv' hl' hr' ?_ ?_
+    · rw [h_left_eq]; exact ih_l
+    · rw [h_right_eq]; exact ih_r
+
+/-- rbt_lookup: BST search. Returns value if found, sets *found.
+    Precondition strengthened to include arena validity for reachable nodes. -/
 def rbt_lookup_spec : FuncSpec ProgramState where
   pre := fun s =>
     heapPtrValid s.globals.rawHeap s.locals.t ∧
-    heapPtrValid s.globals.rawHeap s.locals.found
+    heapPtrValid s.globals.rawHeap s.locals.found ∧
+    RbtNodeValid s.globals.rawHeap s.locals.keys s.locals.vals
+      s.locals.lefts s.locals.rights
+      (hVal s.globals.rawHeap s.locals.t).root ∧
+    -- found pointer is disjoint from all array element pointers
+    (∀ i, ptrDisjoint s.locals.found (Ptr.elemOffset s.locals.keys i)) ∧
+    (∀ i, ptrDisjoint s.locals.found (Ptr.elemOffset s.locals.vals i)) ∧
+    (∀ i, ptrDisjoint s.locals.found (Ptr.elemOffset s.locals.lefts i)) ∧
+    (∀ i, ptrDisjoint s.locals.found (Ptr.elemOffset s.locals.rights i))
   post := fun r s =>
     r = Except.ok () →
     -- found is set to 0 or 1
@@ -232,6 +316,540 @@ theorem rbt_init_correct :
     rw [h4v, h3v, h2v, h1v]
     exact ⟨rfl, rfl, rfl⟩
 
+-- Convenience: FoundOk for the postcondition
+private def FoundOk (s : ProgramState) : Prop :=
+  hVal s.globals.rawHeap s.locals.found = 0 ∨
+  hVal s.globals.rawHeap s.locals.found = 1
+
+-- The loop invariant for rbt_lookup's while loop
+private def rbt_lookup_inv (s : ProgramState) : Prop :=
+  heapPtrValid s.globals.rawHeap s.locals.found ∧
+  hVal s.globals.rawHeap s.locals.found = 0 ∧
+  RbtNodeValid s.globals.rawHeap s.locals.keys s.locals.vals
+    s.locals.lefts s.locals.rights s.locals.curr ∧
+  (∀ i, ptrDisjoint s.locals.found (Ptr.elemOffset s.locals.keys i)) ∧
+  (∀ i, ptrDisjoint s.locals.found (Ptr.elemOffset s.locals.vals i)) ∧
+  (∀ i, ptrDisjoint s.locals.found (Ptr.elemOffset s.locals.lefts i)) ∧
+  (∀ i, ptrDisjoint s.locals.found (Ptr.elemOffset s.locals.rights i))
+
+-- Bridge: derive L1_hoare_while conditions from a single validHoare on the body
+private theorem L1_hoare_while_from_body {σ : Type} {c : σ → Bool} {body : L1Monad σ}
+    {I : σ → Prop} {Q : Except Unit Unit → σ → Prop}
+    (h_body : validHoare (fun s => I s ∧ c s = true) body
+        (fun r s => match r with | Except.ok () => I s | Except.error () => Q (Except.error ()) s))
+    (h_exit : ∀ s, I s → c s = false → Q (Except.ok ()) s) :
+    validHoare I (L1.while c body) Q := by
+  apply L1_hoare_while (I := I)
+  · intro s h; exact h
+  · intro s hi hc; exact (h_body s ⟨hi, hc⟩).1
+  · intro s s' hi hc h_mem; exact (h_body s ⟨hi, hc⟩).2 (Except.ok ()) s' h_mem
+  · exact h_exit
+  · intro s s' hi hc h_mem; exact (h_body s ⟨hi, hc⟩).2 (Except.error ()) s' h_mem
+
+-- L1_hoare_throw: not in L1HoareRules.lean, add locally
+private theorem L1_hoare_throw {σ : Type} (Q : Except Unit Unit → σ → Prop) :
+    validHoare (fun s => Q (Except.error ()) s) (L1.throw (σ := σ)) Q := by
+  intro s₀ hpre
+  constructor
+  · intro h; exact h
+  · intro r s₁ h_mem
+    have heq := Prod.mk.inj h_mem
+    rw [heq.1, heq.2]; exact hpre
+
+/-! ## Anonymous constructor helper functions -/
+
+private noncomputable def rbt_go_left (s : ProgramState) : ProgramState :=
+  ⟨s.globals, ⟨s.locals.capacity, s.locals.colors,
+   hVal s.globals.rawHeap (Ptr.elemOffset s.locals.lefts s.locals.curr.toNat),
+   s.locals.found, s.locals.key, s.locals.keys, s.locals.lefts,
+   s.locals.new_node, s.locals.par, s.locals.parents, s.locals.ret__val,
+   s.locals.rights, s.locals.t, s.locals.vals, s.locals.value,
+   s.locals.x, s.locals.xp, s.locals.y, s.locals.yp⟩⟩
+
+private noncomputable def rbt_go_right (s : ProgramState) : ProgramState :=
+  ⟨s.globals, ⟨s.locals.capacity, s.locals.colors,
+   hVal s.globals.rawHeap (Ptr.elemOffset s.locals.rights s.locals.curr.toNat),
+   s.locals.found, s.locals.key, s.locals.keys, s.locals.lefts,
+   s.locals.new_node, s.locals.par, s.locals.parents, s.locals.ret__val,
+   s.locals.rights, s.locals.t, s.locals.vals, s.locals.value,
+   s.locals.x, s.locals.xp, s.locals.y, s.locals.yp⟩⟩
+
+private noncomputable def rbt_set_found1 (s : ProgramState) : ProgramState :=
+  ⟨⟨heapUpdate s.globals.rawHeap s.locals.found 1⟩, s.locals⟩
+
+private noncomputable def rbt_set_retval_curr (s : ProgramState) : ProgramState :=
+  ⟨s.globals, ⟨s.locals.capacity, s.locals.colors, s.locals.curr,
+   s.locals.found, s.locals.key, s.locals.keys, s.locals.lefts,
+   s.locals.new_node, s.locals.par, s.locals.parents,
+   hVal s.globals.rawHeap (Ptr.elemOffset s.locals.vals s.locals.curr.toNat),
+   s.locals.rights, s.locals.t, s.locals.vals, s.locals.value,
+   s.locals.x, s.locals.xp, s.locals.y, s.locals.yp⟩⟩
+
+private noncomputable def rbt_set_curr_root (s : ProgramState) : ProgramState :=
+  ⟨s.globals, ⟨s.locals.capacity, s.locals.colors,
+   (hVal s.globals.rawHeap s.locals.t).root,
+   s.locals.found, s.locals.key, s.locals.keys, s.locals.lefts,
+   s.locals.new_node, s.locals.par, s.locals.parents, s.locals.ret__val,
+   s.locals.rights, s.locals.t, s.locals.vals, s.locals.value,
+   s.locals.x, s.locals.xp, s.locals.y, s.locals.yp⟩⟩
+
+private noncomputable def rbt_init_found0 (s : ProgramState) : ProgramState :=
+  ⟨⟨heapUpdate s.globals.rawHeap s.locals.found 0⟩, s.locals⟩
+
+private noncomputable def rbt_set_retval0 (s : ProgramState) : ProgramState :=
+  ⟨s.globals, ⟨s.locals.capacity, s.locals.colors, s.locals.curr,
+   s.locals.found, s.locals.key, s.locals.keys, s.locals.lefts,
+   s.locals.new_node, s.locals.par, s.locals.parents, (0 : UInt32),
+   s.locals.rights, s.locals.t, s.locals.vals, s.locals.value,
+   s.locals.x, s.locals.xp, s.locals.y, s.locals.yp⟩⟩
+
+/-! ## Projection lemmas (two-step pattern)
+
+The kernel cannot reduce (⟨g, ⟨f1,...,f19⟩⟩ : CState Locals).locals.fi
+in one step due to its depth limit. We split into:
+  Step 1: .locals = ⟨f1,...,f19⟩  (one iota on CState.mk)
+  Step 2: rw to get .fi from the known Locals constructor (shallow iota)
+
+For .globals (first field of CState), direct unfold+rfl works. -/
+
+-- rbt_go_left: ⟨s.globals, ⟨..., new_curr, ...⟩⟩
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rbt_go_left_globals (s : ProgramState) :
+    (rbt_go_left s).globals = s.globals := by unfold rbt_go_left; rfl
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rbt_go_left_locals_eq (s : ProgramState) :
+    (rbt_go_left s).locals = ⟨s.locals.capacity, s.locals.colors,
+      hVal s.globals.rawHeap (Ptr.elemOffset s.locals.lefts s.locals.curr.toNat),
+      s.locals.found, s.locals.key, s.locals.keys, s.locals.lefts,
+      s.locals.new_node, s.locals.par, s.locals.parents, s.locals.ret__val,
+      s.locals.rights, s.locals.t, s.locals.vals, s.locals.value,
+      s.locals.x, s.locals.xp, s.locals.y, s.locals.yp⟩ := by unfold rbt_go_left; rfl
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rbt_go_left_locals_found (s : ProgramState) :
+    (rbt_go_left s).locals.found = s.locals.found := by rw [rbt_go_left_locals_eq]
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rbt_go_left_locals_keys (s : ProgramState) :
+    (rbt_go_left s).locals.keys = s.locals.keys := by rw [rbt_go_left_locals_eq]
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rbt_go_left_locals_vals (s : ProgramState) :
+    (rbt_go_left s).locals.vals = s.locals.vals := by rw [rbt_go_left_locals_eq]
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rbt_go_left_locals_lefts (s : ProgramState) :
+    (rbt_go_left s).locals.lefts = s.locals.lefts := by rw [rbt_go_left_locals_eq]
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rbt_go_left_locals_rights (s : ProgramState) :
+    (rbt_go_left s).locals.rights = s.locals.rights := by rw [rbt_go_left_locals_eq]
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rbt_go_left_locals_curr (s : ProgramState) :
+    (rbt_go_left s).locals.curr =
+      hVal s.globals.rawHeap (Ptr.elemOffset s.locals.lefts s.locals.curr.toNat) := by
+  rw [rbt_go_left_locals_eq]
+
+-- rbt_go_right: ⟨s.globals, ⟨..., new_curr, ...⟩⟩
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rbt_go_right_globals (s : ProgramState) :
+    (rbt_go_right s).globals = s.globals := by unfold rbt_go_right; rfl
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rbt_go_right_locals_eq (s : ProgramState) :
+    (rbt_go_right s).locals = ⟨s.locals.capacity, s.locals.colors,
+      hVal s.globals.rawHeap (Ptr.elemOffset s.locals.rights s.locals.curr.toNat),
+      s.locals.found, s.locals.key, s.locals.keys, s.locals.lefts,
+      s.locals.new_node, s.locals.par, s.locals.parents, s.locals.ret__val,
+      s.locals.rights, s.locals.t, s.locals.vals, s.locals.value,
+      s.locals.x, s.locals.xp, s.locals.y, s.locals.yp⟩ := by unfold rbt_go_right; rfl
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rbt_go_right_locals_found (s : ProgramState) :
+    (rbt_go_right s).locals.found = s.locals.found := by rw [rbt_go_right_locals_eq]
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rbt_go_right_locals_keys (s : ProgramState) :
+    (rbt_go_right s).locals.keys = s.locals.keys := by rw [rbt_go_right_locals_eq]
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rbt_go_right_locals_vals (s : ProgramState) :
+    (rbt_go_right s).locals.vals = s.locals.vals := by rw [rbt_go_right_locals_eq]
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rbt_go_right_locals_lefts (s : ProgramState) :
+    (rbt_go_right s).locals.lefts = s.locals.lefts := by rw [rbt_go_right_locals_eq]
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rbt_go_right_locals_rights (s : ProgramState) :
+    (rbt_go_right s).locals.rights = s.locals.rights := by rw [rbt_go_right_locals_eq]
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rbt_go_right_locals_curr (s : ProgramState) :
+    (rbt_go_right s).locals.curr =
+      hVal s.globals.rawHeap (Ptr.elemOffset s.locals.rights s.locals.curr.toNat) := by
+  rw [rbt_go_right_locals_eq]
+
+-- rbt_set_found1: ⟨⟨heapUpdate ...⟩, s.locals⟩ — locals unchanged
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rbt_set_found1_locals (s : ProgramState) :
+    (rbt_set_found1 s).locals = s.locals := by unfold rbt_set_found1; rfl
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rbt_set_found1_globals_rawHeap (s : ProgramState) :
+    (rbt_set_found1 s).globals.rawHeap =
+      heapUpdate s.globals.rawHeap s.locals.found 1 := by
+  show (⟨heapUpdate s.globals.rawHeap s.locals.found 1⟩ : Globals).rawHeap = _
+  rfl
+
+-- rbt_set_retval_curr: ⟨s.globals, ⟨..., new_retval, ...⟩⟩
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rbt_set_retval_curr_globals (s : ProgramState) :
+    (rbt_set_retval_curr s).globals = s.globals := by unfold rbt_set_retval_curr; rfl
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rbt_set_retval_curr_locals_eq (s : ProgramState) :
+    (rbt_set_retval_curr s).locals = ⟨s.locals.capacity, s.locals.colors, s.locals.curr,
+      s.locals.found, s.locals.key, s.locals.keys, s.locals.lefts,
+      s.locals.new_node, s.locals.par, s.locals.parents,
+      hVal s.globals.rawHeap (Ptr.elemOffset s.locals.vals s.locals.curr.toNat),
+      s.locals.rights, s.locals.t, s.locals.vals, s.locals.value,
+      s.locals.x, s.locals.xp, s.locals.y, s.locals.yp⟩ := by
+  unfold rbt_set_retval_curr; rfl
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rbt_set_retval_curr_locals_found (s : ProgramState) :
+    (rbt_set_retval_curr s).locals.found = s.locals.found := by
+  rw [rbt_set_retval_curr_locals_eq]
+
+-- rbt_set_curr_root: ⟨s.globals, ⟨..., new_curr, ...⟩⟩
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rbt_set_curr_root_globals (s : ProgramState) :
+    (rbt_set_curr_root s).globals = s.globals := by unfold rbt_set_curr_root; rfl
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rbt_set_curr_root_locals_eq (s : ProgramState) :
+    (rbt_set_curr_root s).locals = ⟨s.locals.capacity, s.locals.colors,
+      (hVal s.globals.rawHeap s.locals.t).root,
+      s.locals.found, s.locals.key, s.locals.keys, s.locals.lefts,
+      s.locals.new_node, s.locals.par, s.locals.parents, s.locals.ret__val,
+      s.locals.rights, s.locals.t, s.locals.vals, s.locals.value,
+      s.locals.x, s.locals.xp, s.locals.y, s.locals.yp⟩ := by unfold rbt_set_curr_root; rfl
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rbt_set_curr_root_locals_found (s : ProgramState) :
+    (rbt_set_curr_root s).locals.found = s.locals.found := by rw [rbt_set_curr_root_locals_eq]
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rbt_set_curr_root_locals_keys (s : ProgramState) :
+    (rbt_set_curr_root s).locals.keys = s.locals.keys := by rw [rbt_set_curr_root_locals_eq]
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rbt_set_curr_root_locals_vals (s : ProgramState) :
+    (rbt_set_curr_root s).locals.vals = s.locals.vals := by rw [rbt_set_curr_root_locals_eq]
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rbt_set_curr_root_locals_lefts (s : ProgramState) :
+    (rbt_set_curr_root s).locals.lefts = s.locals.lefts := by rw [rbt_set_curr_root_locals_eq]
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rbt_set_curr_root_locals_rights (s : ProgramState) :
+    (rbt_set_curr_root s).locals.rights = s.locals.rights := by rw [rbt_set_curr_root_locals_eq]
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rbt_set_curr_root_locals_curr (s : ProgramState) :
+    (rbt_set_curr_root s).locals.curr =
+      (hVal s.globals.rawHeap s.locals.t).root := by rw [rbt_set_curr_root_locals_eq]
+
+-- rbt_init_found0: ⟨⟨heapUpdate ...⟩, s.locals⟩ — locals unchanged
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rbt_init_found0_locals (s : ProgramState) :
+    (rbt_init_found0 s).locals = s.locals := by unfold rbt_init_found0; rfl
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rbt_init_found0_globals_rawHeap (s : ProgramState) :
+    (rbt_init_found0 s).globals.rawHeap =
+      heapUpdate s.globals.rawHeap s.locals.found 0 := by
+  show (⟨heapUpdate s.globals.rawHeap s.locals.found 0⟩ : Globals).rawHeap = _
+  rfl
+
+-- rbt_set_retval0: ⟨s.globals, ⟨..., 0, ...⟩⟩
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rbt_set_retval0_globals (s : ProgramState) :
+    (rbt_set_retval0 s).globals = s.globals := by unfold rbt_set_retval0; rfl
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rbt_set_retval0_locals_eq (s : ProgramState) :
+    (rbt_set_retval0 s).locals = ⟨s.locals.capacity, s.locals.colors, s.locals.curr,
+      s.locals.found, s.locals.key, s.locals.keys, s.locals.lefts,
+      s.locals.new_node, s.locals.par, s.locals.parents, (0 : UInt32),
+      s.locals.rights, s.locals.t, s.locals.vals, s.locals.value,
+      s.locals.x, s.locals.xp, s.locals.y, s.locals.yp⟩ := by unfold rbt_set_retval0; rfl
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rbt_set_retval0_locals_found (s : ProgramState) :
+    (rbt_set_retval0 s).locals.found = s.locals.found := by rw [rbt_set_retval0_locals_eq]
+
+/-! ## Invariant preservation and FoundOk lemmas -/
+
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rbt_go_left_preserves_inv (s : ProgramState)
+    (h_inv : rbt_lookup_inv s) (h_ne : s.locals.curr ≠ 4294967295) :
+    rbt_lookup_inv (rbt_go_left s) := by
+  obtain ⟨h_fv, h_f0, h_valid, h_dk, h_dv, h_dl, h_dr⟩ := h_inv
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  · rw [rbt_go_left_globals, rbt_go_left_locals_found]; exact h_fv
+  · rw [rbt_go_left_globals, rbt_go_left_locals_found]; exact h_f0
+  · rw [rbt_go_left_globals, rbt_go_left_locals_keys, rbt_go_left_locals_vals,
+        rbt_go_left_locals_lefts, rbt_go_left_locals_rights, rbt_go_left_locals_curr]
+    exact h_valid.left_child h_ne
+  · intro i; rw [rbt_go_left_locals_found, rbt_go_left_locals_keys]; exact h_dk i
+  · intro i; rw [rbt_go_left_locals_found, rbt_go_left_locals_vals]; exact h_dv i
+  · intro i; rw [rbt_go_left_locals_found, rbt_go_left_locals_lefts]; exact h_dl i
+  · intro i; rw [rbt_go_left_locals_found, rbt_go_left_locals_rights]; exact h_dr i
+
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rbt_go_right_preserves_inv (s : ProgramState)
+    (h_inv : rbt_lookup_inv s) (h_ne : s.locals.curr ≠ 4294967295) :
+    rbt_lookup_inv (rbt_go_right s) := by
+  obtain ⟨h_fv, h_f0, h_valid, h_dk, h_dv, h_dl, h_dr⟩ := h_inv
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  · rw [rbt_go_right_globals, rbt_go_right_locals_found]; exact h_fv
+  · rw [rbt_go_right_globals, rbt_go_right_locals_found]; exact h_f0
+  · rw [rbt_go_right_globals, rbt_go_right_locals_keys, rbt_go_right_locals_vals,
+        rbt_go_right_locals_lefts, rbt_go_right_locals_rights, rbt_go_right_locals_curr]
+    exact h_valid.right_child h_ne
+  · intro i; rw [rbt_go_right_locals_found, rbt_go_right_locals_keys]; exact h_dk i
+  · intro i; rw [rbt_go_right_locals_found, rbt_go_right_locals_vals]; exact h_dv i
+  · intro i; rw [rbt_go_right_locals_found, rbt_go_right_locals_lefts]; exact h_dl i
+  · intro i; rw [rbt_go_right_locals_found, rbt_go_right_locals_rights]; exact h_dr i
+
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rbt_found_branch_foundok (s : ProgramState)
+    (h_fv : heapPtrValid s.globals.rawHeap s.locals.found) :
+    FoundOk (rbt_set_retval_curr (rbt_set_found1 s)) := by
+  unfold FoundOk; right
+  rw [rbt_set_retval_curr_globals, rbt_set_retval_curr_locals_found,
+      rbt_set_found1_globals_rawHeap, rbt_set_found1_locals]
+  exact hVal_heapUpdate_same _ _ _ (heapPtrValid_bound h_fv)
+
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rbt_teardown_foundok (s : ProgramState)
+    (h_f0 : hVal s.globals.rawHeap s.locals.found = 0) :
+    FoundOk (rbt_set_retval0 s) := by
+  unfold FoundOk; left
+  rw [rbt_set_retval0_globals, rbt_set_retval0_locals_found]; exact h_f0
+
+/-! ## Function extensionality: {s with ...} = anonymous constructor
+
+These are needed to rewrite the generated L1 body's modify functions
+to our anonymous constructor forms. -/
+
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rbt_set_curr_root_funext :
+    (fun s : ProgramState => { s with locals := { s.locals with curr :=
+        (hVal s.globals.rawHeap s.locals.t).root } }) = rbt_set_curr_root := by
+  funext s; unfold rbt_set_curr_root; rfl
+
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rbt_init_found0_funext :
+    (fun s : ProgramState =>
+      { s with globals := { s.globals with rawHeap :=
+        (heapUpdate s.globals.rawHeap s.locals.found 0) } }) = rbt_init_found0 := by
+  funext s; unfold rbt_init_found0; rfl
+
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rbt_set_found1_funext :
+    (fun s : ProgramState =>
+      { s with globals := { s.globals with rawHeap :=
+        (heapUpdate s.globals.rawHeap s.locals.found 1) } }) = rbt_set_found1 := by
+  funext s; unfold rbt_set_found1; rfl
+
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rbt_set_retval_curr_funext :
+    (fun s : ProgramState =>
+      { s with locals := { s.locals with ret__val :=
+        (hVal s.globals.rawHeap (Ptr.elemOffset s.locals.vals s.locals.curr.toNat)) } }) =
+    rbt_set_retval_curr := by
+  funext s; unfold rbt_set_retval_curr; rfl
+
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rbt_go_left_funext :
+    (fun s : ProgramState =>
+      { s with locals := { s.locals with curr :=
+        (hVal s.globals.rawHeap (Ptr.elemOffset s.locals.lefts s.locals.curr.toNat)) } }) =
+    rbt_go_left := by
+  funext s; unfold rbt_go_left; rfl
+
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rbt_go_right_funext :
+    (fun s : ProgramState =>
+      { s with locals := { s.locals with curr :=
+        (hVal s.globals.rawHeap (Ptr.elemOffset s.locals.rights s.locals.curr.toNat)) } }) =
+    rbt_go_right := by
+  funext s; unfold rbt_go_right; rfl
+
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rbt_set_retval0_funext :
+    (fun s : ProgramState =>
+      { s with locals := { s.locals with ret__val := (0 : UInt32) } }) =
+    rbt_set_retval0 := by
+  funext s; unfold rbt_set_retval0; rfl
+
+/-! ## Main correctness theorem -/
+
+set_option maxRecDepth 8192 in
+set_option maxHeartbeats 25600000 in
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
 theorem rbt_lookup_correct :
     rbt_lookup_spec.satisfiedBy Rbtree.l1_rbt_lookup_body := by
-  sorry
+  show validHoare rbt_lookup_spec.pre Rbtree.l1_rbt_lookup_body rbt_lookup_spec.post
+  unfold Rbtree.l1_rbt_lookup_body
+  simp only [rbt_set_curr_root_funext, rbt_init_found0_funext, rbt_set_found1_funext,
+             rbt_set_retval_curr_funext, rbt_go_left_funext, rbt_go_right_funext,
+             rbt_set_retval0_funext]
+  apply L1_hoare_catch (R := FoundOk)
+  · apply L1_hoare_seq
+      (R := fun s =>
+        heapPtrValid s.globals.rawHeap s.locals.found ∧
+        RbtNodeValid s.globals.rawHeap s.locals.keys s.locals.vals
+          s.locals.lefts s.locals.rights s.locals.curr ∧
+        (∀ i, ptrDisjoint s.locals.found (Ptr.elemOffset s.locals.keys i)) ∧
+        (∀ i, ptrDisjoint s.locals.found (Ptr.elemOffset s.locals.vals i)) ∧
+        (∀ i, ptrDisjoint s.locals.found (Ptr.elemOffset s.locals.lefts i)) ∧
+        (∀ i, ptrDisjoint s.locals.found (Ptr.elemOffset s.locals.rights i)))
+    · -- Setup: guard ptrValid t >> modify rbt_set_curr_root
+      intro s hpre
+      unfold rbt_lookup_spec at hpre
+      obtain ⟨h_tv, h_fv, h_tree, h_dk, h_dv, h_dl, h_dr⟩ := hpre
+      have h_gm := L1_guard_modify_result
+        (fun s : ProgramState => heapPtrValid s.globals.rawHeap s.locals.t)
+        rbt_set_curr_root s h_tv
+      constructor
+      · exact h_gm.2
+      · intro r s' h_mem
+        rw [h_gm.1] at h_mem
+        have ⟨hr, hs⟩ := Prod.mk.inj h_mem
+        subst hr; subst hs
+        rw [rbt_set_curr_root_globals, rbt_set_curr_root_locals_found,
+            rbt_set_curr_root_locals_keys, rbt_set_curr_root_locals_vals,
+            rbt_set_curr_root_locals_lefts, rbt_set_curr_root_locals_rights,
+            rbt_set_curr_root_locals_curr]
+        exact ⟨h_fv, h_tree, h_dk, h_dv, h_dl, h_dr⟩
+    · -- Rest: seq init_found (seq while teardown)
+      apply L1_hoare_seq (R := rbt_lookup_inv)
+      · -- init_found: guard ptrValid found >> modify rbt_init_found0
+        intro s ⟨h_fv, h_tree, h_dk, h_dv, h_dl, h_dr⟩
+        have h_gm := L1_guard_modify_result
+          (fun s : ProgramState => heapPtrValid s.globals.rawHeap s.locals.found)
+          rbt_init_found0 s h_fv
+        constructor
+        · exact h_gm.2
+        · intro r s' h_mem
+          rw [h_gm.1] at h_mem
+          have ⟨hr, hs⟩ := Prod.mk.inj h_mem
+          subst hr; subst hs
+          unfold rbt_lookup_inv
+          rw [rbt_init_found0_locals, rbt_init_found0_globals_rawHeap]
+          refine ⟨heapUpdate_preserves_heapPtrValid _ _ _ _ h_fv,
+                  hVal_heapUpdate_same _ _ _ (heapPtrValid_bound h_fv),
+                  ?_, h_dk, h_dv, h_dl, h_dr⟩
+          exact RbtNodeValid.of_heapUpdate_found h_tree
+            (heapPtrValid_bound h_fv) h_dk h_dv h_dl h_dr
+      · -- seq while teardown
+        apply L1_hoare_seq (R := fun s => rbt_lookup_inv s)
+        · -- While loop
+          apply L1_hoare_while_from_body
+          · -- body Hoare
+            apply L1_hoare_seq
+              (P := fun s => rbt_lookup_inv s ∧ (decide (s.locals.curr ≠ 4294967295)) = true)
+              (R := fun s => rbt_lookup_inv s ∧ (decide (s.locals.curr ≠ 4294967295)) = true)
+            · -- First condition: found or skip
+              apply L1_hoare_condition
+              · -- key = keys[curr]: found branch
+                intro s ⟨⟨h_inv, h_cond⟩, h_key_eq⟩
+                have h_ne : s.locals.curr ≠ 4294967295 := by
+                  simp at h_cond; exact h_cond
+                obtain ⟨h_fv, h_f0, h_valid, h_dk, h_dv, h_dl, h_dr⟩ := h_inv
+                have h_gm1 := L1_guard_modify_result
+                  (fun s : ProgramState => heapPtrValid s.globals.rawHeap s.locals.found)
+                  rbt_set_found1 s h_fv
+                have h_vv := h_valid.vals_valid h_ne
+                have h_vv1 : heapPtrValid (rbt_set_found1 s).globals.rawHeap
+                    (Ptr.elemOffset (rbt_set_found1 s).locals.vals (rbt_set_found1 s).locals.curr.toNat) :=
+                  (rbt_set_found1_globals_rawHeap s).symm ▸ (rbt_set_found1_locals s).symm ▸
+                    heapUpdate_preserves_heapPtrValid _ _ _ _ h_vv
+                have h_mt := L1_modify_throw_result rbt_set_retval_curr (rbt_set_found1 s)
+                -- guard+rest at (rbt_set_found1 s): use guard_modify result lemmas
+                -- The guard predicate p applied to (rbt_set_found1 s) reduces to h_vv1's type
+                have h_guard_res := L1_guard_results (p := fun s => heapPtrValid s.globals.rawHeap
+                    (Ptr.elemOffset s.locals.vals s.locals.curr.toNat)) (s := rbt_set_found1 s) h_vv1
+                have h_guard_nf := L1_guard_not_failed (p := fun s => heapPtrValid s.globals.rawHeap
+                    (Ptr.elemOffset s.locals.vals s.locals.curr.toNat)) (s := rbt_set_found1 s) h_vv1
+                have h_seq2 := L1_seq_singleton_ok h_guard_res h_guard_nf
+                  (m₂ := L1.seq (L1.modify rbt_set_retval_curr) L1.throw)
+                have h_inner2_res :
+                    (L1.seq (L1.guard (fun s => heapPtrValid s.globals.rawHeap
+                        (Ptr.elemOffset s.locals.vals s.locals.curr.toNat)))
+                      (L1.seq (L1.modify rbt_set_retval_curr) L1.throw) (rbt_set_found1 s)).results =
+                    {(Except.error (), rbt_set_retval_curr (rbt_set_found1 s))} := by
+                  rw [h_seq2.1, h_mt.1]
+                have h_inner2_nf :
+                    ¬(L1.seq (L1.guard (fun s => heapPtrValid s.globals.rawHeap
+                        (Ptr.elemOffset s.locals.vals s.locals.curr.toNat)))
+                      (L1.seq (L1.modify rbt_set_retval_curr) L1.throw) (rbt_set_found1 s)).failed :=
+                  fun hf => h_mt.2 (h_seq2.2.mp hf)
+                have h_chain := L1_seq_singleton_ok h_gm1.1 h_gm1.2
+                  (m₂ := L1.seq (L1.guard (fun s => heapPtrValid s.globals.rawHeap
+                      (Ptr.elemOffset s.locals.vals s.locals.curr.toNat)))
+                    (L1.seq (L1.modify rbt_set_retval_curr) L1.throw))
+                constructor
+                · intro hf; exact h_inner2_nf (h_chain.2.mp hf)
+                · intro r s' h_mem
+                  rw [h_chain.1, h_inner2_res] at h_mem
+                  have ⟨hr, hs⟩ := Prod.mk.inj h_mem
+                  subst hr; subst hs
+                  exact rbt_found_branch_foundok s h_fv
+              · -- key ≠ keys[curr]: skip (state unchanged, ok)
+                intro s ⟨⟨h_inv, h_cond⟩, h_key_ne⟩
+                constructor
+                · intro h; exact h
+                · intro r s' h_mem
+                  have ⟨hr, hs⟩ := Prod.mk.inj h_mem
+                  match r with
+                  | Except.ok () => subst hs; exact ⟨h_inv, h_cond⟩
+                  | Except.error () => exact absurd hr (by intro h; cases h)
+            · -- Second condition: left or right
+              apply L1_hoare_condition
+              · -- key < keys[curr]: go left
+                intro s ⟨⟨h_inv, h_cond⟩, h_key_lt⟩
+                have h_ne : s.locals.curr ≠ 4294967295 := by
+                  simp at h_cond; exact h_cond
+                obtain ⟨h_fv, h_f0, h_valid, h_dk, h_dv, h_dl, h_dr⟩ := h_inv
+                have h_lv := h_valid.lefts_valid h_ne
+                have h_gm := L1_guard_modify_result
+                  (fun s : ProgramState => heapPtrValid s.globals.rawHeap
+                      (Ptr.elemOffset s.locals.lefts s.locals.curr.toNat))
+                  rbt_go_left s h_lv
+                constructor
+                · exact h_gm.2
+                · intro r s' h_mem
+                  rw [h_gm.1] at h_mem
+                  have ⟨hr, hs⟩ := Prod.mk.inj h_mem
+                  subst hr; subst hs
+                  exact rbt_go_left_preserves_inv s
+                    ⟨h_fv, h_f0, h_valid, h_dk, h_dv, h_dl, h_dr⟩ h_ne
+              · -- key >= keys[curr]: go right
+                intro s ⟨⟨h_inv, h_cond⟩, h_key_ge⟩
+                have h_ne : s.locals.curr ≠ 4294967295 := by
+                  simp at h_cond; exact h_cond
+                obtain ⟨h_fv, h_f0, h_valid, h_dk, h_dv, h_dl, h_dr⟩ := h_inv
+                have h_rv := h_valid.rights_valid h_ne
+                have h_gm := L1_guard_modify_result
+                  (fun s : ProgramState => heapPtrValid s.globals.rawHeap
+                      (Ptr.elemOffset s.locals.rights s.locals.curr.toNat))
+                  rbt_go_right s h_rv
+                constructor
+                · exact h_gm.2
+                · intro r s' h_mem
+                  rw [h_gm.1] at h_mem
+                  have ⟨hr, hs⟩ := Prod.mk.inj h_mem
+                  subst hr; subst hs
+                  exact rbt_go_right_preserves_inv s
+                    ⟨h_fv, h_f0, h_valid, h_dk, h_dv, h_dl, h_dr⟩ h_ne
+          · -- exit: I ∧ curr = NULL → Q(ok) = I
+            intro s h_inv _; exact h_inv
+        · -- Teardown: modify retval0 >> throw
+          intro s h_inv
+          obtain ⟨h_fv, h_f0, h_valid, h_dk, h_dv, h_dl, h_dr⟩ := h_inv
+          have h_mt := L1_modify_throw_result rbt_set_retval0 s
+          constructor
+          · exact h_mt.2
+          · intro r s' h_mem
+            rw [h_mt.1] at h_mem
+            have ⟨hr, hs⟩ := Prod.mk.inj h_mem
+            subst hr; subst hs
+            exact rbt_teardown_foundok s h_f0
+  · -- Handler: skip from FoundOk → post
+    intro s h_foundok
+    constructor
+    · intro h; exact h
+    · intro r s' h_mem
+      have ⟨hr, hs⟩ := Prod.mk.inj h_mem
+      subst hr; subst hs
+      unfold rbt_lookup_spec; intro _; exact h_foundok
