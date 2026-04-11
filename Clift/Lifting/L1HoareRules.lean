@@ -411,4 +411,68 @@ theorem L1_hoare_pre {P P' : σ → Prop} {Q : Except Unit Unit → σ → Prop}
     validHoare P' m Q :=
   fun s hp => h s (h_pre s hp)
 
+/-! ## L1 while loop Hoare rule
+
+The key theorem that enables verification of loop-containing C functions.
+Given a loop invariant I, proves validHoare for L1.while by:
+1. Showing WhileFail cannot happen (body doesn't fail when I holds + condition true)
+2. Showing every WhileResult satisfies Q (by induction on the derivation)
+
+The invariant I must:
+- Be established by the precondition P
+- Be preserved by the loop body (when condition is true and body returns ok)
+- Imply Q when the loop exits (condition is false → Q(ok, s))
+- The body's abrupt (error) results must also satisfy Q
+-/
+
+-- Generalized: WhileFail is impossible when invariant holds
+private theorem L1_while_not_failed_of_inv {σ : Type} {c : σ → Bool} {body : L1Monad σ}
+    {I : σ → Prop}
+    (h_body_nf : ∀ s, I s → c s = true → ¬(body s).failed)
+    (h_body_inv : ∀ s s', I s → c s = true → (Except.ok (), s') ∈ (body s).results → I s')
+    : ∀ s, I s → ¬L1.WhileFail c body s := by
+  intro s h_I h_fail
+  induction h_fail with
+  | here s' hc hf => exact h_body_nf s' h_I hc hf
+  | later s' s'' hc h_body h_rest ih =>
+    exact ih (h_body_inv s' s'' h_I hc h_body)
+
+-- Generalized: every WhileResult satisfies Q when invariant holds
+private theorem L1_while_result_of_inv {σ : Type} {c : σ → Bool} {body : L1Monad σ}
+    {I : σ → Prop} {Q : Except Unit Unit → σ → Prop}
+    (h_body_inv : ∀ s s', I s → c s = true → (Except.ok (), s') ∈ (body s).results → I s')
+    (h_exit : ∀ s, I s → c s = false → Q (Except.ok ()) s)
+    (h_abrupt : ∀ s s', I s → c s = true → (Except.error (), s') ∈ (body s).results →
+                Q (Except.error ()) s')
+    : ∀ s (p : Except Unit Unit × σ), I s → L1.WhileResult c body s p → Q p.1 p.2 := by
+  intro s p h_I h_wr
+  induction h_wr with
+  | done s₀ hc => exact h_exit s₀ h_I hc
+  | step s₀ s₁ _ hc h_body _ ih => exact ih (h_body_inv s₀ s₁ h_I hc h_body)
+  | abrupt s₀ s₁ hc h_body => exact h_abrupt s₀ s₁ h_I hc h_body
+
+theorem L1_hoare_while {σ : Type} {c : σ → Bool} {body : L1Monad σ}
+    {P : σ → Prop} {Q : Except Unit Unit → σ → Prop}
+    (I : σ → Prop)
+    -- Initialization: P implies I
+    (h_init : ∀ s, P s → I s)
+    -- Body doesn't fail when invariant holds and condition is true
+    (h_body_nf : ∀ s, I s → c s = true → ¬(body s).failed)
+    -- Body preserves invariant on normal (ok) return
+    (h_body_inv : ∀ s s', I s → c s = true → (Except.ok (), s') ∈ (body s).results → I s')
+    -- Exit condition: invariant + condition false implies postcondition
+    (h_exit : ∀ s, I s → c s = false → Q (Except.ok ()) s)
+    -- Abrupt exit: body error results satisfy Q
+    (h_abrupt : ∀ s s', I s → c s = true → (Except.error (), s') ∈ (body s).results →
+                Q (Except.error ()) s') :
+    validHoare P (L1.while c body) Q := by
+  intro s₀ h_P
+  have h_I₀ := h_init s₀ h_P
+  constructor
+  · -- WhileFail is impossible
+    exact L1_while_not_failed_of_inv h_body_nf h_body_inv s₀ h_I₀
+  · -- Every WhileResult satisfies Q
+    intro r s₁ h_mem
+    exact L1_while_result_of_inv h_body_inv h_exit h_abrupt s₀ (r, s₁) h_I₀ h_mem
+
 end L1Hoare
