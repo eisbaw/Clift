@@ -194,9 +194,45 @@ theorem example_10ops_abstract_valid :
       queueInvariant s₀ →
       abstractExec extQueueSpec example_10ops s₀
     := by
-  -- abstractExec just wraps the existence of states.
-  -- We construct them manually: the abstract trace is deterministic.
-  sorry  -- Mechanical abstract trace construction (tedious, all postconditions are concrete)
+  intro s₀ ⟨h_elems, h_cap, h_pushes, h_pops⟩ _h_inv
+  -- Unfold abstractExec for the 10-op trace and construct witnesses
+  unfold example_10ops abstractExec
+  simp only [extQueueSpec]
+  -- op 1: init 10
+  -- pre: 10 > 0
+  refine ⟨by omega, ?_⟩
+  -- post: s'.elems = [] ∧ s'.capacity = 10 ∧ s'.totalPushes = 0 ∧ s'.totalPops = 0
+  refine ⟨⟨[], 10, 0, 0⟩, ⟨rfl, rfl, rfl, rfl⟩, ?_⟩
+  -- op 2: push 42
+  -- pre: [].length < 10
+  refine ⟨by simp, ?_⟩
+  refine ⟨⟨[42], 10, 1, 0⟩, ⟨by simp, rfl, rfl, rfl⟩, ?_⟩
+  -- op 3: push 17
+  refine ⟨by simp, ?_⟩
+  refine ⟨⟨[42, 17], 10, 2, 0⟩, ⟨by simp, rfl, rfl, rfl⟩, ?_⟩
+  -- op 4: push 99
+  refine ⟨by simp, ?_⟩
+  refine ⟨⟨[42, 17, 99], 10, 3, 0⟩, ⟨by simp, rfl, rfl, rfl⟩, ?_⟩
+  -- op 5: size (read-only, state unchanged)
+  refine ⟨trivial, ?_⟩
+  refine ⟨⟨[42, 17, 99], 10, 3, 0⟩, rfl, ?_⟩
+  -- op 6: pop
+  -- pre: [42, 17, 99] ≠ []
+  refine ⟨by simp, ?_⟩
+  -- post: ∃ v rest, [42,17,99] = v :: rest ∧ s'.elems = rest ∧ ...
+  refine ⟨⟨[17, 99], 10, 3, 1⟩, ⟨42, [17, 99], rfl, rfl, rfl, rfl, rfl⟩, ?_⟩
+  -- op 7: peek (read-only)
+  refine ⟨trivial, ?_⟩
+  refine ⟨⟨[17, 99], 10, 3, 1⟩, rfl, ?_⟩
+  -- op 8: push 7
+  refine ⟨by simp, ?_⟩
+  refine ⟨⟨[17, 99, 7], 10, 4, 1⟩, ⟨by simp, rfl, rfl, rfl⟩, ?_⟩
+  -- op 9: pop
+  refine ⟨by simp, ?_⟩
+  refine ⟨⟨[99, 7], 10, 4, 2⟩, ⟨17, [99, 7], rfl, rfl, rfl, rfl, rfl⟩, ?_⟩
+  -- op 10: pop (last element, uses single-op case)
+  refine ⟨by simp, ?_⟩
+  exact ⟨⟨[7], 10, 4, 3⟩, ⟨99, [7], rfl, rfl, rfl, rfl, rfl⟩⟩
 
 /-! # Status and measurements
 
@@ -221,7 +257,7 @@ composition logic.
 - system_exec_refines: 0 sorry in the proof itself
   (but uses sr.inv_preserved which has sorry in the rbExt instantiation)
 - rb_ext_system_correct: 0 additional sorry (delegates)
-- example_10ops_abstract_valid: 1 sorry (mechanical)
+- example_10ops_abstract_valid: PROVEN (sorry eliminated)
 - Blocked on: task 0136 (validHoare proofs) for the rbExt sorry chain
 -/
 

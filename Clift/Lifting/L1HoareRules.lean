@@ -141,6 +141,89 @@ theorem L1_catch_singleton_ok {body : L1Monad σ} {s s' : σ}
     · rw [h_res] at h_err
       exact absurd (Prod.mk.inj h_err).1 (by intro h; cases h)
 
+/-- seq (modify f) throw produces exactly {(error, f s)}, not failed. -/
+theorem L1_modify_throw_result (f : σ → σ) (s : σ) :
+    (L1.seq (L1.modify f) L1.throw s).results = {(Except.error (), f s)} ∧
+    ¬(L1.seq (L1.modify f) L1.throw s).failed := by
+  constructor
+  · ext ⟨r, s'⟩; constructor
+    · intro h; change (_ ∨ _) at h
+      rcases h with ⟨s'', h_mod, h_throw⟩ | ⟨h_err, _⟩
+      · have ⟨_, rfl⟩ := Prod.mk.inj h_mod
+        exact h_throw
+      · exact absurd (Prod.mk.inj h_err).1 (by intro h; cases h)
+    · intro h; change (_ ∨ _); left
+      refine ⟨f s, rfl, ?_⟩; rw [h]; show (Except.error (), f s) ∈ {(Except.error (), f s)}; rfl
+  · intro hf; change (_ ∨ _) at hf
+    rcases hf with h | ⟨_, _, h⟩ <;> exact h
+
+/-- catch body skip: when body produces exactly {(error, s')}, result is {(ok, s')}. -/
+theorem L1_catch_error_singleton {body : L1Monad σ} {s s' : σ}
+    (h_res : (body s).results = {(Except.error (), s')})
+    (h_nf : ¬(body s).failed) :
+    (L1.catch body L1.skip s).results = {(Except.ok (), s')} ∧
+    ¬(L1.catch body L1.skip s).failed := by
+  constructor
+  · ext ⟨r, t⟩; constructor
+    · intro h; change (_ ∨ _) at h
+      rcases h with ⟨h_ok, _⟩ | ⟨s'', h_err, h_skip⟩
+      · rw [h_res] at h_ok; exact absurd (Prod.mk.inj h_ok).1 (by intro h; cases h)
+      · rw [h_res] at h_err
+        have ⟨_, rfl⟩ := Prod.mk.inj h_err
+        exact h_skip
+    · intro h; change (_ ∨ _); right
+      refine ⟨s', ?_, h⟩; rw [h_res]; simp only [Set.mem_singleton_iff]
+  · intro hf; change (_ ∨ _) at hf
+    rcases hf with hf1 | ⟨s'', h_err, hf2⟩
+    · exact h_nf hf1
+    · exact hf2
+
+/-- When m1 produces exactly one error result, seq m1 m2 propagates that error. -/
+theorem L1_seq_error_propagate {m₁ m₂ : L1Monad σ} {s s' : σ}
+    (h_res : (m₁ s).results = {(Except.error (), s')})
+    (h_nf : ¬(m₁ s).failed) :
+    (L1.seq m₁ m₂ s).results = {(Except.error (), s')} ∧
+    ¬(L1.seq m₁ m₂ s).failed := by
+  constructor
+  · ext ⟨r, t⟩; constructor
+    · intro h; change (_ ∨ _) at h
+      rcases h with ⟨t', h_ok, _⟩ | ⟨h_err, h_eq⟩
+      · rw [h_res] at h_ok; exact absurd (Prod.mk.inj h_ok).1 (by intro h; cases h)
+      · rw [h_res] at h_err; have ⟨_, ht⟩ := Prod.mk.inj h_err
+        exact Prod.ext h_eq ht
+    · intro h; change (_ ∨ _); right
+      have ⟨hr, ht⟩ := Prod.mk.inj h
+      constructor
+      · show (Except.error (), t) ∈ (m₁ s).results; rw [h_res, ht]; rfl
+      · exact hr
+  · intro hf; change (_ ∨ _) at hf
+    rcases hf with hf1 | ⟨t', h_ok, _⟩
+    · exact h_nf hf1
+    · rw [h_res] at h_ok; exact absurd (Prod.mk.inj h_ok).1 (by intro h; cases h)
+
+/-- The modify-throw-catch-skip pattern: pure, returns with f applied. -/
+theorem L1_modify_throw_catch_skip_result (f : σ → σ) (s : σ) :
+    (L1.catch (L1.seq (L1.modify f) L1.throw) L1.skip s).results =
+      {(Except.ok (), f s)} ∧
+    ¬(L1.catch (L1.seq (L1.modify f) L1.throw) L1.skip s).failed :=
+  let ⟨h1, h2⟩ := L1_modify_throw_result f s
+  L1_catch_error_singleton h1 h2
+
+/-- The guard-modify-throw-catch-skip pattern: reads heap, sets ret__val, returns. -/
+theorem L1_guard_modify_throw_catch_skip_result
+    (p : σ → Prop) [DecidablePred p] (f : σ → σ) (s : σ) (hp : p s) :
+    (L1.catch (L1.seq (L1.guard p) (L1.seq (L1.modify f) L1.throw)) L1.skip s).results =
+      {(Except.ok (), f s)} ∧
+    ¬(L1.catch (L1.seq (L1.guard p) (L1.seq (L1.modify f) L1.throw)) L1.skip s).failed := by
+  have h_seq := L1_seq_singleton_ok (L1_guard_results hp) (L1_guard_not_failed hp)
+    (m₂ := L1.seq (L1.modify f) L1.throw)
+  have ⟨h_mt_res, h_mt_nf⟩ := L1_modify_throw_result f s
+  have h_body_res : (L1.seq (L1.guard p) (L1.seq (L1.modify f) L1.throw) s).results =
+      {(Except.error (), f s)} := by rw [h_seq.1, h_mt_res]
+  have h_body_nf : ¬(L1.seq (L1.guard p) (L1.seq (L1.modify f) L1.throw) s).failed :=
+    fun hf => h_mt_nf (h_seq.2.mp hf)
+  exact L1_catch_error_singleton h_body_res h_body_nf
+
 end L1Results
 
 /-! # L1 Hoare rules (validHoare)

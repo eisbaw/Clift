@@ -46,7 +46,48 @@ theorem linear_probe_bounded (idx cap : Nat) (h_cap : cap > 0)
     This ensures the while loop terminates. -/
 theorem linear_probe_covers_all (cap : Nat) (h_cap : cap > 0) (start : Nat) :
     ∀ i, i < cap → ∃ probe, probe < cap ∧ (start + probe) % cap = i := by
-  sorry  -- requires Chinese Remainder Theorem-style argument
+  intro i hi
+  have hsm : start % cap < cap := Nat.mod_lt _ h_cap
+  -- Witness: probe = (i + cap - start % cap) % cap
+  refine ⟨(i + cap - start % cap) % cap, Nat.mod_lt _ h_cap, ?_⟩
+  -- Suffices to show (start + (i + cap - start % cap) % cap) % cap = i
+  -- Rewrite start using Nat.div_add_mod: start = cap * (start / cap) + start % cap
+  have hdm := Nat.div_add_mod start cap
+  -- Case split on whether i ≥ start % cap
+  by_cases h : start % cap ≤ i
+  · -- Case i ≥ start % cap:
+    -- i + cap - start % cap ≥ cap, and < 2*cap
+    -- So (i + cap - start % cap) % cap = i - start % cap
+    have h_ge : cap ≤ i + cap - start % cap := by omega
+    have h_lt : i + cap - start % cap < 2 * cap := by omega
+    rw [Nat.mod_eq_sub_mod h_ge]
+    -- Now probe = i + cap - start % cap - cap = i - start % cap
+    -- start + probe = start + (i - start % cap) = cap * (start / cap) + start % cap + i - start % cap
+    -- = cap * (start / cap) + i
+    -- mod cap = i (since i < cap)
+    have hsub : i + cap - start % cap - cap = i - start % cap := by omega
+    rw [hsub]
+    -- Now goal: (start + (i - start % cap) % cap) % cap = i
+    -- i - start % cap < cap (since i < cap)
+    have h_inner_lt : i - start % cap < cap := by omega
+    rw [Nat.mod_eq_of_lt h_inner_lt]
+    -- Now goal: (start + (i - start % cap)) % cap = i
+    have h_start := hdm.symm  -- start = cap * (start / cap) + start % cap
+    have h_eq : start + (i - start % cap) = cap * (start / cap) + i := by omega
+    rw [h_eq, Nat.mul_add_mod]
+    exact Nat.mod_eq_of_lt hi
+  · -- Case i < start % cap:
+    have h_lt_sm : i < start % cap := by omega
+    have h_lt : i + cap - start % cap < cap := by omega
+    rw [Nat.mod_eq_of_lt h_lt]
+    -- Now goal: (start + (i + cap - start % cap)) % cap = i
+    -- start + (i + cap - start % cap) = cap * (start / cap + 1) + i
+    have h_start := hdm.symm  -- start = cap * (start / cap) + start % cap
+    have h_eq : start + (i + cap - start % cap) = cap * (start / cap + 1) + i := by
+      rw [Nat.mul_add cap (start / cap) 1, Nat.mul_one]
+      omega
+    rw [h_eq, Nat.mul_add_mod]
+    exact Nat.mod_eq_of_lt hi
 
 /-! # 2. Heap index bounds (priority queue)
 
@@ -123,7 +164,7 @@ theorem ht_lookup_inv_init (capacity start : Nat) (h_cap : capacity > 0) :
   constructor
   · omega
   constructor
-  · simp [Nat.zero_add, Nat.mod_mod_of_dvd]
+  · simp
   · exact Nat.mod_lt _ h_cap
 
 /-- The invariant is maintained by one loop iteration. -/
@@ -133,7 +174,23 @@ theorem ht_lookup_inv_step (probes idx capacity start : Nat)
     ht_lookup_loop_inv (probes + 1) ((idx + 1) % capacity) capacity start := by
   obtain ⟨h1, h2, h3⟩ := h_inv
   refine ⟨by omega, ?_, Nat.mod_lt _ (by omega)⟩
-  sorry  -- modular arithmetic: (start + probes) % cap + 1 ≡ (start + probes + 1) % cap
+  -- Goal: (idx + 1) % capacity = (start + (probes + 1)) % capacity
+  subst h2
+  -- Goal: ((start + probes) % capacity + 1) % capacity = (start + (probes + 1)) % capacity
+  have h_cap_pos : capacity > 0 := by omega
+  have : start + (probes + 1) = (start + probes) + 1 := by omega
+  rw [this]
+  -- Goal: ((start + probes) % capacity + 1) % capacity = (start + probes + 1) % capacity
+  -- Decompose start + probes = capacity * q + r
+  have hdm := Nat.div_add_mod (start + probes) capacity
+  -- RHS: (start + probes + 1) % capacity
+  --    = (capacity * q + r + 1) % capacity   [since start + probes = capacity * q + r]
+  --    = (r + 1) % capacity                   [by Nat.mul_add_mod]
+  --    = LHS
+  have h_eq : start + probes + 1 = capacity * ((start + probes) / capacity) + ((start + probes) % capacity + 1) := by
+    have := hdm.symm; omega
+  rw [h_eq]
+  exact (Nat.mul_add_mod capacity ((start + probes) / capacity) ((start + probes) % capacity + 1)).symm
 
 /-! # 5. Priority queue heap invariant for bounds -/
 
