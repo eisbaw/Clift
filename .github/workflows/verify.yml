@@ -16,6 +16,9 @@ on:
     branches: [main, master]
   pull_request:
     branches: [main, master]
+  schedule:
+    # Nightly at 03:00 UTC
+    - cron: '0 3 * * *'
 
 # Cancel in-progress runs for the same branch/PR
 concurrency:
@@ -91,6 +94,31 @@ jobs:
       - name: Lake build (all targets)
         run: |
           nix develop --command bash -c "lake build"
+
+      - name: Track sorry count
+        if: always()
+        run: |
+          mkdir -p metrics
+          SORRY_COUNT=$(grep -rn "sorry" Clift/ Examples/ Generated/ --include="*.lean" \
+            | grep -v "^.*:.*--" \
+            | grep -v "sorry-free" \
+            | grep -v "no sorry" \
+            | grep -v "zero sorry" \
+            | grep -v "Sorry" \
+            | grep -v "#print axioms" \
+            | grep -c "sorry" || true)
+          TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+          echo "${TIMESTAMP} ${COMMIT} ${SORRY_COUNT}" >> metrics/sorry-count.log
+          echo "Sorry count: ${SORRY_COUNT} (${TIMESTAMP}, ${COMMIT})"
+
+          # Alert: check if sorry count increased vs previous entry
+          if [ -f metrics/sorry-count.log ] && [ $(wc -l < metrics/sorry-count.log) -gt 1 ]; then
+            PREV_COUNT=$(tail -2 metrics/sorry-count.log | head -1 | awk '{print $3}')
+            if [ "${SORRY_COUNT}" -gt "${PREV_COUNT}" ] 2>/dev/null; then
+              echo "::warning::Sorry count INCREASED: ${PREV_COUNT} -> ${SORRY_COUNT}"
+            fi
+          fi
 
       - name: Verification summary
         if: always()

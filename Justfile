@@ -169,6 +169,49 @@ sorry-count:
         | grep "sorry"
     fi
 
+# Nightly verification: full rebuild + sorry count tracking + regression alert
+nightly:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "=== Nightly Verification $(date -u +%Y-%m-%dT%H:%M:%SZ) ==="
+
+    # 1. Full build
+    lake build
+
+    # 2. Count sorry
+    mkdir -p metrics
+    SORRY_COUNT=$(grep -rn "sorry" Clift/ Examples/ Generated/ --include="*.lean" \
+      | grep -v "^.*:.*--" \
+      | grep -v "sorry-free" \
+      | grep -v "no sorry" \
+      | grep -v "zero sorry" \
+      | grep -v "Sorry" \
+      | grep -v "#print axioms" \
+      | grep -c "sorry" || true)
+    TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+    COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+    echo "${TIMESTAMP} ${COMMIT} ${SORRY_COUNT}" >> metrics/sorry-count.log
+    echo "Sorry count: ${SORRY_COUNT}"
+
+    # 3. Alert if sorry count increased
+    if [ $(wc -l < metrics/sorry-count.log) -gt 1 ]; then
+      PREV_COUNT=$(tail -2 metrics/sorry-count.log | head -1 | awk '{print $3}')
+      if [ "${SORRY_COUNT}" -gt "${PREV_COUNT}" ] 2>/dev/null; then
+        echo "ALERT: Sorry count INCREASED: ${PREV_COUNT} -> ${SORRY_COUNT}"
+        exit 1
+      elif [ "${SORRY_COUNT}" -lt "${PREV_COUNT}" ]; then
+        echo "Progress: sorry count decreased ${PREV_COUNT} -> ${SORRY_COUNT}"
+      else
+        echo "Stable: sorry count unchanged at ${SORRY_COUNT}"
+      fi
+    fi
+
+    echo ""
+    echo "=== Sorry count history ==="
+    cat metrics/sorry-count.log
+    echo ""
+    echo "=== Nightly verification complete ==="
+
 # Clean Lake build artifacts
 clean:
     lake clean
