@@ -113,10 +113,20 @@ def sha256_schedule_word_spec : FuncSpec ProgramState where
 
 theorem sha256_ch_satisfies_spec :
     sha256_ch_spec.satisfiedBy (l1_sha256_ch_body) := by
-  unfold FuncSpec.satisfiedBy sha256_ch_spec
-  unfold validHoare
+  unfold FuncSpec.satisfiedBy sha256_ch_spec validHoare
   intro s _
-  sorry -- Requires: unfolding L1 bitwise ops, UInt32 bitwise lemmas
+  unfold Sha256Core.l1_sha256_ch_body
+  have h := L1_modify_throw_catch_skip_result
+    (fun s : ProgramState => { s with locals := { s.locals with ret__val := ((s.locals.e &&& s.locals.f) ^^^ ((~~~s.locals.e) &&& s.locals.g)) } })
+    s
+  obtain ⟨h_res, h_nf⟩ := h
+  constructor
+  · exact h_nf
+  · intro r s' h_mem
+    rw [h_res] at h_mem
+    have ⟨hr, hs⟩ := Prod.mk.inj h_mem
+    subst hr; subst hs
+    intro _; rfl
 
 theorem sha256_init_satisfies_spec :
     sha256_init_spec.satisfiedBy (l1_sha256_init_body) := by

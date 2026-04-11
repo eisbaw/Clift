@@ -121,14 +121,51 @@ theorem pool_init_correct :
     pool_init_spec.satisfiedBy MemAlloc.l1_pool_init_body := by
   sorry
 
+private theorem ma_retval_globals (s : ProgramState) (v : UInt32) :
+    ({ s with locals := { s.locals with ret__val := v } } : ProgramState).globals = s.globals := rfl
+private theorem ma_retval_pm (s : ProgramState) (v : UInt32) :
+    ({ s with locals := { s.locals with ret__val := v } } : ProgramState).locals.pm = s.locals.pm := rfl
+private theorem ma_retval_val (s : ProgramState) (v : UInt32) :
+    ({ s with locals := { s.locals with ret__val := v } } : ProgramState).locals.ret__val = v := rfl
+
+attribute [local irreducible] hVal heapPtrValid in
 theorem pool_allocated_correct :
     pool_allocated_spec.satisfiedBy MemAlloc.l1_pool_allocated_body := by
-  sorry
+  unfold FuncSpec.satisfiedBy pool_allocated_spec validHoare
+  intro s hpre
+  unfold MemAlloc.l1_pool_allocated_body
+  have h := L1_guard_modify_throw_catch_skip_result
+    (fun s : ProgramState => heapPtrValid s.globals.rawHeap s.locals.pm)
+    (fun s : ProgramState => { s with locals := { s.locals with ret__val := (hVal s.globals.rawHeap s.locals.pm).total_allocated } })
+    s hpre
+  obtain ⟨h_res, h_nf⟩ := h
+  constructor
+  · exact h_nf
+  · intro r s' h_mem _
+    rw [h_res] at h_mem
+    have ⟨hr, hs⟩ := Prod.mk.inj h_mem
+    subst hr; subst hs
+    rw [ma_retval_val, ma_retval_globals, ma_retval_pm]
 
+attribute [local irreducible] hVal heapPtrValid in
 theorem pool_alloc_count_correct :
     pool_alloc_count_spec.satisfiedBy MemAlloc.l1_pool_alloc_count_body := by
-  sorry
+  unfold FuncSpec.satisfiedBy pool_alloc_count_spec validHoare
+  intro s hpre
+  unfold MemAlloc.l1_pool_alloc_count_body
+  have h := L1_guard_modify_throw_catch_skip_result
+    (fun s : ProgramState => heapPtrValid s.globals.rawHeap s.locals.pm)
+    (fun s : ProgramState => { s with locals := { s.locals with ret__val := (hVal s.globals.rawHeap s.locals.pm).alloc_count } })
+    s hpre
+  obtain ⟨h_res, h_nf⟩ := h
+  constructor
+  · exact h_nf
+  · intro r s' h_mem _
+    rw [h_res] at h_mem
+    have ⟨hr, hs⟩ := Prod.mk.inj h_mem
+    subst hr; subst hs
+    rw [ma_retval_val, ma_retval_globals, ma_retval_pm]
 
 theorem pool_has_free_correct :
     pool_has_free_spec.satisfiedBy MemAlloc.l1_pool_has_free_body := by
-  sorry
+  sorry -- Requires: conditional reasoning + UInt32 equality with 0xFFFFFFFF literal

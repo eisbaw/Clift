@@ -137,12 +137,32 @@ theorem queue_init_satisfies_spec :
   intro s hpre
   sorry -- Requires: unfolding L1 monadic form, heap write reasoning
 
+-- Projection lemmas for ret__val update
+private theorem rq_retval_globals (s : ProgramState) (v : UInt32) :
+    ({ s with locals := { s.locals with ret__val := v } } : ProgramState).globals = s.globals := rfl
+private theorem rq_retval_q (s : ProgramState) (v : UInt32) :
+    ({ s with locals := { s.locals with ret__val := v } } : ProgramState).locals.q = s.locals.q := rfl
+private theorem rq_retval_val (s : ProgramState) (v : UInt32) :
+    ({ s with locals := { s.locals with ret__val := v } } : ProgramState).locals.ret__val = v := rfl
+
+attribute [local irreducible] hVal heapPtrValid in
 theorem queue_count_satisfies_spec :
     queue_count_spec.satisfiedBy (l1_queue_count_body) := by
-  unfold FuncSpec.satisfiedBy queue_count_spec
-  unfold validHoare
+  unfold FuncSpec.satisfiedBy queue_count_spec validHoare
   intro s hpre
-  sorry -- Requires: heap read reasoning (pure accessor)
+  unfold RtosQueue.l1_queue_count_body
+  have h := L1_guard_modify_throw_catch_skip_result
+    (fun s : ProgramState => heapPtrValid s.globals.rawHeap s.locals.q)
+    (fun s : ProgramState => { s with locals := { s.locals with ret__val := (hVal s.globals.rawHeap s.locals.q).count } })
+    s hpre
+  obtain ⟨h_res, h_nf⟩ := h
+  constructor
+  · exact h_nf
+  · intro r s' h_mem _
+    rw [h_res] at h_mem
+    have ⟨hr, hs⟩ := Prod.mk.inj h_mem
+    subst hr; subst hs
+    rw [rq_retval_val, rq_retval_globals, rq_retval_q]
 
 theorem queue_is_empty_satisfies_spec :
     queue_is_empty_spec.satisfiedBy (l1_queue_is_empty_body) := by

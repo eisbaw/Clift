@@ -126,12 +126,31 @@ theorem uart_init_satisfies_spec :
   intro s hpre
   sorry -- Requires: heap write reasoning for 11 field assignments
 
+private theorem uart_retval_globals (s : ProgramState) (v : UInt32) :
+    ({ s with locals := { s.locals with ret__val := v } } : ProgramState).globals = s.globals := rfl
+private theorem uart_retval_drv (s : ProgramState) (v : UInt32) :
+    ({ s with locals := { s.locals with ret__val := v } } : ProgramState).locals.drv = s.locals.drv := rfl
+private theorem uart_retval_val (s : ProgramState) (v : UInt32) :
+    ({ s with locals := { s.locals with ret__val := v } } : ProgramState).locals.ret__val = v := rfl
+
+attribute [local irreducible] hVal heapPtrValid in
 theorem uart_get_state_satisfies_spec :
     uart_get_state_spec.satisfiedBy (l1_uart_get_state_body) := by
-  unfold FuncSpec.satisfiedBy uart_get_state_spec
-  unfold validHoare
+  unfold FuncSpec.satisfiedBy uart_get_state_spec validHoare
   intro s hpre
-  sorry -- Requires: heap read + field projection
+  unfold UartDriver.l1_uart_get_state_body
+  have h := L1_guard_modify_throw_catch_skip_result
+    (fun s : ProgramState => heapPtrValid s.globals.rawHeap s.locals.drv)
+    (fun s : ProgramState => { s with locals := { s.locals with ret__val := (hVal s.globals.rawHeap s.locals.drv).state } })
+    s hpre
+  obtain ⟨h_res, h_nf⟩ := h
+  constructor
+  · exact h_nf
+  · intro r s' h_mem _
+    rw [h_res] at h_mem
+    have ⟨hr, hs⟩ := Prod.mk.inj h_mem
+    subst hr; subst hs
+    rw [uart_retval_val, uart_retval_globals, uart_retval_drv]
 
 /-! # Step 5: Driver state machine property
 

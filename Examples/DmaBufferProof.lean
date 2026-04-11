@@ -60,7 +60,13 @@ theorem dma_write_preserves_inv (w r c cap : Nat)
   obtain ⟨h1, h2, h3, h4, h5⟩ := h_inv
   refine ⟨by omega, ?_, h3, h4, ?_⟩
   · exact Nat.mod_lt _ h4
-  · sorry  -- modular arithmetic: (r + c) % cap + 1 ≡ (r + c + 1) % cap
+  · -- Goal: (w + 1) % cap = (r + (c + 1)) % cap
+    rw [h5, show r + (c + 1) = (r + c) + 1 from by omega]
+    -- Goal: ((r + c) % cap + 1) % cap = ((r + c) + 1) % cap
+    -- LHS: rewrite using Nat.add_mod then Nat.mod_mod to normalize
+    conv => lhs; rw [Nat.add_mod, Nat.mod_mod]
+    -- RHS: rewrite using Nat.add_mod
+    conv => rhs; rw [Nat.add_mod]
 
 /-- Invariant preserved by read (when count > 0). -/
 theorem dma_read_preserves_inv (w r c cap : Nat)
@@ -69,7 +75,17 @@ theorem dma_read_preserves_inv (w r c cap : Nat)
     dmaInvariant w ((r + 1) % cap) (c - 1) cap := by
   obtain ⟨h1, h2, h3, h4, h5⟩ := h_inv
   refine ⟨by omega, h2, Nat.mod_lt _ h4, h4, ?_⟩
-  sorry  -- modular arithmetic reasoning
+  -- Goal: w = ((r + 1) % cap + (c - 1)) % cap
+  -- We know w = (r + c) % cap from h5, and c > 0 from h_not_empty
+  rw [h5]
+  -- Goal: (r + c) % cap = ((r + 1) % cap + (c - 1)) % cap
+  -- Key: (r + 1) + (c - 1) = r + c since c > 0
+  -- Normalize both sides using Nat.add_mod
+  conv => rhs; rw [Nat.add_mod, Nat.mod_mod]
+  -- RHS is now ((r + 1) % cap + (c - 1) % cap) % cap
+  -- Rewrite LHS: r + c = (r + 1) + (c - 1) since c > 0
+  conv => lhs; rw [show r + c = (r + 1) + (c - 1) from by omega]
+  rw [Nat.add_mod]
 
 /-- Reset establishes the invariant. -/
 theorem dma_reset_establishes_inv (cap : Nat) (h_pos : cap > 0) :
@@ -143,9 +159,31 @@ theorem dma_init_correct :
     dma_init_spec.satisfiedBy DmaBuffer.l1_dma_init_body := by
   sorry
 
+private theorem dma_retval_globals (s : ProgramState) (v : UInt32) :
+    ({ s with locals := { s.locals with ret__val := v } } : ProgramState).globals = s.globals := rfl
+private theorem dma_retval_buf (s : ProgramState) (v : UInt32) :
+    ({ s with locals := { s.locals with ret__val := v } } : ProgramState).locals.buf = s.locals.buf := rfl
+private theorem dma_retval_val (s : ProgramState) (v : UInt32) :
+    ({ s with locals := { s.locals with ret__val := v } } : ProgramState).locals.ret__val = v := rfl
+
+attribute [local irreducible] hVal heapPtrValid in
 theorem dma_available_correct :
     dma_available_spec.satisfiedBy DmaBuffer.l1_dma_available_body := by
-  sorry
+  unfold FuncSpec.satisfiedBy dma_available_spec validHoare
+  intro s hpre
+  unfold DmaBuffer.l1_dma_available_body
+  have h := L1_guard_modify_throw_catch_skip_result
+    (fun s : ProgramState => heapPtrValid s.globals.rawHeap s.locals.buf)
+    (fun s : ProgramState => { s with locals := { s.locals with ret__val := (hVal s.globals.rawHeap s.locals.buf).count } })
+    s hpre
+  obtain ⟨h_res, h_nf⟩ := h
+  constructor
+  · exact h_nf
+  · intro r s' h_mem _
+    rw [h_res] at h_mem
+    have ⟨hr, hs⟩ := Prod.mk.inj h_mem
+    subst hr; subst hs
+    rw [dma_retval_val, dma_retval_globals, dma_retval_buf]
 
 theorem dma_write_correct :
     dma_write_spec.satisfiedBy DmaBuffer.l1_dma_write_body := by

@@ -95,9 +95,36 @@ theorem ht_hash_correct :
     ht_hash_spec.satisfiedBy HashTable.l1_ht_hash_body := by
   sorry
 
+-- Projection lemma: updating ret__val preserves globals
+private theorem ht_update_retval_globals (s : ProgramState) (v : UInt32) :
+    ({ s with locals := { s.locals with ret__val := v } } : ProgramState).globals = s.globals := rfl
+
+-- Projection lemma: updating ret__val preserves locals.ht
+private theorem ht_update_retval_ht (s : ProgramState) (v : UInt32) :
+    ({ s with locals := { s.locals with ret__val := v } } : ProgramState).locals.ht = s.locals.ht := rfl
+
+-- Projection lemma: updating ret__val gives v
+private theorem ht_update_retval_val (s : ProgramState) (v : UInt32) :
+    ({ s with locals := { s.locals with ret__val := v } } : ProgramState).locals.ret__val = v := rfl
+
+attribute [local irreducible] hVal heapPtrValid in
 theorem ht_count_correct :
     ht_count_spec.satisfiedBy HashTable.l1_ht_count_body := by
-  sorry
+  unfold FuncSpec.satisfiedBy ht_count_spec validHoare
+  intro s hpre
+  unfold HashTable.l1_ht_count_body
+  have h := L1_guard_modify_throw_catch_skip_result
+    (fun s : ProgramState => heapPtrValid s.globals.rawHeap s.locals.ht)
+    (fun s : ProgramState => { s with locals := { s.locals with ret__val := (hVal s.globals.rawHeap s.locals.ht).count } })
+    s hpre
+  obtain ⟨h_res, h_nf⟩ := h
+  constructor
+  · exact h_nf
+  · intro r s' h_mem _
+    rw [h_res] at h_mem
+    have ⟨hr, hs⟩ := Prod.mk.inj h_mem
+    subst hr; subst hs
+    rw [ht_update_retval_val, ht_update_retval_globals, ht_update_retval_ht]
 
 theorem ht_insert_correct :
     ht_insert_spec.satisfiedBy HashTable.l1_ht_insert_body := by

@@ -104,12 +104,31 @@ def pkt_read_byte_bounds_spec : FuncSpec ProgramState where
 
 /-! # Step 4: validHoare theorems -/
 
+private theorem pp_retval_globals (s : ProgramState) (v : UInt32) :
+    ({ s with locals := { s.locals with ret__val := v } } : ProgramState).globals = s.globals := rfl
+private theorem pp_retval_buf (s : ProgramState) (v : UInt32) :
+    ({ s with locals := { s.locals with ret__val := v } } : ProgramState).locals.buf = s.locals.buf := rfl
+private theorem pp_retval_val (s : ProgramState) (v : UInt32) :
+    ({ s with locals := { s.locals with ret__val := v } } : ProgramState).locals.ret__val = v := rfl
+
+attribute [local irreducible] hVal heapPtrValid in
 theorem pkt_buffer_length_satisfies_spec :
     pkt_buffer_length_spec.satisfiedBy (l1_pkt_buffer_length_body) := by
-  unfold FuncSpec.satisfiedBy pkt_buffer_length_spec
-  unfold validHoare
+  unfold FuncSpec.satisfiedBy pkt_buffer_length_spec validHoare
   intro s hpre
-  sorry -- Requires: heap read for single field
+  unfold PacketParser.l1_pkt_buffer_length_body
+  have h := L1_guard_modify_throw_catch_skip_result
+    (fun s : ProgramState => heapPtrValid s.globals.rawHeap s.locals.buf)
+    (fun s : ProgramState => { s with locals := { s.locals with ret__val := (hVal s.globals.rawHeap s.locals.buf).length } })
+    s hpre
+  obtain ⟨h_res, h_nf⟩ := h
+  constructor
+  · exact h_nf
+  · intro r s' h_mem _
+    rw [h_res] at h_mem
+    have ⟨hr, hs⟩ := Prod.mk.inj h_mem
+    subst hr; subst hs
+    rw [pp_retval_val, pp_retval_globals, pp_retval_buf]
 
 theorem ipv4_is_tcp_satisfies_spec :
     ipv4_is_tcp_spec.satisfiedBy (l1_ipv4_is_tcp_body) := by

@@ -46,11 +46,40 @@ def isMinHeap (data : Nat → Nat) (size : Nat) : Prop :=
     (2 * i + 2 < size → data i ≤ data (2 * i + 2))
 
 /-- The minimum element is at index 0. -/
+private theorem minHeap_root_is_min_aux (data : Nat → Nat) (size : Nat)
+    (h_heap : isMinHeap data size) (h_pos : size > 0) :
+    ∀ n i, i < size → i ≤ n → data 0 ≤ data i := by
+  intro n
+  induction n with
+  | zero =>
+    intro i h_i_lt h_le
+    have : i = 0 := by omega
+    subst this; exact Nat.le_refl _
+  | succ n ih =>
+    intro i h_i_lt h_le
+    match i with
+    | 0 => exact Nat.le_refl _
+    | i + 1 =>
+      -- parent of (i+1) is i / 2, and i / 2 ≤ n since i + 1 ≤ n + 1
+      have h_parent_le_n : i / 2 ≤ n := by omega
+      have h_parent_lt_size : i / 2 < size := by omega
+      have h_root_le_parent := ih (i / 2) h_parent_lt_size h_parent_le_n
+      have h_heap_parent := h_heap (i / 2) h_parent_lt_size
+      by_cases h_odd : i + 1 = 2 * (i / 2) + 1
+      · have h_le := h_heap_parent.1 (by omega : 2 * (i / 2) + 1 < size)
+        calc data 0 ≤ data (i / 2) := h_root_le_parent
+          _ ≤ data (2 * (i / 2) + 1) := h_le
+          _ = data (i + 1) := by rw [h_odd]
+      · have h_even : i + 1 = 2 * (i / 2) + 2 := by omega
+        have h_le := h_heap_parent.2 (by omega : 2 * (i / 2) + 2 < size)
+        calc data 0 ≤ data (i / 2) := h_root_le_parent
+          _ ≤ data (2 * (i / 2) + 2) := h_le
+          _ = data (i + 1) := by rw [h_even]
+
 theorem minHeap_root_is_min (data : Nat → Nat) (size : Nat)
     (h_heap : isMinHeap data size) (h_pos : size > 0) :
-    ∀ i, i < size → data 0 ≤ data i := by
-  -- This requires induction on the path from root to i
-  sorry
+    ∀ i, i < size → data 0 ≤ data i :=
+  fun i h => minHeap_root_is_min_aux data size h_heap h_pos i i h (Nat.le_refl _)
 
 /-! # Step 4: FuncSpecs -/
 
@@ -119,9 +148,31 @@ theorem pq_init_correct :
     pq_init_spec.satisfiedBy PriorityQueue.l1_pq_init_body := by
   sorry
 
+private theorem pq_retval_globals (s : ProgramState) (v : UInt32) :
+    ({ s with locals := { s.locals with ret__val := v } } : ProgramState).globals = s.globals := rfl
+private theorem pq_retval_pq (s : ProgramState) (v : UInt32) :
+    ({ s with locals := { s.locals with ret__val := v } } : ProgramState).locals.pq = s.locals.pq := rfl
+private theorem pq_retval_val (s : ProgramState) (v : UInt32) :
+    ({ s with locals := { s.locals with ret__val := v } } : ProgramState).locals.ret__val = v := rfl
+
+attribute [local irreducible] hVal heapPtrValid in
 theorem pq_size_correct :
     pq_size_spec.satisfiedBy PriorityQueue.l1_pq_size_body := by
-  sorry
+  unfold FuncSpec.satisfiedBy pq_size_spec validHoare
+  intro s hpre
+  unfold PriorityQueue.l1_pq_size_body
+  have h := L1_guard_modify_throw_catch_skip_result
+    (fun s : ProgramState => heapPtrValid s.globals.rawHeap s.locals.pq)
+    (fun s : ProgramState => { s with locals := { s.locals with ret__val := (hVal s.globals.rawHeap s.locals.pq).size } })
+    s hpre
+  obtain ⟨h_res, h_nf⟩ := h
+  constructor
+  · exact h_nf
+  · intro r s' h_mem _
+    rw [h_res] at h_mem
+    have ⟨hr, hs⟩ := Prod.mk.inj h_mem
+    subst hr; subst hs
+    rw [pq_retval_val, pq_retval_globals, pq_retval_pq]
 
 theorem pq_is_empty_correct :
     pq_is_empty_spec.satisfiedBy PriorityQueue.l1_pq_is_empty_body := by

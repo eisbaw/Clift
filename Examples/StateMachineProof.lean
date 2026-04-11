@@ -161,8 +161,56 @@ theorem conn_init_correct :
 
 theorem conn_state_valid_correct :
     conn_state_valid_spec.satisfiedBy StateMachine.l1_conn_state_valid_body := by
-  sorry
+  unfold FuncSpec.satisfiedBy conn_state_valid_spec validHoare
+  intro s _
+  -- l1_conn_state_valid_body is L1.catch (L1.seq (L1.modify f) L1.throw) L1.skip
+  -- where f sets ret__val := if state < 6 then 1 else 0
+  -- Use the modify-throw-catch-skip result pattern
+  unfold StateMachine.l1_conn_state_valid_body
+  have h := L1_modify_throw_catch_skip_result
+    (fun s : ProgramState => { s with locals := { s.locals with ret__val := (if s.locals.state < 6 then 1 else 0) } })
+    s
+  obtain ⟨h_res, h_nf⟩ := h
+  constructor
+  · exact h_nf
+  · intro r s' h_mem
+    rw [h_res] at h_mem
+    have ⟨hr, hs⟩ := Prod.mk.inj h_mem
+    subst hr; subst hs
+    intro _
+    simp only
+    constructor
+    · intro h_lt; simp [h_lt]
+    · intro h_ge; simp [h_ge]
 
+-- Projection lemma: updating ret__val doesn't change globals
+private theorem update_retval_globals (s : ProgramState) (v : UInt32) :
+    ({ s with locals := { s.locals with ret__val := v } } : ProgramState).globals = s.globals := rfl
+
+-- Projection lemma: updating ret__val doesn't change locals.conn
+private theorem update_retval_conn (s : ProgramState) (v : UInt32) :
+    ({ s with locals := { s.locals with ret__val := v } } : ProgramState).locals.conn = s.locals.conn := rfl
+
+-- Projection lemma: updating ret__val gives back v
+private theorem update_retval_val (s : ProgramState) (v : UInt32) :
+    ({ s with locals := { s.locals with ret__val := v } } : ProgramState).locals.ret__val = v := rfl
+
+attribute [local irreducible] hVal heapPtrValid in
 theorem conn_get_state_correct :
     conn_get_state_spec.satisfiedBy StateMachine.l1_conn_get_state_body := by
-  sorry
+  unfold FuncSpec.satisfiedBy conn_get_state_spec validHoare
+  intro s hpre
+  unfold StateMachine.l1_conn_get_state_body
+  have h := L1_guard_modify_throw_catch_skip_result
+    (fun s : ProgramState => heapPtrValid s.globals.rawHeap s.locals.conn)
+    (fun s : ProgramState => { s with locals := { s.locals with ret__val := (hVal s.globals.rawHeap s.locals.conn).state } })
+    s hpre
+  obtain ⟨h_res, h_nf⟩ := h
+  constructor
+  · exact h_nf
+  · intro r s' h_mem
+    rw [h_res] at h_mem
+    have ⟨hr, hs⟩ := Prod.mk.inj h_mem
+    subst hr; subst hs
+    intro _
+    rw [update_retval_val, update_retval_globals, update_retval_conn]

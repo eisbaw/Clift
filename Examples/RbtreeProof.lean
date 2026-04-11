@@ -71,7 +71,20 @@ def BST.insert (key value : Nat) : BST → BST
 /-- Key property: lookup after insert returns the inserted value. -/
 theorem BST.lookup_insert (t : BST) (k v : Nat) (h_ord : t.ordered) :
     BST.lookup k (BST.insert k v t) = some v := by
-  sorry  -- requires careful induction on BST structure with ordering constraints
+  induction t with
+  | leaf => simp [BST.insert, BST.lookup]
+  | node l k' v' r ih_l ih_r =>
+    unfold BST.insert
+    by_cases h_eq : k = k'
+    · -- k = k': replace value, lookup trivially finds it
+      simp [h_eq, BST.lookup]
+    · by_cases h_lt : k < k'
+      · -- k < k': insert into left, lookup into left
+        simp only [h_eq, ite_false, h_lt, ite_true, BST.lookup]
+        exact ih_l h_ord.2.2.1
+      · -- k > k': insert into right, lookup into right
+        simp only [h_eq, ite_false, h_lt, BST.lookup]
+        exact ih_r h_ord.2.2.2
 
 /-! # Step 4: FuncSpecs -/
 
@@ -107,9 +120,31 @@ def rbt_init_spec : FuncSpec ProgramState where
 
 /-! # Step 5: validHoare theorems -/
 
+private theorem rb_retval_globals (s : ProgramState) (v : UInt32) :
+    ({ s with locals := { s.locals with ret__val := v } } : ProgramState).globals = s.globals := rfl
+private theorem rb_retval_t (s : ProgramState) (v : UInt32) :
+    ({ s with locals := { s.locals with ret__val := v } } : ProgramState).locals.t = s.locals.t := rfl
+private theorem rb_retval_val (s : ProgramState) (v : UInt32) :
+    ({ s with locals := { s.locals with ret__val := v } } : ProgramState).locals.ret__val = v := rfl
+
+attribute [local irreducible] hVal heapPtrValid in
 theorem rbt_count_correct :
     rbt_count_spec.satisfiedBy Rbtree.l1_rbt_count_body := by
-  sorry
+  unfold FuncSpec.satisfiedBy rbt_count_spec validHoare
+  intro s hpre
+  unfold Rbtree.l1_rbt_count_body
+  have h := L1_guard_modify_throw_catch_skip_result
+    (fun s : ProgramState => heapPtrValid s.globals.rawHeap s.locals.t)
+    (fun s : ProgramState => { s with locals := { s.locals with ret__val := (hVal s.globals.rawHeap s.locals.t).count } })
+    s hpre
+  obtain ⟨h_res, h_nf⟩ := h
+  constructor
+  · exact h_nf
+  · intro r s' h_mem _
+    rw [h_res] at h_mem
+    have ⟨hr, hs⟩ := Prod.mk.inj h_mem
+    subst hr; subst hs
+    rw [rb_retval_val, rb_retval_globals, rb_retval_t]
 
 theorem rbt_init_correct :
     rbt_init_spec.satisfiedBy Rbtree.l1_rbt_init_body := by
