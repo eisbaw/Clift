@@ -590,6 +590,11 @@ theorem rb_count_at_or_below_validHoare :
   sorry
 
 -- rb_swap_front_back: multi-step heap mutation (3 checks + 3 writes)
+-- SORRY: The 3 conditions are eliminable (L1_hoare_condition + precondition contradictions).
+-- The guard+modify chain after conditions needs ptrDisjoint(head, rb) and ptrDisjoint(tail, rb)
+-- to show hVal of rb is unchanged after heapUpdate to head/tail nodes.
+-- Without these, the guard predicates at intermediate states cannot be discharged.
+-- Fix: add ptrDisjoint assumptions to rb_swap_front_back_spec.pre.
 theorem rb_swap_front_back_validHoare :
     rb_swap_front_back_spec.satisfiedBy RingBufferExt.l1_rb_swap_front_back_body := by
   sorry

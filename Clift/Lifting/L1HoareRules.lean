@@ -539,4 +539,85 @@ theorem L1_hoare_condition' (c : σ → Bool) (t e : L1Monad σ)
     validHoare P (L1.condition c t e) (fun r s => r = Except.ok () ∧ R s) :=
   L1_hoare_condition c t e P _ h_true h_false
 
+/-! ## L1 merge assignments and fused guard+modify
+
+AutoCorres2's L1_merge_assignments pattern. Instead of proving set equality
+(which is hard), we prove Hoare-level rules that compose guard+modify steps.
+-/
+
+/-- Hoare rule for fused guard+modify (the most common L1 pattern).
+    Proves `{P} guard p; modify f {Q}` in one step. -/
+theorem L1_hoare_guard_modify_fused {σ : Type}
+    {p : σ → Prop} [DecidablePred p] {f : σ → σ}
+    {P : σ → Prop} {Q : Except Unit Unit → σ → Prop}
+    (h_guard : ∀ s, P s → p s)
+    (h_post : ∀ s, P s → Q (Except.ok ()) (f s)) :
+    validHoare P (L1.seq (L1.guard p) (L1.modify f)) Q := by
+  intro s hP
+  have hp := h_guard s hP
+  have h_gm := L1_guard_modify_result p f s hp
+  constructor
+  · exact h_gm.2
+  · intro r s' h_mem
+    rw [h_gm.1] at h_mem
+    have ⟨hr, hs⟩ := Prod.mk.inj h_mem
+    rw [hr, hs]; exact h_post s hP
+
+/-- Chain two guard+modify pairs: `{P} guard p; modify f; guard q; modify g {Q}`.
+    The guards and modifies compose: q is checked on f(s), not on s. -/
+theorem L1_hoare_guard_modify_chain2 {σ : Type}
+    {p : σ → Prop} [DecidablePred p] {f : σ → σ}
+    {q : σ → Prop} [DecidablePred q] {g : σ → σ}
+    {P : σ → Prop} {Q : Except Unit Unit → σ → Prop}
+    (h_p : ∀ s, P s → p s)
+    (h_q : ∀ s, P s → q (f s))
+    (h_post : ∀ s, P s → Q (Except.ok ()) (g (f s))) :
+    validHoare P (L1.seq (L1.guard p) (L1.seq (L1.modify f)
+                 (L1.seq (L1.guard q) (L1.modify g)))) Q := by
+  -- Split: m₁ = guard p, m₂ = seq (modify f) (seq (guard q) (modify g))
+  apply L1_hoare_seq_ok (R := fun s => P s)
+  · -- guard p preserves P (and we know p holds)
+    apply L1_hoare_pre (P := fun s => p s ∧ P s)
+    · intro s hP; exact ⟨h_p s hP, hP⟩
+    · exact L1_hoare_guard' p P
+  · -- seq (modify f) (seq (guard q) (modify g)) from P establishes Q
+    apply L1_hoare_seq_ok (R := fun s => ∃ s₀, P s₀ ∧ s = f s₀)
+    · -- modify f: P s → (∃ s₀, P s₀ ∧ f s = f s₀)
+      apply L1_hoare_pre (P := fun s => (∃ s₀, P s₀ ∧ f s = f s₀))
+      · intro s hP; exact ⟨s, hP, rfl⟩
+      · exact L1_hoare_modify' f (fun s => ∃ s₀, P s₀ ∧ s = f s₀)
+    · -- guard q; modify g from R establishes Q
+      apply L1_hoare_guard_modify_fused
+      · rintro s ⟨s₀, hP, rfl⟩; exact h_q s₀ hP
+      · rintro s ⟨s₀, hP, rfl⟩; exact h_post s₀ hP
+
+/-- Chain three guard+modify pairs. -/
+theorem L1_hoare_guard_modify_chain3 {σ : Type}
+    {p₁ : σ → Prop} [DecidablePred p₁] {f₁ : σ → σ}
+    {p₂ : σ → Prop} [DecidablePred p₂] {f₂ : σ → σ}
+    {p₃ : σ → Prop} [DecidablePred p₃] {f₃ : σ → σ}
+    {P : σ → Prop} {Q : Except Unit Unit → σ → Prop}
+    (h_p₁ : ∀ s, P s → p₁ s)
+    (h_p₂ : ∀ s, P s → p₂ (f₁ s))
+    (h_p₃ : ∀ s, P s → p₃ (f₂ (f₁ s)))
+    (h_post : ∀ s, P s → Q (Except.ok ()) (f₃ (f₂ (f₁ s)))) :
+    validHoare P (L1.seq (L1.guard p₁) (L1.seq (L1.modify f₁)
+                 (L1.seq (L1.guard p₂) (L1.seq (L1.modify f₂)
+                 (L1.seq (L1.guard p₃) (L1.modify f₃)))))) Q := by
+  -- Split: m₁ = guard p₁, m₂ = rest
+  apply L1_hoare_seq_ok (R := fun s => P s)
+  · apply L1_hoare_pre (P := fun s => p₁ s ∧ P s)
+    · intro s hP; exact ⟨h_p₁ s hP, hP⟩
+    · exact L1_hoare_guard' p₁ P
+  · -- seq (modify f₁) (seq (guard p₂) (seq (modify f₂) (seq (guard p₃) (modify f₃))))
+    apply L1_hoare_seq_ok (R := fun s => ∃ s₀, P s₀ ∧ s = f₁ s₀)
+    · apply L1_hoare_pre (P := fun s => (∃ s₀, P s₀ ∧ f₁ s = f₁ s₀))
+      · intro s hP; exact ⟨s, hP, rfl⟩
+      · exact L1_hoare_modify' f₁ (fun s => ∃ s₀, P s₀ ∧ s = f₁ s₀)
+    · -- chain2: guard p₂; modify f₂; guard p₃; modify f₃ from R
+      apply L1_hoare_guard_modify_chain2
+      · rintro s ⟨s₀, hP, rfl⟩; exact h_p₂ s₀ hP
+      · rintro s ⟨s₀, hP, rfl⟩; exact h_p₃ s₀ hP
+      · rintro s ⟨s₀, hP, rfl⟩; exact h_post s₀ hP
+
 end L1Hoare
