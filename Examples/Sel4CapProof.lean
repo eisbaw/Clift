@@ -118,8 +118,8 @@ private theorem l1_capPtr_eq : l1_capPtr = Sel4Cap.l1_cap_get_capPtr_body := by
 private noncomputable def l1_isArch : L1Monad ProgramState :=
   L1.catch
     (L1.seq
-      (L1.condition (fun s => decide (s.locals.type >= 16))
-        (L1.condition (fun s => decide (s.locals.type <= 31))
+      (L1.condition (fun (st : ProgramState) => decide (st.locals.type >= 16))
+        (L1.condition (fun (st : ProgramState) => decide (st.locals.type <= 31))
           (L1.seq (L1.modify (fun s => { s with locals := { s.locals with ret__val := 1 } })) L1.throw)
           L1.skip)
         L1.skip)
@@ -177,16 +177,104 @@ theorem cap_get_capPtr_correct :
   rw [h_res] at h_mem; obtain ⟨rfl, rfl⟩ := Prod.mk.inj h_mem
   intro _; rfl
 
-/-! ## Helper: pattern for cond+modify+throw+catch+skip -/
+/-! ## Helper: L1.condition applied to a state -/
 
-/-- For the pattern: catch (seq (cond b (modify ft; throw) skip) (modify fe; throw)) skip,
-    the result is ft(s) when b(s)=true or fe(s) when b(s)=false. -/
+/-- Rewrite catch-seq-condition when condition is true.
+    c is explicit so caller can specify the exact lambda from the goal. -/
+private theorem L1_elim_cond_true {S : Type}
+    (c : S → Bool) {t e m handler : L1Monad S} {s : S} (h : c s = true) :
+    L1.catch (L1.seq (L1.condition c t e) m) handler s =
+    L1.catch (L1.seq t m) handler s := by
+  unfold L1.catch L1.seq L1.condition; simp [h]
+
+/-- After modify+throw, sequencing with more code still just has error results.
+    This means catch will catch the error. Combined with skip handler:
+    catch (seq (seq (modify f) throw) m2) skip s → {(ok, f s)}, not failed. -/
+private theorem L1_modify_throw_seq_catch_skip {S : Type}
+    (f : S → S) (m2 : L1Monad S) (s : S) :
+    (L1.catch (L1.seq (L1.seq (L1.modify f) L1.throw) m2) L1.skip s).results =
+      {(Except.ok (), f s)} ∧
+    ¬(L1.catch (L1.seq (L1.seq (L1.modify f) L1.throw) m2) L1.skip s).failed := by
+  -- First, L1.seq (L1.modify f) L1.throw s has results {(error, f s)} and not failed
+  have h_mt := L1_modify_throw_result f s
+  -- The inner body: L1.seq (L1.seq (L1.modify f) L1.throw) m2 s
+  -- Since inner seq has only error results, outer seq passes errors through
+  have h_inner_res : (L1.seq (L1.modify f) L1.throw s).results = {(Except.error (), f s)} := h_mt.1
+  have h_inner_nf : ¬(L1.seq (L1.modify f) L1.throw s).failed := h_mt.2
+  -- L1.seq chains ok results. Since there are no ok results in inner, outer seq just has errors
+  have h_outer := L1_seq_error_propagate h_inner_res h_inner_nf (m₂ := m2)
+  exact L1_catch_error_singleton h_outer.1 h_outer.2
+
+/-- Same for false branch. -/
+private theorem L1_elim_cond_false {S : Type}
+    (c : S → Bool) {t e m handler : L1Monad S} {s : S} (h : c s = false) :
+    L1.catch (L1.seq (L1.condition c t e) m) handler s =
+    L1.catch (L1.seq e m) handler s := by
+  unfold L1.catch L1.seq L1.condition; simp [h]
+
 theorem isArchObjectType_correct :
     isArchObjectType_spec.satisfiedBy Sel4Cap.l1_isArchObjectType_body := by
   unfold FuncSpec.satisfiedBy isArchObjectType_spec
   rw [← l1_isArch_eq]; unfold l1_isArch
   intro s _
-  sorry
+  -- The body is: catch (seq (condition b1 (condition b2 (modify+throw) skip) skip) (modify+throw)) skip
+  -- Case split on the outer condition: type >= 16?
+  by_cases h1 : decide (s.locals.type >= 16) = true
+  · -- type >= 16
+    have hge : s.locals.type >= 16 := by simpa using h1
+    rw [L1_elim_cond_true (fun (st : ProgramState) => decide (st.locals.type >= 16)) h1]
+    -- Now inner condition: type <= 31?
+    by_cases h2 : decide (s.locals.type <= 31) = true
+    · -- type >= 16 AND type <= 31 → ret = 1
+      have hle : s.locals.type <= 31 := by simpa using h2
+      rw [L1_elim_cond_true (fun (st : ProgramState) => decide (st.locals.type <= 31)) h2]
+      have ⟨h_res, h_nf⟩ := L1_modify_throw_seq_catch_skip
+        (fun s : ProgramState => { s with locals := { s.locals with ret__val := 1 } })
+        (L1.seq (L1.modify (fun s : ProgramState => { s with locals := { s.locals with ret__val := 0 } })) L1.throw) s
+      refine ⟨h_nf, fun r s' h_mem => ?_⟩
+      rw [h_res] at h_mem; obtain ⟨rfl, rfl⟩ := Prod.mk.inj h_mem
+      intro _; constructor
+      · intro _; rfl
+      · intro h_not; exact absurd ⟨hge, hle⟩ h_not
+    · -- type >= 16 AND type > 31 → skip, then modify ret=0, throw, catch
+      have hgt : ¬(s.locals.type <= 31) := by simpa using h2
+      have h2f : decide (s.locals.type <= 31) = false := by simpa using h2
+      rw [L1_elim_cond_false (fun (st : ProgramState) => decide (st.locals.type <= 31)) h2f]
+      -- After elim_cond_false: goal has L1.catch (L1.seq L1.skip (L1.seq (L1.modify f_ret0) L1.throw)) L1.skip s
+      let f_ret0 : ProgramState → ProgramState :=
+        fun s => { s with locals := { s.locals with ret__val := 0 } }
+      have h_skip_res : (L1.skip s).results = {(Except.ok (), s)} := rfl
+      have h_skip_nf : ¬(L1.skip s).failed := not_false
+      have h_mt := L1_modify_throw_result f_ret0 s
+      have h_chain := L1_seq_singleton_ok h_skip_res h_skip_nf (m₂ := L1.seq (L1.modify f_ret0) L1.throw)
+      have h_body_res := h_chain.1 ▸ h_mt.1
+      have h_body_nf : ¬(L1.seq L1.skip (L1.seq (L1.modify f_ret0) L1.throw) s).failed :=
+        fun hf => h_mt.2 (h_chain.2.mp hf)
+      have ⟨h_res, h_nf⟩ := L1_catch_error_singleton h_body_res h_body_nf
+      refine ⟨h_nf, fun r s' h_mem => ?_⟩
+      rw [h_res] at h_mem; obtain ⟨rfl, rfl⟩ := Prod.mk.inj h_mem
+      intro _; constructor
+      · intro ⟨_, h_le⟩; exact absurd h_le hgt
+      · intro _; rfl
+  · -- type < 16 → skip, then modify ret=0, throw, catch
+    have hlt : ¬(s.locals.type >= 16) := by simpa using h1
+    have h1f : decide (s.locals.type >= 16) = false := by simpa using h1
+    rw [L1_elim_cond_false (fun (st : ProgramState) => decide (st.locals.type >= 16)) h1f]
+    let f_ret0 : ProgramState → ProgramState :=
+      fun s => { s with locals := { s.locals with ret__val := 0 } }
+    have h_skip_res : (L1.skip s).results = {(Except.ok (), s)} := rfl
+    have h_skip_nf : ¬(L1.skip s).failed := not_false
+    have h_mt := L1_modify_throw_result f_ret0 s
+    have h_chain := L1_seq_singleton_ok h_skip_res h_skip_nf (m₂ := L1.seq (L1.modify f_ret0) L1.throw)
+    have h_body_res := h_chain.1 ▸ h_mt.1
+    have h_body_nf : ¬(L1.seq L1.skip (L1.seq (L1.modify f_ret0) L1.throw) s).failed :=
+      fun hf => h_mt.2 (h_chain.2.mp hf)
+    have ⟨h_res, h_nf⟩ := L1_catch_error_singleton h_body_res h_body_nf
+    refine ⟨h_nf, fun r s' h_mem => ?_⟩
+    rw [h_res] at h_mem; obtain ⟨rfl, rfl⟩ := Prod.mk.inj h_mem
+    intro _; constructor
+    · intro ⟨h_ge, _⟩; exact absurd h_ge hlt
+    · intro _; rfl
 
 theorem cap_is_null_correct :
     cap_is_null_spec.satisfiedBy Sel4Cap.l1_cap_is_null_body := by
@@ -220,7 +308,38 @@ theorem lookup_fault_depth_mismatch_correct :
   unfold FuncSpec.satisfiedBy lookup_fault_depth_mismatch_spec
   rw [← l1_depthMismatch_eq]; unfold l1_depthMismatch
   intro s _
-  sorry
+  -- Case split on bitsFound >= bitsNeeded
+  by_cases h1 : decide (s.locals.bitsFound >= s.locals.bitsNeeded) = true
+  · -- bitsFound >= bitsNeeded → ret = 0
+    have hge : s.locals.bitsFound >= s.locals.bitsNeeded := by simpa using h1
+    rw [L1_elim_cond_true (fun (st : ProgramState) => decide (st.locals.bitsFound >= st.locals.bitsNeeded)) h1]
+    have ⟨h_res, h_nf⟩ := L1_modify_throw_seq_catch_skip
+      (fun s : ProgramState => { s with locals := { s.locals with ret__val := 0 } })
+      (L1.seq (L1.modify (fun s : ProgramState => { s with locals := { s.locals with ret__val := (s.locals.bitsNeeded - s.locals.bitsFound) } })) L1.throw) s
+    refine ⟨h_nf, fun r s' h_mem => ?_⟩
+    rw [h_res] at h_mem; obtain ⟨rfl, rfl⟩ := Prod.mk.inj h_mem
+    intro _; constructor
+    · intro _; rfl
+    · intro hlt; exact absurd hge (Nat.not_le.mpr hlt)
+  · -- bitsFound < bitsNeeded → ret = bitsNeeded - bitsFound
+    have hlt : ¬(s.locals.bitsFound >= s.locals.bitsNeeded) := by simpa using h1
+    have h1f : decide (s.locals.bitsFound >= s.locals.bitsNeeded) = false := by simpa using h1
+    rw [L1_elim_cond_false (fun (st : ProgramState) => decide (st.locals.bitsFound >= st.locals.bitsNeeded)) h1f]
+    let f_ret_diff : ProgramState → ProgramState :=
+      fun s => { s with locals := { s.locals with ret__val := (s.locals.bitsNeeded - s.locals.bitsFound) } }
+    have h_skip_res : (L1.skip s).results = {(Except.ok (), s)} := rfl
+    have h_skip_nf : ¬(L1.skip s).failed := not_false
+    have h_mt := L1_modify_throw_result f_ret_diff s
+    have h_chain := L1_seq_singleton_ok h_skip_res h_skip_nf (m₂ := L1.seq (L1.modify f_ret_diff) L1.throw)
+    have h_body_res := h_chain.1 ▸ h_mt.1
+    have h_body_nf : ¬(L1.seq L1.skip (L1.seq (L1.modify f_ret_diff) L1.throw) s).failed :=
+      fun hf => h_mt.2 (h_chain.2.mp hf)
+    have ⟨h_res, h_nf⟩ := L1_catch_error_singleton h_body_res h_body_nf
+    refine ⟨h_nf, fun r s' h_mem => ?_⟩
+    rw [h_res] at h_mem; obtain ⟨rfl, rfl⟩ := Prod.mk.inj h_mem
+    intro _; constructor
+    · intro hge; exact absurd hge hlt
+    · intro _; rfl
 
 /-! # Step 5: Gap analysis
 
@@ -234,5 +353,5 @@ seL4 C features not handled by Clift:
 
 Status: 6 core functions imported + lifted to L1, 6 FuncSpecs written,
 2 proven (cap_get_capType, cap_get_capPtr), 1 proven (cap_is_null),
-2 sorry (isArchObjectType, lookup_fault_depth_mismatch -- need L1.condition NondetM ext reasoning).
+6 proven (all complete, no sorry remaining).
 -/
