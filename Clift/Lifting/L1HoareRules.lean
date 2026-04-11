@@ -475,4 +475,68 @@ theorem L1_hoare_while {σ : Type} {c : σ → Bool} {body : L1Monad σ}
     intro r s₁ h_mem
     exact L1_while_result_of_inv h_body_inv h_exit h_abrupt s₀ (r, s₁) h_I₀ h_mem
 
+/-- Combined guard+modify Hoare rule.
+    When the precondition implies the guard predicate p, and Q holds at (f s),
+    then validHoare holds for seq (guard p) (modify f).
+    This handles the most common L1 pattern in a single step. -/
+theorem L1_hoare_guard_modify (p : σ → Prop) [DecidablePred p] (f : σ → σ)
+    (Q : Except Unit Unit → σ → Prop)
+    (h : ∀ s, p s → Q (Except.ok ()) (f s)) :
+    validHoare (fun s => p s) (L1.seq (L1.guard p) (L1.modify f)) Q := by
+  intro s₀ hp
+  have h_gm := L1_guard_modify_result p f s₀ hp
+  constructor
+  · exact h_gm.2
+  · intro r s₁ h_mem
+    rw [h_gm.1] at h_mem
+    have ⟨hr, hs⟩ := Prod.mk.inj h_mem
+    rw [hr, hs]; exact h s₀ hp
+
+/-- Combined guard+modify producing r = ok ∧ R form (for seq_ok chains). -/
+theorem L1_hoare_guard_modify' (p : σ → Prop) [DecidablePred p] (f : σ → σ) (R : σ → Prop)
+    (h : ∀ s, p s → R (f s)) :
+    validHoare (fun s => p s) (L1.seq (L1.guard p) (L1.modify f))
+      (fun r s => r = Except.ok () ∧ R s) := by
+  intro s₀ hp
+  have h_gm := L1_guard_modify_result p f s₀ hp
+  constructor
+  · exact h_gm.2
+  · intro r s₁ h_mem
+    rw [h_gm.1] at h_mem
+    have ⟨hr, hs⟩ := Prod.mk.inj h_mem
+    exact ⟨hr, hs ▸ h s₀ hp⟩
+
+/-- Post-weakening: strengthen postcondition from True to any trivially-true Q.
+    When the postcondition Q holds for all r and s, and we can prove validHoare P m True,
+    then validHoare P m Q follows. Useful when specs have tautological postconditions. -/
+theorem L1_hoare_weaken_trivial_post
+    {P : σ → Prop} {Q : Except Unit Unit → σ → Prop}
+    {m : L1Monad σ}
+    (hQ : ∀ r s, Q r s)
+    (h : validHoare P m (fun _ _ => True)) :
+    validHoare P m Q := by
+  intro s₀ hpre
+  have ⟨h_nf, _⟩ := h s₀ hpre
+  exact ⟨h_nf, fun r s₁ _ => hQ r s₁⟩
+
+/-- L1.condition Hoare rule: when the condition is decidable, prove both branches. -/
+theorem L1_hoare_condition (c : σ → Bool) (t e : L1Monad σ)
+    (P : σ → Prop) (Q : Except Unit Unit → σ → Prop)
+    (h_true : validHoare (fun s => P s ∧ c s = true) t Q)
+    (h_false : validHoare (fun s => P s ∧ c s = false) e Q) :
+    validHoare P (L1.condition c t e) Q := by
+  intro s₀ hpre
+  simp only [L1.condition]
+  cases hc : c s₀ with
+  | false => exact h_false s₀ ⟨hpre, hc⟩
+  | true => exact h_true s₀ ⟨hpre, hc⟩
+
+/-- L1.condition Hoare rule with ok-only postcondition (for seq_ok chains). -/
+theorem L1_hoare_condition' (c : σ → Bool) (t e : L1Monad σ)
+    (P : σ → Prop) (R : σ → Prop)
+    (h_true : validHoare (fun s => P s ∧ c s = true) t (fun r s => r = Except.ok () ∧ R s))
+    (h_false : validHoare (fun s => P s ∧ c s = false) e (fun r s => r = Except.ok () ∧ R s)) :
+    validHoare P (L1.condition c t e) (fun r s => r = Except.ok () ∧ R s) :=
+  L1_hoare_condition c t e P _ h_true h_false
+
 end L1Hoare

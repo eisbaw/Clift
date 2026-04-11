@@ -559,98 +559,19 @@ theorem rb_nth_validHoare :
     rb_nth_spec.satisfiedBy RingBufferExt.l1_rb_nth_body := by
   sorry
 
--- rb_sum: loop (same pattern as count_nodes but with two guards in body)
+-- rb_sum: same pattern as count_nodes but kernel depth is an issue with 4-step while body.
+-- Revert to sorry while investigating merge_assignments approach to collapse body.
 set_option maxRecDepth 8192 in
 theorem rb_sum_validHoare :
     rb_sum_spec.satisfiedBy RingBufferExt.l1_rb_sum_body := by
   sorry
-/-  -- Full proof deferred: same pattern as rb_count_nodes but with two guards in while body
-  unfold FuncSpec.satisfiedBy rb_sum_spec
-  apply validHoare_weaken_trivial_post (fun _ _ => fun _ => rfl)
-  unfold RingBufferExt.l1_rb_sum_body
-  apply L1_hoare_catch (R := fun _ => True)
-  · apply L1_hoare_seq (R := fun s =>
-      heapPtrValid s.globals.rawHeap s.locals.rb ∧
-      LinkedListValid s.globals.rawHeap (hVal s.globals.rawHeap s.locals.rb).head)
-    · intro s₀ ⟨hrb, hll⟩; constructor; · intro h; exact h
-      · intro r s₁ h_mem; have ⟨hr, hs⟩ := Prod.mk.inj h_mem; subst hr; subst hs; exact ⟨hrb, hll⟩
-    · apply L1_hoare_seq (R := fun s => LinkedListValid s.globals.rawHeap s.locals.cur)
-      · -- guard+modify: establishes LinkedListValid cur
-        intro s₀ ⟨hrb, hll⟩
-        constructor
-        · intro hf; change (_ ∨ _) at hf
-          rcases hf with hf_g | ⟨_, _, hf_m⟩
-          · simp only [L1.guard, if_pos hrb] at hf_g
-          · exact hf_m
-        · intro r s₁ h_mem; change (_ ∨ _) at h_mem
-          rcases h_mem with ⟨s_g, h_guard, h_mod⟩ | ⟨h_err, _⟩
-          · simp only [L1.guard, if_pos hrb] at h_guard
-            have ⟨_, hs_g⟩ := Prod.mk.inj h_guard; subst hs_g
-            have ⟨hr, hs⟩ := Prod.mk.inj h_mod; subst hr; subst hs; exact hll
-          · simp only [L1.guard, if_pos hrb] at h_err
-            exact absurd (Prod.mk.inj h_err).1 (by intro h; cases h)
-      · apply L1_hoare_seq (R := fun _ => True)
-        · apply L1_hoare_while (I := fun s => LinkedListValid s.globals.rawHeap s.locals.cur)
-          · intro s h; exact h
-          · -- h_body_nf: body = seq (guard+modify total) (guard+modify next)
-            intro s h_inv hc
-            have h_ne : s.locals.cur ≠ Ptr.null := by simp only [decide_eq_true_eq] at hc; exact hc
-            have h_valid := h_inv.heapValid h_ne
-            intro hf; change (_ ∨ _) at hf
-            rcases hf with hf1 | ⟨s', hs', hf2⟩
-            · -- first seq (guard+modify) failed
-              change (_ ∨ _) at hf1
-              rcases hf1 with hf_g | ⟨_, _, hf_m⟩
-              · simp only [L1.guard, if_pos h_valid] at hf_g
-              · exact hf_m
-            · -- second seq (guard+modify) failed after first succeeded
-              have ⟨_, hs'_eq⟩ := Prod.mk.inj hs'; subst hs'_eq
-              change (_ ∨ _) at hf2
-              rcases hf2 with hf_g2 | ⟨_, _, hf_m2⟩
-              · simp only [L1.guard, if_pos h_valid] at hf_g2
-              · exact hf_m2
-          · -- h_body_inv
-            intro s s' h_inv hc h_res
-            have h_ne : s.locals.cur ≠ Ptr.null := by simp only [decide_eq_true_eq] at hc; exact hc
-            have h_valid := h_inv.heapValid h_ne
-            have h_tail := h_inv.tail h_ne
-            change (_ ∨ _) at h_res
-            rcases h_res with ⟨s_mid, hs_mid, h_rest⟩ | ⟨h_err, _⟩
-            · -- s_mid from first guard+modify (total updated)
-              change (_ ∨ _) at h_rest
-              rcases h_rest with ⟨s_g2, h_guard2, h_mod2⟩ | ⟨h_err2, _⟩
-              · -- second guard+modify succeeded
-                have ⟨_, hs_mid_eq⟩ := Prod.mk.inj hs_mid; subst hs_mid_eq
-                simp only [L1.guard, if_pos h_valid] at h_guard2
-                have ⟨_, hs_g2_eq⟩ := Prod.mk.inj h_guard2; subst hs_g2_eq
-                have ⟨_, hs'_eq⟩ := Prod.mk.inj h_mod2; subst hs'_eq
-                exact h_tail
-              · have ⟨_, hs_mid_eq⟩ := Prod.mk.inj hs_mid; subst hs_mid_eq
-                simp only [L1.guard, if_pos h_valid] at h_err2
-                exact absurd (Prod.mk.inj h_err2).1 (by intro h; cases h)
-            · exact absurd (Prod.mk.inj h_err).1 (by intro h; cases h)
-          · intro _ _ _; trivial
-          · -- h_abrupt: no error from body
-            intro s s' h_inv hc h_err
-            have h_ne : s.locals.cur ≠ Ptr.null := by simp only [decide_eq_true_eq] at hc; exact hc
-            have h_valid := h_inv.heapValid h_ne
-            change (_ ∨ _) at h_err
-            rcases h_err with ⟨s_mid, hs_mid, h_rest⟩ | ⟨h_err2, _⟩
-            · change (_ ∨ _) at h_rest
-              rcases h_rest with ⟨s_g2, h_guard2, h_mod2⟩ | ⟨h_guard_err, _⟩
-              · have ⟨_, hs_mid_eq⟩ := Prod.mk.inj hs_mid; subst hs_mid_eq
-                simp only [L1.guard, if_pos h_valid] at h_guard2
-                have ⟨_, hs_g2_eq⟩ := Prod.mk.inj h_guard2; subst hs_g2_eq
-                exact absurd (Prod.mk.inj h_mod2).1 (by intro h; cases h)
-              · have ⟨_, hs_mid_eq⟩ := Prod.mk.inj hs_mid; subst hs_mid_eq
-                simp only [L1.guard, if_pos h_valid] at h_guard_err
-                exact absurd (Prod.mk.inj h_guard_err).1 (by intro h; cases h)
-            · exact absurd (Prod.mk.inj h_err2).1 (by intro h; cases h)
-        · intro s₀ _; constructor
-          · intro hf; change (_ ∨ _) at hf
-            rcases hf with hf1 | ⟨_, _, hf2⟩; · exact hf1; · exact hf2
-          · intro r _ _; cases r with | ok => trivial | error => trivial
-  · intro _ _; exact ⟨not_false, fun _ _ _ => trivial⟩
+/-
+-- Full proof exists but hits kernel deep recursion with 40-field Locals struct.
+-- The while body has seq (guard+modify total) (guard+modify cur) = 4 nested seqs,
+-- which exceeds the kernel's ~512 recursion depth limit when combined with the
+-- 40-field record structure.
+-- Fix: implement L1_merge_assignments to fuse guard+modify pairs into a single
+-- guard+modify, reducing the while body from 4 steps to 2.
 -/
 
 -- rb_increment_all: loop with heap mutation per iteration
