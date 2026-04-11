@@ -657,34 +657,174 @@ theorem rb_remaining_validHoare :
     intro _
     rw [rb_retval_val, rb_retval_globals, rb_retval_rb]
 
+/-! ## Helper lemmas for conditional return pattern -/
+
+/-- Rewrite catch-seq-condition when condition is true. -/
+private theorem L1_elim_cond_true
+    (c : ProgramState → Bool) {t e m handler : L1Monad ProgramState}
+    {s : ProgramState} (h : c s = true) :
+    L1.catch (L1.seq (L1.condition c t e) m) handler s =
+    L1.catch (L1.seq t m) handler s := by
+  unfold L1.catch L1.seq L1.condition; simp [h]
+
+/-- Rewrite catch-seq-condition when condition is false. -/
+private theorem L1_elim_cond_false
+    (c : ProgramState → Bool) {t e m handler : L1Monad ProgramState}
+    {s : ProgramState} (h : c s = false) :
+    L1.catch (L1.seq (L1.condition c t e) m) handler s =
+    L1.catch (L1.seq e m) handler s := by
+  unfold L1.catch L1.seq L1.condition; simp [h]
+
+/-- After modify+throw, sequencing with more code still just has error results.
+    Combined with catch+skip: catch (seq (seq (modify f) throw) m2) skip s → {(ok, f s)}. -/
+private theorem L1_modify_throw_seq_catch_skip
+    (f : ProgramState → ProgramState) (m2 : L1Monad ProgramState) (s : ProgramState) :
+    (L1.catch (L1.seq (L1.seq (L1.modify f) L1.throw) m2) L1.skip s).results =
+      {(Except.ok (), f s)} ∧
+    ¬(L1.catch (L1.seq (L1.seq (L1.modify f) L1.throw) m2) L1.skip s).failed := by
+  have h_mt := L1_modify_throw_result f s
+  have h_inner_res : (L1.seq (L1.modify f) L1.throw s).results = {(Except.error (), f s)} := h_mt.1
+  have h_inner_nf : ¬(L1.seq (L1.modify f) L1.throw s).failed := h_mt.2
+  have h_outer := L1_seq_error_propagate h_inner_res h_inner_nf (m₂ := m2)
+  exact L1_catch_error_singleton h_outer.1 h_outer.2
+
 /-! ## Conditional accessor validHoare proofs -/
 
--- Helper for the conditional return pattern:
--- L1.catch (L1.seq (L1.condition c (L1.seq (L1.modify f_true) L1.throw) L1.skip)
---                   (L1.seq (L1.modify f_false) L1.throw)) L1.skip
--- When c is true: produces (ok, f_true s). When c is false: produces (ok, f_false s).
--- L1_cond_return_result: helper for conditional return pattern
--- DEFERRED: needs `show` tactic to expose if-then-else for rewriting.
--- The conditional validHoare proofs (is_empty, is_full, iter_has_next) need
--- this helper + postcondition projections through if-then-else struct updates.
-
--- Conditional accessor validHoare proofs: rb_is_empty, rb_is_full, rb_iter_has_next
--- These need the L1_cond_return_result helper + postcondition case-split on the decide.
--- The postcondition projection through struct update with if-then-else requires
--- careful handling of ProgramState field access that is not trivially automated.
--- DEFERRED: needs a projection lemma suite for if-then-else struct updates.
-
+-- rb_is_empty: catch (seq (cond (count=0) (seq (modify ret=1) throw) skip) (seq (modify ret=0) throw)) skip
+attribute [local irreducible] hVal heapPtrValid in
 theorem rb_is_empty_validHoare :
     rb_is_empty_spec.satisfiedBy l1_rb_is_empty_body := by
-  sorry  -- Needs: conditional return pattern + postcondition projections
+  unfold FuncSpec.satisfiedBy rb_is_empty_spec validHoare
+  intro s _
+  unfold RingBufferExt.l1_rb_is_empty_body
+  by_cases h1 : decide ((hVal s.globals.rawHeap s.locals.rb).count = 0) = true
+  · -- count = 0 → ret = 1
+    have hcount : (hVal s.globals.rawHeap s.locals.rb).count = 0 := by simpa using h1
+    rw [L1_elim_cond_true (fun (st : ProgramState) => decide ((hVal st.globals.rawHeap st.locals.rb).count = 0)) h1]
+    have ⟨h_res, h_nf⟩ := L1_modify_throw_seq_catch_skip
+      (fun s : ProgramState => { s with locals := { s.locals with ret__val := 1 } })
+      (L1.seq (L1.modify (fun s : ProgramState => { s with locals := { s.locals with ret__val := 0 } })) L1.throw) s
+    constructor
+    · exact h_nf
+    · intro r s' h_mem
+      rw [h_res] at h_mem; obtain ⟨rfl, rfl⟩ := Prod.mk.inj h_mem
+      intro _; constructor
+      · intro _; rw [rb_retval_val]
+      · intro hne; rw [rb_retval_globals, rb_retval_rb] at hne; exact absurd hcount hne
+  · -- count ≠ 0 → skip, then ret = 0
+    have hcount : ¬((hVal s.globals.rawHeap s.locals.rb).count = 0) := by simpa using h1
+    have h1f : decide ((hVal s.globals.rawHeap s.locals.rb).count = 0) = false := by simpa using h1
+    rw [L1_elim_cond_false (fun (st : ProgramState) => decide ((hVal st.globals.rawHeap st.locals.rb).count = 0)) h1f]
+    -- After elim_cond_false: catch (seq skip (seq (modify ret=0) throw)) skip s
+    have h_skip_res : (L1.skip s).results = {(Except.ok (), s)} := rfl
+    have h_skip_nf : ¬(L1.skip s).failed := not_false
+    have h_mt := L1_modify_throw_result
+      (fun s : ProgramState => { s with locals := { s.locals with ret__val := 0 } }) s
+    have h_body := L1_seq_singleton_ok h_skip_res h_skip_nf
+      (m₂ := L1.seq (L1.modify (fun s : ProgramState => { s with locals := { s.locals with ret__val := 0 } })) L1.throw)
+    have h_body_res : (L1.seq L1.skip (L1.seq (L1.modify (fun s : ProgramState => { s with locals := { s.locals with ret__val := 0 } })) L1.throw) s).results =
+        {(Except.error (), { s with locals := { s.locals with ret__val := 0 } })} := by
+      rw [h_body.1, h_mt.1]
+    have h_body_nf : ¬(L1.seq L1.skip (L1.seq (L1.modify (fun s : ProgramState => { s with locals := { s.locals with ret__val := 0 } })) L1.throw) s).failed :=
+      fun hf => h_mt.2 (h_body.2.mp hf)
+    have ⟨h_res, h_nf⟩ := L1_catch_error_singleton h_body_res h_body_nf
+    constructor
+    · exact h_nf
+    · intro r s' h_mem
+      rw [h_res] at h_mem; obtain ⟨rfl, rfl⟩ := Prod.mk.inj h_mem
+      intro _; constructor
+      · intro heq; exact absurd heq hcount
+      · intro _; rw [rb_retval_val]
 
+-- rb_is_full: catch (seq (cond (count>=capacity) (seq (modify ret=1) throw) skip) (seq (modify ret=0) throw)) skip
+attribute [local irreducible] hVal heapPtrValid in
 theorem rb_is_full_validHoare :
     rb_is_full_spec.satisfiedBy l1_rb_is_full_body := by
-  sorry  -- Needs: conditional return pattern + postcondition projections
+  unfold FuncSpec.satisfiedBy rb_is_full_spec validHoare
+  intro s _
+  unfold RingBufferExt.l1_rb_is_full_body
+  by_cases h1 : decide ((hVal s.globals.rawHeap s.locals.rb).count >= (hVal s.globals.rawHeap s.locals.rb).capacity) = true
+  · -- count >= capacity → ret = 1
+    have hfull : (hVal s.globals.rawHeap s.locals.rb).count >= (hVal s.globals.rawHeap s.locals.rb).capacity := by simpa using h1
+    rw [L1_elim_cond_true (fun (st : ProgramState) => decide ((hVal st.globals.rawHeap st.locals.rb).count >= (hVal st.globals.rawHeap st.locals.rb).capacity)) h1]
+    have ⟨h_res, h_nf⟩ := L1_modify_throw_seq_catch_skip
+      (fun s : ProgramState => { s with locals := { s.locals with ret__val := 1 } })
+      (L1.seq (L1.modify (fun s : ProgramState => { s with locals := { s.locals with ret__val := 0 } })) L1.throw) s
+    constructor
+    · exact h_nf
+    · intro r s' h_mem
+      rw [h_res] at h_mem; obtain ⟨rfl, rfl⟩ := Prod.mk.inj h_mem
+      intro _; constructor
+      · intro _; rw [rb_retval_val]
+      · intro hlt; rw [rb_retval_globals, rb_retval_rb] at hlt; exact absurd hfull (Nat.not_le.mpr hlt)
+  · -- count < capacity → ret = 0
+    have hnotfull : ¬((hVal s.globals.rawHeap s.locals.rb).count >= (hVal s.globals.rawHeap s.locals.rb).capacity) := by simpa using h1
+    have h1f : decide ((hVal s.globals.rawHeap s.locals.rb).count >= (hVal s.globals.rawHeap s.locals.rb).capacity) = false := by simpa using h1
+    rw [L1_elim_cond_false (fun (st : ProgramState) => decide ((hVal st.globals.rawHeap st.locals.rb).count >= (hVal st.globals.rawHeap st.locals.rb).capacity)) h1f]
+    have h_skip_res : (L1.skip s).results = {(Except.ok (), s)} := rfl
+    have h_skip_nf : ¬(L1.skip s).failed := not_false
+    have h_mt := L1_modify_throw_result
+      (fun s : ProgramState => { s with locals := { s.locals with ret__val := 0 } }) s
+    have h_body := L1_seq_singleton_ok h_skip_res h_skip_nf
+      (m₂ := L1.seq (L1.modify (fun s : ProgramState => { s with locals := { s.locals with ret__val := 0 } })) L1.throw)
+    have h_body_res : (L1.seq L1.skip (L1.seq (L1.modify (fun s : ProgramState => { s with locals := { s.locals with ret__val := 0 } })) L1.throw) s).results =
+        {(Except.error (), { s with locals := { s.locals with ret__val := 0 } })} := by
+      rw [h_body.1, h_mt.1]
+    have h_body_nf : ¬(L1.seq L1.skip (L1.seq (L1.modify (fun s : ProgramState => { s with locals := { s.locals with ret__val := 0 } })) L1.throw) s).failed :=
+      fun hf => h_mt.2 (h_body.2.mp hf)
+    have ⟨h_res, h_nf⟩ := L1_catch_error_singleton h_body_res h_body_nf
+    constructor
+    · exact h_nf
+    · intro r s' h_mem
+      rw [h_res] at h_mem; obtain ⟨rfl, rfl⟩ := Prod.mk.inj h_mem
+      intro _; constructor
+      · intro hge; exact absurd hge hnotfull
+      · intro _; rw [rb_retval_val]
 
+-- rb_iter_has_next: catch (seq (cond (current≠null) (seq (modify ret=1) throw) skip) (seq (modify ret=0) throw)) skip
+attribute [local irreducible] hVal heapPtrValid in
 theorem rb_iter_has_next_validHoare :
     rb_iter_has_next_spec.satisfiedBy l1_rb_iter_has_next_body := by
-  sorry  -- Needs: conditional return pattern + postcondition projections
+  unfold FuncSpec.satisfiedBy rb_iter_has_next_spec validHoare
+  intro s _
+  unfold RingBufferExt.l1_rb_iter_has_next_body
+  by_cases h1 : decide ((hVal s.globals.rawHeap s.locals.iter).current ≠ Ptr.null) = true
+  · -- current ≠ null → ret = 1
+    have hnonnull : (hVal s.globals.rawHeap s.locals.iter).current ≠ Ptr.null := by simpa using h1
+    rw [L1_elim_cond_true (fun (st : ProgramState) => decide ((hVal st.globals.rawHeap st.locals.iter).current ≠ Ptr.null)) h1]
+    have ⟨h_res, h_nf⟩ := L1_modify_throw_seq_catch_skip
+      (fun s : ProgramState => { s with locals := { s.locals with ret__val := 1 } })
+      (L1.seq (L1.modify (fun s : ProgramState => { s with locals := { s.locals with ret__val := 0 } })) L1.throw) s
+    constructor
+    · exact h_nf
+    · intro r s' h_mem
+      rw [h_res] at h_mem; obtain ⟨rfl, rfl⟩ := Prod.mk.inj h_mem
+      intro _; constructor
+      · intro _; rw [rb_retval_val]
+      · intro hnull; rw [rb_retval_globals, rb_retval_iter] at hnull; exact absurd hnull hnonnull
+  · -- current = null → ret = 0
+    have hnull : ¬((hVal s.globals.rawHeap s.locals.iter).current ≠ Ptr.null) := by simpa using h1
+    have h1f : decide ((hVal s.globals.rawHeap s.locals.iter).current ≠ Ptr.null) = false := by simpa using h1
+    rw [L1_elim_cond_false (fun (st : ProgramState) => decide ((hVal st.globals.rawHeap st.locals.iter).current ≠ Ptr.null)) h1f]
+    have h_skip_res : (L1.skip s).results = {(Except.ok (), s)} := rfl
+    have h_skip_nf : ¬(L1.skip s).failed := not_false
+    have h_mt := L1_modify_throw_result
+      (fun s : ProgramState => { s with locals := { s.locals with ret__val := 0 } }) s
+    have h_body := L1_seq_singleton_ok h_skip_res h_skip_nf
+      (m₂ := L1.seq (L1.modify (fun s : ProgramState => { s with locals := { s.locals with ret__val := 0 } })) L1.throw)
+    have h_body_res : (L1.seq L1.skip (L1.seq (L1.modify (fun s : ProgramState => { s with locals := { s.locals with ret__val := 0 } })) L1.throw) s).results =
+        {(Except.error (), { s with locals := { s.locals with ret__val := 0 } })} := by
+      rw [h_body.1, h_mt.1]
+    have h_body_nf : ¬(L1.seq L1.skip (L1.seq (L1.modify (fun s : ProgramState => { s with locals := { s.locals with ret__val := 0 } })) L1.throw) s).failed :=
+      fun hf => h_mt.2 (h_body.2.mp hf)
+    have ⟨h_res, h_nf⟩ := L1_catch_error_singleton h_body_res h_body_nf
+    constructor
+    · exact h_nf
+    · intro r s' h_mem
+      rw [h_res] at h_mem; obtain ⟨rfl, rfl⟩ := Prod.mk.inj h_mem
+      intro _; constructor
+      · intro hne; exact absurd hne hnull
+      · intro _; rw [rb_retval_val]
 
 -- rb_stats_total_ops has 4 identical guards. Build the chain by composing L1_seq_singleton_ok.
 private theorem L1_4guard_modify_throw_catch_skip_result
@@ -817,12 +957,56 @@ theorem rb_remaining_totalHoare :
 /-- totalHoare for rb_is_empty: no UB. -/
 theorem rb_is_empty_totalHoare :
     totalHoare rb_is_empty_spec.pre l1_rb_is_empty_body rb_is_empty_spec.post := by
-  sorry  -- Blocked on rb_is_empty_validHoare
+  constructor
+  · exact rb_is_empty_validHoare
+  · intro s₀ _
+    unfold l1_rb_is_empty_body
+    by_cases h1 : decide ((hVal s₀.globals.rawHeap s₀.locals.rb).count = 0) = true
+    · rw [L1_elim_cond_true (fun (st : ProgramState) => decide ((hVal st.globals.rawHeap st.locals.rb).count = 0)) h1]
+      have ⟨h_res, _⟩ := L1_modify_throw_seq_catch_skip
+        (fun s : ProgramState => { s with locals := { s.locals with ret__val := 1 } })
+        (L1.seq (L1.modify (fun s : ProgramState => { s with locals := { s.locals with ret__val := 0 } })) L1.throw) s₀
+      exact ⟨_, _, by rw [h_res]; rfl⟩
+    · have h1f : decide ((hVal s₀.globals.rawHeap s₀.locals.rb).count = 0) = false := by simpa using h1
+      rw [L1_elim_cond_false (fun (st : ProgramState) => decide ((hVal st.globals.rawHeap st.locals.rb).count = 0)) h1f]
+      have h_mt := L1_modify_throw_result
+        (fun s : ProgramState => { s with locals := { s.locals with ret__val := 0 } }) s₀
+      have h_body := L1_seq_singleton_ok (show (L1.skip s₀).results = {(Except.ok (), s₀)} from rfl) not_false
+        (m₂ := L1.seq (L1.modify (fun s : ProgramState => { s with locals := { s.locals with ret__val := 0 } })) L1.throw)
+      have h_body_res : (L1.seq L1.skip (L1.seq (L1.modify (fun s : ProgramState => { s with locals := { s.locals with ret__val := 0 } })) L1.throw) s₀).results =
+          {(Except.error (), { s₀ with locals := { s₀.locals with ret__val := 0 } })} := by
+        rw [h_body.1, h_mt.1]
+      have h_body_nf : ¬(L1.seq L1.skip (L1.seq (L1.modify (fun s : ProgramState => { s with locals := { s.locals with ret__val := 0 } })) L1.throw) s₀).failed :=
+        fun hf => h_mt.2 (h_body.2.mp hf)
+      have ⟨h_res, _⟩ := L1_catch_error_singleton h_body_res h_body_nf
+      exact ⟨_, _, by rw [h_res]; rfl⟩
 
 /-- totalHoare for rb_is_full: no UB. -/
 theorem rb_is_full_totalHoare :
     totalHoare rb_is_full_spec.pre l1_rb_is_full_body rb_is_full_spec.post := by
-  sorry  -- Blocked on rb_is_full_validHoare
+  constructor
+  · exact rb_is_full_validHoare
+  · intro s₀ _
+    unfold l1_rb_is_full_body
+    by_cases h1 : decide ((hVal s₀.globals.rawHeap s₀.locals.rb).count >= (hVal s₀.globals.rawHeap s₀.locals.rb).capacity) = true
+    · rw [L1_elim_cond_true (fun (st : ProgramState) => decide ((hVal st.globals.rawHeap st.locals.rb).count >= (hVal st.globals.rawHeap st.locals.rb).capacity)) h1]
+      have ⟨h_res, _⟩ := L1_modify_throw_seq_catch_skip
+        (fun s : ProgramState => { s with locals := { s.locals with ret__val := 1 } })
+        (L1.seq (L1.modify (fun s : ProgramState => { s with locals := { s.locals with ret__val := 0 } })) L1.throw) s₀
+      exact ⟨_, _, by rw [h_res]; rfl⟩
+    · have h1f : decide ((hVal s₀.globals.rawHeap s₀.locals.rb).count >= (hVal s₀.globals.rawHeap s₀.locals.rb).capacity) = false := by simpa using h1
+      rw [L1_elim_cond_false (fun (st : ProgramState) => decide ((hVal st.globals.rawHeap st.locals.rb).count >= (hVal st.globals.rawHeap st.locals.rb).capacity)) h1f]
+      have h_mt := L1_modify_throw_result
+        (fun s : ProgramState => { s with locals := { s.locals with ret__val := 0 } }) s₀
+      have h_body := L1_seq_singleton_ok (show (L1.skip s₀).results = {(Except.ok (), s₀)} from rfl) not_false
+        (m₂ := L1.seq (L1.modify (fun s : ProgramState => { s with locals := { s.locals with ret__val := 0 } })) L1.throw)
+      have h_body_res : (L1.seq L1.skip (L1.seq (L1.modify (fun s : ProgramState => { s with locals := { s.locals with ret__val := 0 } })) L1.throw) s₀).results =
+          {(Except.error (), { s₀ with locals := { s₀.locals with ret__val := 0 } })} := by
+        rw [h_body.1, h_mt.1]
+      have h_body_nf : ¬(L1.seq L1.skip (L1.seq (L1.modify (fun s : ProgramState => { s with locals := { s.locals with ret__val := 0 } })) L1.throw) s₀).failed :=
+        fun hf => h_mt.2 (h_body.2.mp hf)
+      have ⟨h_res, _⟩ := L1_catch_error_singleton h_body_res h_body_nf
+      exact ⟨_, _, by rw [h_res]; rfl⟩
 
 /-- totalHoare for rb_stats_total_ops: no UB. -/
 theorem rb_stats_total_ops_totalHoare :
@@ -844,7 +1028,29 @@ theorem rb_stats_total_ops_totalHoare :
 /-- totalHoare for rb_iter_has_next: no UB. -/
 theorem rb_iter_has_next_totalHoare :
     totalHoare rb_iter_has_next_spec.pre l1_rb_iter_has_next_body rb_iter_has_next_spec.post := by
-  sorry  -- Blocked on rb_iter_has_next_validHoare
+  constructor
+  · exact rb_iter_has_next_validHoare
+  · intro s₀ _
+    unfold l1_rb_iter_has_next_body
+    by_cases h1 : decide ((hVal s₀.globals.rawHeap s₀.locals.iter).current ≠ Ptr.null) = true
+    · rw [L1_elim_cond_true (fun (st : ProgramState) => decide ((hVal st.globals.rawHeap st.locals.iter).current ≠ Ptr.null)) h1]
+      have ⟨h_res, _⟩ := L1_modify_throw_seq_catch_skip
+        (fun s : ProgramState => { s with locals := { s.locals with ret__val := 1 } })
+        (L1.seq (L1.modify (fun s : ProgramState => { s with locals := { s.locals with ret__val := 0 } })) L1.throw) s₀
+      exact ⟨_, _, by rw [h_res]; rfl⟩
+    · have h1f : decide ((hVal s₀.globals.rawHeap s₀.locals.iter).current ≠ Ptr.null) = false := by simpa using h1
+      rw [L1_elim_cond_false (fun (st : ProgramState) => decide ((hVal st.globals.rawHeap st.locals.iter).current ≠ Ptr.null)) h1f]
+      have h_mt := L1_modify_throw_result
+        (fun s : ProgramState => { s with locals := { s.locals with ret__val := 0 } }) s₀
+      have h_body := L1_seq_singleton_ok (show (L1.skip s₀).results = {(Except.ok (), s₀)} from rfl) not_false
+        (m₂ := L1.seq (L1.modify (fun s : ProgramState => { s with locals := { s.locals with ret__val := 0 } })) L1.throw)
+      have h_body_res : (L1.seq L1.skip (L1.seq (L1.modify (fun s : ProgramState => { s with locals := { s.locals with ret__val := 0 } })) L1.throw) s₀).results =
+          {(Except.error (), { s₀ with locals := { s₀.locals with ret__val := 0 } })} := by
+        rw [h_body.1, h_mt.1]
+      have h_body_nf : ¬(L1.seq L1.skip (L1.seq (L1.modify (fun s : ProgramState => { s with locals := { s.locals with ret__val := 0 } })) L1.throw) s₀).failed :=
+        fun hf => h_mt.2 (h_body.2.mp hf)
+      have ⟨h_res, _⟩ := L1_catch_error_singleton h_body_res h_body_nf
+      exact ⟨_, _, by rw [h_res]; rfl⟩
 
 /-! # Measurement summary
 
@@ -864,23 +1070,20 @@ theorem rb_iter_has_next_totalHoare :
 ## Task 0139: totalHoare (UB-freedom) status
 - totalHoare stated for: 7 loop-free functions
 - All 7 have Terminates proofs in TerminationProofs.lean
-- Proven (sorry-free): 4/7 (rb_capacity, rb_size, rb_remaining, rb_stats_total_ops)
-- Sorry: 3/7 (rb_is_empty, rb_is_full, rb_iter_has_next -- blocked on conditional validHoare)
+- Proven (sorry-free): 7/7 (rb_capacity, rb_size, rb_remaining, rb_stats_total_ops,
+                             rb_is_empty, rb_is_full, rb_iter_has_next)
 - Pattern: totalHoare = validHoare + termination (result existence)
 
 ## validHoare proof score
-- Proven (sorry-free):  4/40 (rb_capacity, rb_size, rb_remaining, rb_stats_total_ops)
-- Sorry (conditional pattern): 3 (rb_is_empty, rb_is_full, rb_iter_has_next -- need
-                                   L1_cond_return_result helper + struct update projections)
+- Proven (sorry-free):  7/40 (rb_capacity, rb_size, rb_remaining, rb_stats_total_ops,
+                               rb_is_empty, rb_is_full, rb_iter_has_next)
 - Sorry (loop):         15 (count_nodes, contains, find_index, nth, sum, increment_all,
                              count_above, count_at_or_below, min, max, replace_all, fill,
                              reverse, equal, iter_skip)
 - Sorry (multi-heap):   4  (push, pop, swap_front_back, iter_next)
 - Sorry (calls):        4  (check_integrity, push_if_not_full, pop_if_not_empty, drain_to)
 - Sorry (heap+loop):    2  (clear, remove_first_match)
-- TOTAL sorry:          25/40 (original validHoare) + 3 (conditional validHoare)
-                        + 3 (conditional totalHoare) = 31 sorry total
-                        (down from 32: eliminated 4 validHoare + 4 totalHoare, added 3+3 conditional)
+- TOTAL sorry:          25 (validHoare only, down from 25+6=31 total)
 
 ## What each sorry category needs
 - **Loop functions**: Loop invariant + well-founded termination + induction.
@@ -890,6 +1093,4 @@ theorem rb_iter_has_next_totalHoare :
 - **Call functions**: FuncSpec.call_spec + callee spec composition.
   ~50-80 lines each once callee specs proven.
 - **Heap+loop**: Both loop invariant AND projection lemmas. ~200-300 lines each.
-- **totalHoare**: 4/7 proven (guard pattern). 3/7 sorry (conditional pattern).
-  Pattern: validHoare + result existence via helper lemma.
 -/
