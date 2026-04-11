@@ -273,4 +273,29 @@ theorem pool_alloc_count_correct :
 
 theorem pool_has_free_correct :
     pool_has_free_spec.satisfiedBy MemAlloc.l1_pool_has_free_body := by
-  sorry -- Requires: conditional reasoning + UInt32 equality with 0xFFFFFFFF literal
+  unfold FuncSpec.satisfiedBy pool_has_free_spec validHoare
+  intro s hpre
+  unfold MemAlloc.l1_pool_has_free_body
+  have h := L1_guard_modify_throw_catch_skip_result
+    (fun s : ProgramState => heapPtrValid s.globals.rawHeap s.locals.pm)
+    (fun s : ProgramState =>
+      { s with locals := { s.locals with ret__val := (if (hVal s.globals.rawHeap s.locals.pm).free_head != 0xFFFFFFFF then 1 else 0) } })
+    s hpre
+  obtain ⟨h_res, h_nf⟩ := h
+  refine ⟨h_nf, fun r s' h_mem _ => ?_⟩
+  rw [h_res] at h_mem
+  obtain ⟨hr, hs⟩ := Prod.mk.inj h_mem
+  subst hr
+  have h_ret :
+      s'.locals.ret__val = (if (hVal s.globals.rawHeap s.locals.pm).free_head != 0xFFFFFFFF then 1 else 0) :=
+    hs ▸ ma_retval_val s _
+  have h_glob : s'.globals = s.globals := hs ▸ ma_retval_globals s _
+  have h_pm : s'.locals.pm = s.locals.pm := hs ▸ ma_retval_pm s _
+  rw [h_glob, h_pm]
+  constructor
+  · intro hne
+    rw [h_ret]
+    simp [hne]
+  · intro heq
+    rw [h_ret]
+    simp [heq]
