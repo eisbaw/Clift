@@ -4,6 +4,7 @@ title: 'Prove remaining loop functions: find_index, nth, count_at_or_below, max'
 status: To Do
 assignee: []
 created_date: '2026-04-11 15:07'
+updated_date: '2026-04-11 21:27'
 labels:
   - sorry-elimination
   - loops
@@ -26,3 +27,13 @@ Same pattern as task-0222 but with additional complexity: rb_nth has conditional
 - [ ] #3 rb_count_at_or_below_validHoare proven
 - [ ] #4 rb_max_validHoare proven
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+rb_find_index, rb_nth have conditionals inside loop body — need L1_hoare_condition inside L1_hoare_while body preservation proof. The L1_elim_cond_true/false lemmas from Sel4CapProof work for this.
+
+rb_count_at_or_below is same pattern as rb_count_above (just different comparison).
+
+rb_max has heap write per iteration — needs the two-step projection pattern with heapUpdate preservation through iterations.
+<!-- SECTION:NOTES:END -->

@@ -4,6 +4,7 @@ title: Prove rb_push validHoare using guard_modify chain lemmas
 status: To Do
 assignee: []
 created_date: '2026-04-11 15:07'
+updated_date: '2026-04-11 21:27'
 labels:
   - sorry-elimination
   - ring-buffer
@@ -25,3 +26,13 @@ rb_push is an 8-step guard+modify chain: guard(valid rb) -> read count -> guard(
 - [ ] #3 Projection simp lemmas for each step function
 - [ ] #4 Postcondition discharged via hVal_heapUpdate_same/disjoint + ptrDisjoint
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Blocker identified: rb_push has 8+ guard+modify steps with heap writes. Each heapUpdate changes the heap, so subsequent heapPtrValid guards need ptrDisjoint to show validity preserved.
+
+Approach: define each step as anonymous-constructor function, prove two-step projection lemmas, chain with L1_guard_modify_result + L1_seq_singleton_ok. Need ptrDisjoint(new_node, rb_state) in precondition.
+
+AutoCorres2 insight: their L1_merge_assignments fuses consecutive modifies. Our equivalent: L1_guard_modify_guard_modify_result chains 2 pairs. Need chain4/chain5 for rb_push.
+<!-- SECTION:NOTES:END -->

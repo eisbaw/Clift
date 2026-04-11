@@ -4,6 +4,7 @@ title: Document the sorry elimination playbook
 status: To Do
 assignee: []
 created_date: '2026-04-11 15:07'
+updated_date: '2026-04-11 21:27'
 labels:
   - documentation
   - sorry-elimination
@@ -25,3 +26,19 @@ Capture everything we learned about eliminating sorry into a single reference do
 - [ ] #4 Common pitfalls and workarounds documented
 - [ ] #5 Which L1HoareRules lemmas to use for each pattern
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+BREAKTHROUGH DISCOVERED: Two-step projection pattern.
+
+Instead of (f s).locals.found (hits ~512 depth on 19+ field struct):
+1. Prove (f s).locals = ⟨field1, ..., fieldN⟩ via unfold; rfl (single iota on CState)
+2. rw [locals_eq] makes .found a shallow access
+
+Also: define step functions with anonymous constructors ⟨globals, ⟨...⟩⟩ NOT { s with ... }.
+Also: use funext + rfl to prove equivalence between generated lambdas and named step functions.
+
+Proven on: rbt_lookup (19 fields), rb_count_nodes (46 fields), rb_sum (46 fields).
+This pattern should work for ALL remaining sorry.
+<!-- SECTION:NOTES:END -->

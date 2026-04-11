@@ -4,6 +4,7 @@ title: 'Prove inter-procedural: check_integrity, push/pop_if_not_full/empty, dra
 status: To Do
 assignee: []
 created_date: '2026-04-11 15:07'
+updated_date: '2026-04-11 21:27'
 labels:
   - sorry-elimination
   - inter-procedural
@@ -26,3 +27,11 @@ These functions call other ring buffer functions. Strategy: apply the callee's F
 - [ ] #3 rb_pop_if_not_empty_validHoare proven (uses rb_pop spec)
 - [ ] #4 rb_drain_to_validHoare proven (uses rb_pop + rb_push specs in loop)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+AutoCorres2 insight: function calls become runs_to obligations. Callee spec is supplied as [runs_to_vcg] hint. Our equivalent: L1_hoare_call_spec from FuncSpec.lean. Need: callee validHoare proven first, then caller proof applies it via L1_hoare_call_spec.
+
+Dependency: rb_check_integrity needs rb_count_nodes (proven). rb_push_if_not_full needs rb_push (not proven yet). rb_pop_if_not_empty needs rb_pop (not proven). rb_drain_to needs both rb_push + rb_pop in a loop.
+<!-- SECTION:NOTES:END -->

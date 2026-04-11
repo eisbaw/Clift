@@ -4,6 +4,7 @@ title: Extend L1_hoare_guard_modify_chain to N steps
 status: To Do
 assignee: []
 created_date: '2026-04-11 15:07'
+updated_date: '2026-04-11 21:27'
 labels:
   - automation
   - infrastructure
@@ -23,3 +24,9 @@ We have chain2 (2 guard+modify pairs) and chain3 (3 pairs). rb_push needs 8+ pai
 - [ ] #2 rb_push's 8-step chain expressible using these lemmas
 - [ ] #3 All chain lemmas proven with zero sorry
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+L1_guard_modify_guard_modify_result proven (chains 2 guard+modify pairs). In git stash. Also L1_condition_modify_skip_guard_modify_result proven for condition+modify/skip followed by guard+modify. The broken L1_condition_modify_throw_skip_guard_modify_result needs a different approach to unfold L1.condition — use L1_elim_cond_true/false pattern from Sel4CapProof instead of simp/dsimp.
+<!-- SECTION:NOTES:END -->

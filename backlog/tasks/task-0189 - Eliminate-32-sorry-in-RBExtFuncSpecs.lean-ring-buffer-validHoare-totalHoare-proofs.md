@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-10 20:49'
-updated_date: '2026-04-11 08:44'
+updated_date: '2026-04-11 21:27'
 labels:
   - sorry-elimination
   - ring-buffer
@@ -27,6 +27,28 @@ RBExtFuncSpecs.lean has 25 validHoare sorry and 7 totalHoare sorry for ring_buff
 - [ ] #2 7 totalHoare sorry eliminated
 - [ ] #3 All proofs kernel-checked (lake build passes)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+STATUS UPDATE: 25 -> 23 sorry remaining (rb_sum + rb_count_nodes proven).
+
+BREAKTHROUGH: two-step projection pattern discovered. Works on 46-field Locals struct.
+
+Remaining sorry categorized:
+- 13 loop functions: need L1_hoare_while + body preservation with two-step projection
+- 5 multi-step heap: need chainN guard+modify lemmas + ptrDisjoint preconditions
+- 4 inter-procedural: need callee specs proven first
+- 1 blocked (RBExtRefinement: needs all above)
+
+Partially completed work in git stash (rb_contains, rb_count_above, new L1HoareRules lemmas).
+
+Tools identified for next session:
+- llmlean (github.com/cmu-l3/llmlean): llmqed tactic completes proofs via Claude with iterative refinement, running INSIDE Lean with full environment access
+- LeanDojo: extracts proof states from sorry locations for external proof engines
+
+AutoCorres2 strategy translations documented by research agent (8 concrete recommendations).
+<!-- SECTION:NOTES:END -->
 
 ## Final Summary
 

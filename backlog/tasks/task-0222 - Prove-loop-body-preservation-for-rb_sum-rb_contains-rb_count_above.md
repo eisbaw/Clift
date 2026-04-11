@@ -4,6 +4,7 @@ title: 'Prove loop body preservation for rb_sum, rb_contains, rb_count_above'
 status: To Do
 assignee: []
 created_date: '2026-04-11 15:07'
+updated_date: '2026-04-11 21:27'
 labels:
   - sorry-elimination
   - loops
@@ -25,3 +26,14 @@ These loop functions follow the same pattern: traverse linked list, accumulate r
 - [ ] #3 rb_count_above_validHoare proven
 - [ ] #4 Each follows rb_count_nodes proof pattern
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+PARTIAL PROGRESS:
+- rb_sum: FIXED (committed). Used L1_guard_modify_guard_modify_result + two-step projection.
+- rb_contains: partially fixed (in git stash). Agent added step functions + projection lemmas but API error interrupted. The L1_condition_modify_throw_skip_guard_modify_result lemma was attempted but L1.condition unfold doesnt work with simp/dsimp/change (it is a def, not abbrev). Workaround: use L1_elim_cond_true/false from Sel4CapProof pattern instead.
+- rb_count_above: same status as rb_contains.
+
+Key lemma added (in stash): L1_guard_modify_guard_modify_result and L1_guard_modify_guard_modify_no_error in L1HoareRules.lean (lines 625-670). These chain two guard+modify pairs into a singleton result. Also L1_condition_modify_skip_result and L1_condition_modify_skip_guard_modify_result for condition+modify/skip patterns.
+<!-- SECTION:NOTES:END -->

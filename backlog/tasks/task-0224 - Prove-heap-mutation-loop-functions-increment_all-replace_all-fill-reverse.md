@@ -4,6 +4,7 @@ title: 'Prove heap-mutation loop functions: increment_all, replace_all, fill, re
 status: To Do
 assignee: []
 created_date: '2026-04-11 15:07'
+updated_date: '2026-04-11 21:27'
 labels:
   - sorry-elimination
   - loops
@@ -27,3 +28,15 @@ These loops modify the heap on each iteration (write to node values or pointers)
 - [ ] #3 rb_fill_validHoare proven
 - [ ] #4 rb_reverse_validHoare proven
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+These are the hardest loops: each iteration modifies the heap.
+- rb_increment_all: write node.val+1 per iteration. Invariant: visited nodes incremented, unvisited unchanged.
+- rb_replace_all: conditional write per iteration.
+- rb_fill: allocate and link new nodes per iteration.
+- rb_reverse: pointer reversal (prev/curr/next pattern). The hardest loop proof.
+
+AutoCorres2 insight from CList.thy: define node_next_upd abstraction, prove simp lemmas for it (node_next of update_same, node_next of update_different). This separates the heap reasoning from the list structure reasoning.
+<!-- SECTION:NOTES:END -->
