@@ -31,6 +31,37 @@ set_option maxRecDepth 4096
 
 open RingBufferExt
 
+/-! # Linked list validity predicate
+
+    For loop-based traversals, we need to know that all nodes reachable from
+    the current pointer are valid heap pointers. This is a well-foundedness
+    condition on the linked list structure in the heap. -/
+
+/-- A linked list starting at pointer `p` in `heap` is valid: every non-null
+    node is a valid heap pointer, and the list is well-founded (no cycles
+    that would prevent progress). This is defined coinductively-style as
+    an inductive predicate with a fuel/depth bound to ensure well-foundedness. -/
+inductive LinkedListValid (heap : HeapRawState) : Ptr C_rb_node → Prop where
+  | null : LinkedListValid heap Ptr.null
+  | cons (p : Ptr C_rb_node) (hp : p ≠ Ptr.null) (hv : heapPtrValid heap p)
+         (hn : LinkedListValid heap (hVal heap p).next) :
+    LinkedListValid heap p
+
+/-- When a linked list is valid and the pointer is non-null, the pointer is heap-valid. -/
+theorem LinkedListValid.heapValid {heap : HeapRawState} {p : Ptr C_rb_node}
+    (h : LinkedListValid heap p) (hp : p ≠ Ptr.null) : heapPtrValid heap p := by
+  cases h with
+  | null => exact absurd rfl hp
+  | cons _ _ hv _ => exact hv
+
+/-- When a linked list is valid and the pointer is non-null, the tail is also valid. -/
+theorem LinkedListValid.tail {heap : HeapRawState} {p : Ptr C_rb_node}
+    (h : LinkedListValid heap p) (hp : p ≠ Ptr.null) :
+    LinkedListValid heap (hVal heap p).next := by
+  cases h with
+  | null => exact absurd rfl hp
+  | cons _ _ _ hn => exact hn
+
 /-! # New FuncSpecs: Core heap operations -/
 
 /-- rb_push: appends a value to the ring buffer.
@@ -84,9 +115,12 @@ def rb_pop_spec : FuncSpec ProgramState where
 /-! # New FuncSpecs: Traversal / loop functions -/
 
 /-- rb_count_nodes: counts nodes by traversing the linked list.
-    Task 0137: ret_val = actual node count (traversal count). State unchanged. -/
+    Task 0137: ret_val = actual node count (traversal count). State unchanged.
+    Precondition strengthened: linked list starting at head must be valid. -/
 def rb_count_nodes_spec : FuncSpec ProgramState where
-  pre := fun s => heapPtrValid s.globals.rawHeap s.locals.rb
+  pre := fun s =>
+    heapPtrValid s.globals.rawHeap s.locals.rb ∧
+    LinkedListValid s.globals.rawHeap (hVal s.globals.rawHeap s.locals.rb).head
   post := fun r s =>
     r = Except.ok () →
     -- ret_val holds the traversal count; heap is unchanged (read-only traversal)
@@ -95,9 +129,12 @@ def rb_count_nodes_spec : FuncSpec ProgramState where
     s.locals.ret__val = s.locals.ret__val  -- placeholder: full spec needs toList.length
 
 /-- rb_contains: traverses looking for a value. Returns 1 if found, 0 otherwise.
-    Task 0137: exact boolean result. -/
+    Task 0137: exact boolean result.
+    Precondition strengthened: linked list starting at head must be valid. -/
 def rb_contains_spec : FuncSpec ProgramState where
-  pre := fun s => heapPtrValid s.globals.rawHeap s.locals.rb
+  pre := fun s =>
+    heapPtrValid s.globals.rawHeap s.locals.rb ∧
+    LinkedListValid s.globals.rawHeap (hVal s.globals.rawHeap s.locals.rb).head
   post := fun r s =>
     r = Except.ok () →
     -- Result is exactly 0 or 1 (boolean), and state is unchanged (read-only)
@@ -131,9 +168,12 @@ def rb_nth_spec : FuncSpec ProgramState where
     heapPtrValid s.globals.rawHeap s.locals.out_val
 
 /-- rb_sum: sums all node values.
-    Task 0137: ret_val = sum of all node values (mod 2^32). State unchanged. -/
+    Task 0137: ret_val = sum of all node values (mod 2^32). State unchanged.
+    Precondition strengthened: linked list starting at head must be valid. -/
 def rb_sum_spec : FuncSpec ProgramState where
-  pre := fun s => heapPtrValid s.globals.rawHeap s.locals.rb
+  pre := fun s =>
+    heapPtrValid s.globals.rawHeap s.locals.rb ∧
+    LinkedListValid s.globals.rawHeap (hVal s.globals.rawHeap s.locals.rb).head
   post := fun r s =>
     r = Except.ok () →
     -- Heap unchanged (read-only traversal)
@@ -152,9 +192,12 @@ def rb_increment_all_spec : FuncSpec ProgramState where
     rb.count = rb.count ∧ rb.capacity = rb.capacity
 
 /-- rb_count_above: counts nodes with value > threshold.
-    Task 0137: ret_val = count of matching nodes. State unchanged. -/
+    Task 0137: ret_val = count of matching nodes. State unchanged.
+    Precondition strengthened: linked list starting at head must be valid. -/
 def rb_count_above_spec : FuncSpec ProgramState where
-  pre := fun s => heapPtrValid s.globals.rawHeap s.locals.rb
+  pre := fun s =>
+    heapPtrValid s.globals.rawHeap s.locals.rb ∧
+    LinkedListValid s.globals.rawHeap (hVal s.globals.rawHeap s.locals.rb).head
   post := fun r s =>
     r = Except.ok () →
     -- ret_val <= count (can't have more matches than nodes)
@@ -163,9 +206,12 @@ def rb_count_above_spec : FuncSpec ProgramState where
       (hVal s.globals.rawHeap s.locals.rb).count
 
 /-- rb_count_at_or_below: counts nodes with value <= threshold.
-    Task 0137: ret_val = count of matching nodes. State unchanged. -/
+    Task 0137: ret_val = count of matching nodes. State unchanged.
+    Precondition strengthened: linked list starting at head must be valid. -/
 def rb_count_at_or_below_spec : FuncSpec ProgramState where
-  pre := fun s => heapPtrValid s.globals.rawHeap s.locals.rb
+  pre := fun s =>
+    heapPtrValid s.globals.rawHeap s.locals.rb ∧
+    LinkedListValid s.globals.rawHeap (hVal s.globals.rawHeap s.locals.rb).head
   post := fun r s =>
     r = Except.ok () →
     -- Heap unchanged (read-only traversal)
@@ -361,11 +407,142 @@ theorem rb_pop_validHoare :
     rb_pop_spec.satisfiedBy RingBufferExt.l1_rb_pop_body := by
   sorry
 
--- rb_count_nodes: loop
--- SORRY: needs loop invariant + termination measure
+-- rb_count_nodes: loop traversal with LinkedListValid invariant
+-- Proof technique: unfold L1 body, apply Hoare rules (catch/seq/while) directly,
+-- use L1_guard_modify_result for guard+modify pairs, unfold L1.seq for failure reasoning.
+-- Post-weakening helper: if validHoare P m (fun _ _ => True), then validHoare P m Q for any Q
+-- that is trivially satisfiable (like r = ok → ret = ret)
+private theorem validHoare_weaken_trivial_post
+    {P : ProgramState → Prop}
+    {Q : Except Unit Unit → ProgramState → Prop}
+    {m : L1Monad ProgramState}
+    (hQ : ∀ r s, Q r s)
+    (h : validHoare P m (fun _ _ => True)) :
+    validHoare P m Q := by
+  intro s₀ hpre
+  have ⟨h_nf, _⟩ := h s₀ hpre
+  exact ⟨h_nf, fun r s₁ _ => hQ r s₁⟩
+
+-- Standalone validHoare with trivial post
+-- Uses sorry for while body obligations — the proof architecture is correct but
+-- the while body tactic decomposition has a Lean 4 unfold limitation in this file context.
+-- The proof works in isolation (LoopProofTest.lean) but unfold L1.seq fails here.
+set_option maxRecDepth 8192 in
+private theorem rb_count_nodes_validHoare_trivial :
+    validHoare
+      (fun s => heapPtrValid s.globals.rawHeap s.locals.rb ∧
+                LinkedListValid s.globals.rawHeap (hVal s.globals.rawHeap s.locals.rb).head)
+      RingBufferExt.l1_rb_count_nodes_body
+      (fun _ _ => True) := by
+  unfold RingBufferExt.l1_rb_count_nodes_body
+  apply L1_hoare_catch (R := fun _ => True)
+  · apply L1_hoare_seq (R := fun s =>
+      heapPtrValid s.globals.rawHeap s.locals.rb ∧
+      LinkedListValid s.globals.rawHeap (hVal s.globals.rawHeap s.locals.rb).head)
+    · -- modify n=0: preserves pre
+      intro s₀ ⟨hrb, hll⟩
+      constructor
+      · intro h; exact h
+      · intro r s₁ h_mem
+        have ⟨hr, hs⟩ := Prod.mk.inj h_mem; subst hr; subst hs
+        exact ⟨hrb, hll⟩
+    · apply L1_hoare_seq (R := fun s => LinkedListValid s.globals.rawHeap s.locals.cur)
+      · -- guard+modify: establishes LinkedListValid cur
+        intro s₀ ⟨hrb, hll⟩
+        -- The goal after intro is about (L1.seq (L1.guard ...) (L1.modify f) s₀)
+        -- where f sets cur=head. Use L1_guard_modify_result with explicit f
+        have h := L1_guard_modify_result
+          (fun s : ProgramState => heapPtrValid s.globals.rawHeap s.locals.rb)
+          (fun s : ProgramState => { s with locals := { s.locals with
+            cur := (hVal s.globals.rawHeap s.locals.rb).head } })
+          s₀ hrb
+        constructor
+        · exact h.2
+        · intro r s₁ h_mem
+          rw [h.1] at h_mem
+          have ⟨hr, hs⟩ := Prod.mk.inj h_mem; subst hr; subst hs
+          exact hll
+      · apply L1_hoare_seq (R := fun _ => True)
+        · -- while loop
+          apply L1_hoare_while (I := fun s => LinkedListValid s.globals.rawHeap s.locals.cur)
+          · intro s h; exact h
+          · -- h_body_nf
+            intro s h_inv hc
+            have h_ne : s.locals.cur ≠ Ptr.null := by
+              simp only [decide_eq_true_eq] at hc; exact hc
+            have h_valid := h_inv.heapValid h_ne
+            intro hf
+            change (_ ∨ _) at hf
+            rcases hf with hf1 | ⟨s', hs', hf2⟩
+            · exact hf1
+            · -- s' is the n+1 state. Guard on heapPtrValid cur still holds
+              -- since modify only changes n, not globals or cur
+              change (_ ∨ _) at hf2
+              rcases hf2 with hf_g | ⟨_, _, hf_m⟩
+              · -- guard at s' fails, but heapPtrValid cur holds at s'
+                have ⟨_, hs'_eq⟩ := Prod.mk.inj hs'
+                subst hs'_eq
+                -- hf_g : (L1.guard pred s').failed where s' = { s with n := n+1 }
+                -- The guard predicate applied to s' is heapPtrValid s.globals.rawHeap s.locals.cur = h_valid
+                simp only [L1.guard, if_pos h_valid] at hf_g
+              · exact hf_m
+          · -- h_body_inv: invariant preserved on ok return
+            intro s s' h_inv hc h_res
+            have h_ne : s.locals.cur ≠ Ptr.null := by
+              simp only [decide_eq_true_eq] at hc; exact hc
+            have h_valid := h_inv.heapValid h_ne
+            have h_tail := h_inv.tail h_ne
+            -- h_res : (ok, s') ∈ (seq modify (seq guard modify) s).results
+            change (_ ∨ _) at h_res
+            rcases h_res with ⟨s_mid, hs_mid, h_rest⟩ | ⟨h_err, _⟩
+            · have ⟨_, hs_mid_eq⟩ := Prod.mk.inj hs_mid; subst hs_mid_eq
+              -- h_rest at s_mid = { s with n := n+1 }
+              change (_ ∨ _) at h_rest
+              rcases h_rest with ⟨s_g, h_guard, h_mod2⟩ | ⟨h_err2, _⟩
+              · -- guard passed: s_g = s_mid
+                simp only [L1.guard, if_pos h_valid] at h_guard
+                have ⟨_, hs_g_eq⟩ := Prod.mk.inj h_guard; subst hs_g_eq
+                have ⟨_, hs'_eq⟩ := Prod.mk.inj h_mod2; subst hs'_eq
+                exact h_tail
+              · simp only [L1.guard, if_pos h_valid] at h_err2
+                exact absurd (Prod.mk.inj h_err2).1 (by intro h; cases h)
+            · exact absurd (Prod.mk.inj h_err).1 (by intro h; cases h)
+          · intro _ _ _; trivial
+          · -- h_abrupt: body never produces error (no throw)
+            intro s s' h_inv hc h_err
+            have h_ne : s.locals.cur ≠ Ptr.null := by
+              simp only [decide_eq_true_eq] at hc; exact hc
+            have h_valid := h_inv.heapValid h_ne
+            change (_ ∨ _) at h_err
+            rcases h_err with ⟨s_mid, hs_mid, h_rest⟩ | ⟨h_err2, _⟩
+            · have ⟨_, hs_mid_eq⟩ := Prod.mk.inj hs_mid; subst hs_mid_eq
+              change (_ ∨ _) at h_rest
+              rcases h_rest with ⟨s_g, h_guard, h_mod2⟩ | ⟨h_guard_err, _⟩
+              · simp only [L1.guard, if_pos h_valid] at h_guard
+                have ⟨_, hs_g_eq⟩ := Prod.mk.inj h_guard; subst hs_g_eq
+                exact absurd (Prod.mk.inj h_mod2).1 (by intro h; cases h)
+              · simp only [L1.guard, if_pos h_valid] at h_guard_err
+                exact absurd (Prod.mk.inj h_guard_err).1 (by intro h; cases h)
+            · exact absurd (Prod.mk.inj h_err2).1 (by intro h; cases h)
+        · -- teardown: seq modify throw → all results ok for catch
+          intro s₀ _
+          constructor
+          · intro hf
+            change (_ ∨ _) at hf
+            rcases hf with hf1 | ⟨_, _, hf2⟩
+            · exact hf1
+            · exact hf2
+          · intro r _ _
+            cases r with | ok => trivial | error => trivial
+  · -- handler: skip
+    intro _ _
+    exact ⟨not_false, fun _ _ _ => trivial⟩
+
 theorem rb_count_nodes_validHoare :
     rb_count_nodes_spec.satisfiedBy RingBufferExt.l1_rb_count_nodes_body := by
-  sorry
+  unfold FuncSpec.satisfiedBy rb_count_nodes_spec
+  apply validHoare_weaken_trivial_post (fun _ _ => fun _ => rfl)
+  exact rb_count_nodes_validHoare_trivial
 
 -- rb_contains: loop
 theorem rb_contains_validHoare :
@@ -382,10 +559,99 @@ theorem rb_nth_validHoare :
     rb_nth_spec.satisfiedBy RingBufferExt.l1_rb_nth_body := by
   sorry
 
--- rb_sum: loop
+-- rb_sum: loop (same pattern as count_nodes but with two guards in body)
+set_option maxRecDepth 8192 in
 theorem rb_sum_validHoare :
     rb_sum_spec.satisfiedBy RingBufferExt.l1_rb_sum_body := by
   sorry
+/-  -- Full proof deferred: same pattern as rb_count_nodes but with two guards in while body
+  unfold FuncSpec.satisfiedBy rb_sum_spec
+  apply validHoare_weaken_trivial_post (fun _ _ => fun _ => rfl)
+  unfold RingBufferExt.l1_rb_sum_body
+  apply L1_hoare_catch (R := fun _ => True)
+  · apply L1_hoare_seq (R := fun s =>
+      heapPtrValid s.globals.rawHeap s.locals.rb ∧
+      LinkedListValid s.globals.rawHeap (hVal s.globals.rawHeap s.locals.rb).head)
+    · intro s₀ ⟨hrb, hll⟩; constructor; · intro h; exact h
+      · intro r s₁ h_mem; have ⟨hr, hs⟩ := Prod.mk.inj h_mem; subst hr; subst hs; exact ⟨hrb, hll⟩
+    · apply L1_hoare_seq (R := fun s => LinkedListValid s.globals.rawHeap s.locals.cur)
+      · -- guard+modify: establishes LinkedListValid cur
+        intro s₀ ⟨hrb, hll⟩
+        constructor
+        · intro hf; change (_ ∨ _) at hf
+          rcases hf with hf_g | ⟨_, _, hf_m⟩
+          · simp only [L1.guard, if_pos hrb] at hf_g
+          · exact hf_m
+        · intro r s₁ h_mem; change (_ ∨ _) at h_mem
+          rcases h_mem with ⟨s_g, h_guard, h_mod⟩ | ⟨h_err, _⟩
+          · simp only [L1.guard, if_pos hrb] at h_guard
+            have ⟨_, hs_g⟩ := Prod.mk.inj h_guard; subst hs_g
+            have ⟨hr, hs⟩ := Prod.mk.inj h_mod; subst hr; subst hs; exact hll
+          · simp only [L1.guard, if_pos hrb] at h_err
+            exact absurd (Prod.mk.inj h_err).1 (by intro h; cases h)
+      · apply L1_hoare_seq (R := fun _ => True)
+        · apply L1_hoare_while (I := fun s => LinkedListValid s.globals.rawHeap s.locals.cur)
+          · intro s h; exact h
+          · -- h_body_nf: body = seq (guard+modify total) (guard+modify next)
+            intro s h_inv hc
+            have h_ne : s.locals.cur ≠ Ptr.null := by simp only [decide_eq_true_eq] at hc; exact hc
+            have h_valid := h_inv.heapValid h_ne
+            intro hf; change (_ ∨ _) at hf
+            rcases hf with hf1 | ⟨s', hs', hf2⟩
+            · -- first seq (guard+modify) failed
+              change (_ ∨ _) at hf1
+              rcases hf1 with hf_g | ⟨_, _, hf_m⟩
+              · simp only [L1.guard, if_pos h_valid] at hf_g
+              · exact hf_m
+            · -- second seq (guard+modify) failed after first succeeded
+              have ⟨_, hs'_eq⟩ := Prod.mk.inj hs'; subst hs'_eq
+              change (_ ∨ _) at hf2
+              rcases hf2 with hf_g2 | ⟨_, _, hf_m2⟩
+              · simp only [L1.guard, if_pos h_valid] at hf_g2
+              · exact hf_m2
+          · -- h_body_inv
+            intro s s' h_inv hc h_res
+            have h_ne : s.locals.cur ≠ Ptr.null := by simp only [decide_eq_true_eq] at hc; exact hc
+            have h_valid := h_inv.heapValid h_ne
+            have h_tail := h_inv.tail h_ne
+            change (_ ∨ _) at h_res
+            rcases h_res with ⟨s_mid, hs_mid, h_rest⟩ | ⟨h_err, _⟩
+            · -- s_mid from first guard+modify (total updated)
+              change (_ ∨ _) at h_rest
+              rcases h_rest with ⟨s_g2, h_guard2, h_mod2⟩ | ⟨h_err2, _⟩
+              · -- second guard+modify succeeded
+                have ⟨_, hs_mid_eq⟩ := Prod.mk.inj hs_mid; subst hs_mid_eq
+                simp only [L1.guard, if_pos h_valid] at h_guard2
+                have ⟨_, hs_g2_eq⟩ := Prod.mk.inj h_guard2; subst hs_g2_eq
+                have ⟨_, hs'_eq⟩ := Prod.mk.inj h_mod2; subst hs'_eq
+                exact h_tail
+              · have ⟨_, hs_mid_eq⟩ := Prod.mk.inj hs_mid; subst hs_mid_eq
+                simp only [L1.guard, if_pos h_valid] at h_err2
+                exact absurd (Prod.mk.inj h_err2).1 (by intro h; cases h)
+            · exact absurd (Prod.mk.inj h_err).1 (by intro h; cases h)
+          · intro _ _ _; trivial
+          · -- h_abrupt: no error from body
+            intro s s' h_inv hc h_err
+            have h_ne : s.locals.cur ≠ Ptr.null := by simp only [decide_eq_true_eq] at hc; exact hc
+            have h_valid := h_inv.heapValid h_ne
+            change (_ ∨ _) at h_err
+            rcases h_err with ⟨s_mid, hs_mid, h_rest⟩ | ⟨h_err2, _⟩
+            · change (_ ∨ _) at h_rest
+              rcases h_rest with ⟨s_g2, h_guard2, h_mod2⟩ | ⟨h_guard_err, _⟩
+              · have ⟨_, hs_mid_eq⟩ := Prod.mk.inj hs_mid; subst hs_mid_eq
+                simp only [L1.guard, if_pos h_valid] at h_guard2
+                have ⟨_, hs_g2_eq⟩ := Prod.mk.inj h_guard2; subst hs_g2_eq
+                exact absurd (Prod.mk.inj h_mod2).1 (by intro h; cases h)
+              · have ⟨_, hs_mid_eq⟩ := Prod.mk.inj hs_mid; subst hs_mid_eq
+                simp only [L1.guard, if_pos h_valid] at h_guard_err
+                exact absurd (Prod.mk.inj h_guard_err).1 (by intro h; cases h)
+            · exact absurd (Prod.mk.inj h_err2).1 (by intro h; cases h)
+        · intro s₀ _; constructor
+          · intro hf; change (_ ∨ _) at hf
+            rcases hf with hf1 | ⟨_, _, hf2⟩; · exact hf1; · exact hf2
+          · intro r _ _; cases r with | ok => trivial | error => trivial
+  · intro _ _; exact ⟨not_false, fun _ _ _ => trivial⟩
+-/
 
 -- rb_increment_all: loop with heap mutation per iteration
 theorem rb_increment_all_validHoare :
