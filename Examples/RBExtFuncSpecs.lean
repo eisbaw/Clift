@@ -544,10 +544,320 @@ theorem rb_count_nodes_validHoare :
   apply validHoare_weaken_trivial_post (fun _ _ => fun _ => rfl)
   exact rb_count_nodes_validHoare_trivial
 
+-- Bridge: derive L1_hoare_while side-conditions from a single body Hoare proof.
+private theorem L1_hoare_while_from_body {σ : Type} {c : σ → Bool} {body : L1Monad σ}
+    {I : σ → Prop} {Q : Except Unit Unit → σ → Prop}
+    (h_body : validHoare (fun s => I s ∧ c s = true) body
+        (fun r s => match r with | Except.ok () => I s | Except.error () => Q (Except.error ()) s))
+    (h_exit : ∀ s, I s → c s = false → Q (Except.ok ()) s) :
+    validHoare I (L1.while c body) Q := by
+  apply L1_hoare_while (I := I)
+  · intro s h; exact h
+  · intro s hi hc; exact (h_body s ⟨hi, hc⟩).1
+  · intro s s' hi hc h_mem; exact (h_body s ⟨hi, hc⟩).2 (Except.ok ()) s' h_mem
+  · exact h_exit
+  · intro s s' hi hc h_mem; exact (h_body s ⟨hi, hc⟩).2 (Except.error ()) s' h_mem
+
+private def rb_contains_inv (s : ProgramState) : Prop :=
+  LinkedListValid s.globals.rawHeap s.locals.cur
+
+private def rb_contains_ret_bool (s : ProgramState) : Prop :=
+  s.locals.ret__val = 0 ∨ s.locals.ret__val = 1
+
+private noncomputable def rb_contains_set_cur (s : ProgramState) : ProgramState :=
+  ⟨s.globals, ⟨s.locals.a, s.locals.actual, s.locals.b, s.locals.ca, s.locals.cap,
+    s.locals.cb, s.locals.count, (hVal s.globals.rawHeap s.locals.rb).head,
+    s.locals.current_count, s.locals.delta, s.locals.dst, s.locals.filled,
+    s.locals.front, s.locals.idx, s.locals.iter, s.locals.max_drain,
+    s.locals.max_val, s.locals.min_val, s.locals.modified, s.locals.n,
+    s.locals.new_val, s.locals.node, s.locals.nxt, s.locals.old_head,
+    s.locals.old_val, s.locals.out_val, s.locals.pop_ok, s.locals.pop_result,
+    s.locals.prev, s.locals.push_ok, s.locals.push_result, s.locals.rb,
+    s.locals.removed, s.locals.replaced, s.locals.result, s.locals.ret__val,
+    s.locals.scratch, s.locals.skipped, s.locals.src, s.locals.stats,
+    s.locals.temp_node, s.locals.threshold, s.locals.tmp, s.locals.total,
+    s.locals.transferred, s.locals.val⟩⟩
+
+private noncomputable def rb_contains_set_ret1 (s : ProgramState) : ProgramState :=
+  ⟨s.globals, ⟨s.locals.a, s.locals.actual, s.locals.b, s.locals.ca, s.locals.cap,
+    s.locals.cb, s.locals.count, s.locals.cur, s.locals.current_count, s.locals.delta,
+    s.locals.dst, s.locals.filled, s.locals.front, s.locals.idx, s.locals.iter,
+    s.locals.max_drain, s.locals.max_val, s.locals.min_val, s.locals.modified,
+    s.locals.n, s.locals.new_val, s.locals.node, s.locals.nxt, s.locals.old_head,
+    s.locals.old_val, s.locals.out_val, s.locals.pop_ok, s.locals.pop_result,
+    s.locals.prev, s.locals.push_ok, s.locals.push_result, s.locals.rb,
+    s.locals.removed, s.locals.replaced, s.locals.result, (1 : UInt32),
+    s.locals.scratch, s.locals.skipped, s.locals.src, s.locals.stats,
+    s.locals.temp_node, s.locals.threshold, s.locals.tmp, s.locals.total,
+    s.locals.transferred, s.locals.val⟩⟩
+
+private noncomputable def rb_contains_set_cur_next (s : ProgramState) : ProgramState :=
+  ⟨s.globals, ⟨s.locals.a, s.locals.actual, s.locals.b, s.locals.ca, s.locals.cap,
+    s.locals.cb, s.locals.count, (hVal s.globals.rawHeap s.locals.cur).next,
+    s.locals.current_count, s.locals.delta, s.locals.dst, s.locals.filled,
+    s.locals.front, s.locals.idx, s.locals.iter, s.locals.max_drain,
+    s.locals.max_val, s.locals.min_val, s.locals.modified, s.locals.n,
+    s.locals.new_val, s.locals.node, s.locals.nxt, s.locals.old_head,
+    s.locals.old_val, s.locals.out_val, s.locals.pop_ok, s.locals.pop_result,
+    s.locals.prev, s.locals.push_ok, s.locals.push_result, s.locals.rb,
+    s.locals.removed, s.locals.replaced, s.locals.result, s.locals.ret__val,
+    s.locals.scratch, s.locals.skipped, s.locals.src, s.locals.stats,
+    s.locals.temp_node, s.locals.threshold, s.locals.tmp, s.locals.total,
+    s.locals.transferred, s.locals.val⟩⟩
+
+private noncomputable def rb_contains_set_ret0 (s : ProgramState) : ProgramState :=
+  ⟨s.globals, ⟨s.locals.a, s.locals.actual, s.locals.b, s.locals.ca, s.locals.cap,
+    s.locals.cb, s.locals.count, s.locals.cur, s.locals.current_count, s.locals.delta,
+    s.locals.dst, s.locals.filled, s.locals.front, s.locals.idx, s.locals.iter,
+    s.locals.max_drain, s.locals.max_val, s.locals.min_val, s.locals.modified,
+    s.locals.n, s.locals.new_val, s.locals.node, s.locals.nxt, s.locals.old_head,
+    s.locals.old_val, s.locals.out_val, s.locals.pop_ok, s.locals.pop_result,
+    s.locals.prev, s.locals.push_ok, s.locals.push_result, s.locals.rb,
+    s.locals.removed, s.locals.replaced, s.locals.result, (0 : UInt32),
+    s.locals.scratch, s.locals.skipped, s.locals.src, s.locals.stats,
+    s.locals.temp_node, s.locals.threshold, s.locals.tmp, s.locals.total,
+    s.locals.transferred, s.locals.val⟩⟩
+
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rb_contains_set_cur_globals (s : ProgramState) :
+    (rb_contains_set_cur s).globals = s.globals := by
+  unfold rb_contains_set_cur
+  rfl
+
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rb_contains_set_cur_locals_eq (s : ProgramState) :
+    (rb_contains_set_cur s).locals = ⟨s.locals.a, s.locals.actual, s.locals.b, s.locals.ca,
+      s.locals.cap, s.locals.cb, s.locals.count, (hVal s.globals.rawHeap s.locals.rb).head,
+      s.locals.current_count, s.locals.delta, s.locals.dst, s.locals.filled,
+      s.locals.front, s.locals.idx, s.locals.iter, s.locals.max_drain,
+      s.locals.max_val, s.locals.min_val, s.locals.modified, s.locals.n,
+      s.locals.new_val, s.locals.node, s.locals.nxt, s.locals.old_head,
+      s.locals.old_val, s.locals.out_val, s.locals.pop_ok, s.locals.pop_result,
+      s.locals.prev, s.locals.push_ok, s.locals.push_result, s.locals.rb,
+      s.locals.removed, s.locals.replaced, s.locals.result, s.locals.ret__val,
+      s.locals.scratch, s.locals.skipped, s.locals.src, s.locals.stats,
+      s.locals.temp_node, s.locals.threshold, s.locals.tmp, s.locals.total,
+      s.locals.transferred, s.locals.val⟩ := by
+  unfold rb_contains_set_cur
+  rfl
+
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rb_contains_set_cur_locals_cur (s : ProgramState) :
+    (rb_contains_set_cur s).locals.cur = (hVal s.globals.rawHeap s.locals.rb).head := by
+  rw [rb_contains_set_cur_locals_eq]
+
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rb_contains_set_cur_next_globals (s : ProgramState) :
+    (rb_contains_set_cur_next s).globals = s.globals := by
+  unfold rb_contains_set_cur_next
+  rfl
+
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rb_contains_set_cur_next_locals_eq (s : ProgramState) :
+    (rb_contains_set_cur_next s).locals = ⟨s.locals.a, s.locals.actual, s.locals.b, s.locals.ca,
+      s.locals.cap, s.locals.cb, s.locals.count, (hVal s.globals.rawHeap s.locals.cur).next,
+      s.locals.current_count, s.locals.delta, s.locals.dst, s.locals.filled,
+      s.locals.front, s.locals.idx, s.locals.iter, s.locals.max_drain,
+      s.locals.max_val, s.locals.min_val, s.locals.modified, s.locals.n,
+      s.locals.new_val, s.locals.node, s.locals.nxt, s.locals.old_head,
+      s.locals.old_val, s.locals.out_val, s.locals.pop_ok, s.locals.pop_result,
+      s.locals.prev, s.locals.push_ok, s.locals.push_result, s.locals.rb,
+      s.locals.removed, s.locals.replaced, s.locals.result, s.locals.ret__val,
+      s.locals.scratch, s.locals.skipped, s.locals.src, s.locals.stats,
+      s.locals.temp_node, s.locals.threshold, s.locals.tmp, s.locals.total,
+      s.locals.transferred, s.locals.val⟩ := by
+  unfold rb_contains_set_cur_next
+  rfl
+
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rb_contains_set_cur_next_locals_cur (s : ProgramState) :
+    (rb_contains_set_cur_next s).locals.cur = (hVal s.globals.rawHeap s.locals.cur).next := by
+  rw [rb_contains_set_cur_next_locals_eq]
+
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rb_contains_set_ret1_locals_eq (s : ProgramState) :
+    (rb_contains_set_ret1 s).locals = ⟨s.locals.a, s.locals.actual, s.locals.b, s.locals.ca,
+      s.locals.cap, s.locals.cb, s.locals.count, s.locals.cur, s.locals.current_count,
+      s.locals.delta, s.locals.dst, s.locals.filled, s.locals.front, s.locals.idx,
+      s.locals.iter, s.locals.max_drain, s.locals.max_val, s.locals.min_val,
+      s.locals.modified, s.locals.n, s.locals.new_val, s.locals.node, s.locals.nxt,
+      s.locals.old_head, s.locals.old_val, s.locals.out_val, s.locals.pop_ok,
+      s.locals.pop_result, s.locals.prev, s.locals.push_ok, s.locals.push_result,
+      s.locals.rb, s.locals.removed, s.locals.replaced, s.locals.result, (1 : UInt32),
+      s.locals.scratch, s.locals.skipped, s.locals.src, s.locals.stats,
+      s.locals.temp_node, s.locals.threshold, s.locals.tmp, s.locals.total,
+      s.locals.transferred, s.locals.val⟩ := by
+  unfold rb_contains_set_ret1
+  rfl
+
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rb_contains_set_ret1_locals_ret (s : ProgramState) :
+    (rb_contains_set_ret1 s).locals.ret__val = 1 := by
+  rw [rb_contains_set_ret1_locals_eq]
+
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rb_contains_set_ret0_locals_eq (s : ProgramState) :
+    (rb_contains_set_ret0 s).locals = ⟨s.locals.a, s.locals.actual, s.locals.b, s.locals.ca,
+      s.locals.cap, s.locals.cb, s.locals.count, s.locals.cur, s.locals.current_count,
+      s.locals.delta, s.locals.dst, s.locals.filled, s.locals.front, s.locals.idx,
+      s.locals.iter, s.locals.max_drain, s.locals.max_val, s.locals.min_val,
+      s.locals.modified, s.locals.n, s.locals.new_val, s.locals.node, s.locals.nxt,
+      s.locals.old_head, s.locals.old_val, s.locals.out_val, s.locals.pop_ok,
+      s.locals.pop_result, s.locals.prev, s.locals.push_ok, s.locals.push_result,
+      s.locals.rb, s.locals.removed, s.locals.replaced, s.locals.result, (0 : UInt32),
+      s.locals.scratch, s.locals.skipped, s.locals.src, s.locals.stats,
+      s.locals.temp_node, s.locals.threshold, s.locals.tmp, s.locals.total,
+      s.locals.transferred, s.locals.val⟩ := by
+  unfold rb_contains_set_ret0
+  rfl
+
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rb_contains_set_ret0_locals_ret (s : ProgramState) :
+    (rb_contains_set_ret0 s).locals.ret__val = 0 := by
+  rw [rb_contains_set_ret0_locals_eq]
+
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rb_contains_set_cur_funext :
+    (fun s : ProgramState => { s with locals := { s.locals with
+      cur := (hVal s.globals.rawHeap s.locals.rb).head } }) = rb_contains_set_cur := by
+  funext s
+  unfold rb_contains_set_cur
+  rfl
+
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rb_contains_set_ret1_funext :
+    (fun s : ProgramState => { s with locals := { s.locals with ret__val := (1 : UInt32) } }) =
+      rb_contains_set_ret1 := by
+  funext s
+  unfold rb_contains_set_ret1
+  rfl
+
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rb_contains_set_cur_next_funext :
+    (fun s : ProgramState => { s with locals := { s.locals with
+      cur := (hVal s.globals.rawHeap s.locals.cur).next } }) = rb_contains_set_cur_next := by
+  funext s
+  unfold rb_contains_set_cur_next
+  rfl
+
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rb_contains_set_ret0_funext :
+    (fun s : ProgramState => { s with locals := { s.locals with ret__val := (0 : UInt32) } }) =
+      rb_contains_set_ret0 := by
+  funext s
+  unfold rb_contains_set_ret0
+  rfl
+
 -- rb_contains: loop
+set_option maxRecDepth 8192 in
+set_option maxHeartbeats 25600000 in
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
 theorem rb_contains_validHoare :
     rb_contains_spec.satisfiedBy RingBufferExt.l1_rb_contains_body := by
-  sorry
+  unfold FuncSpec.satisfiedBy rb_contains_spec
+  unfold RingBufferExt.l1_rb_contains_body
+  simp only [rb_contains_set_cur_funext, rb_contains_set_ret1_funext,
+    rb_contains_set_cur_next_funext, rb_contains_set_ret0_funext]
+  apply L1_hoare_catch (R := rb_contains_ret_bool)
+  · apply L1_hoare_seq (R := rb_contains_inv)
+    · -- setup: guard rb valid, then cur := rb.head
+      intro s hpre
+      obtain ⟨h_rb, h_ll⟩ := hpre
+      have h_gm := L1_guard_modify_result
+        (fun s : ProgramState => heapPtrValid s.globals.rawHeap s.locals.rb)
+        rb_contains_set_cur s h_rb
+      constructor
+      · exact h_gm.2
+      · intro r s' h_mem
+        rw [h_gm.1] at h_mem
+        have ⟨hr, hs⟩ := Prod.mk.inj h_mem
+        subst hr; subst hs
+        unfold rb_contains_inv
+        rw [rb_contains_set_cur_globals, rb_contains_set_cur_locals_cur]
+        exact h_ll
+    · -- rest: while + teardown
+      apply L1_hoare_seq (R := rb_contains_inv)
+      · -- while loop
+        apply L1_hoare_while_from_body
+        · -- loop body
+          apply L1_hoare_seq
+            (P := fun s => rb_contains_inv s ∧ decide (s.locals.cur ≠ Ptr.null) = true)
+            (R := fun s => rb_contains_inv s ∧ decide (s.locals.cur ≠ Ptr.null) = true)
+          · -- if cur->value == val then ret := 1; throw else skip
+            apply L1_hoare_condition
+            · intro s hpre
+              obtain ⟨⟨h_inv, h_cond⟩, h_match⟩ := hpre
+              have h_mt := L1_modify_throw_result rb_contains_set_ret1 s
+              constructor
+              · exact h_mt.2
+              · intro r s' h_mem
+                rw [h_mt.1] at h_mem
+                have ⟨hr, hs⟩ := Prod.mk.inj h_mem
+                subst hr; subst hs
+                unfold rb_contains_ret_bool
+                right
+                rw [rb_contains_set_ret1_locals_ret]
+            · intro s hpre
+              obtain ⟨⟨h_inv, h_cond⟩, h_nomatch⟩ := hpre
+              constructor
+              · intro hf
+                exact hf
+              · intro r s' h_mem
+                have ⟨hr, hs⟩ := Prod.mk.inj h_mem
+                match r with
+                | Except.ok () =>
+                  subst hs
+                  exact ⟨h_inv, h_cond⟩
+                | Except.error () =>
+                  exact absurd hr (by intro h; cases h)
+          · -- guard cur valid, then cur := cur->next
+            intro s hpre
+            obtain ⟨h_inv, h_cond⟩ := hpre
+            unfold rb_contains_inv at h_inv
+            have h_ne : s.locals.cur ≠ Ptr.null := by
+              simp only [decide_eq_true_eq] at h_cond
+              exact h_cond
+            have h_valid := h_inv.heapValid h_ne
+            have h_tail := h_inv.tail h_ne
+            have h_gm := L1_guard_modify_result
+              (fun s : ProgramState => heapPtrValid s.globals.rawHeap s.locals.cur)
+              rb_contains_set_cur_next s h_valid
+            constructor
+            · exact h_gm.2
+            · intro r s' h_mem
+              rw [h_gm.1] at h_mem
+              have ⟨hr, hs⟩ := Prod.mk.inj h_mem
+              subst hr; subst hs
+              unfold rb_contains_inv
+              rw [rb_contains_set_cur_next_globals, rb_contains_set_cur_next_locals_cur]
+              exact h_tail
+        · -- exit condition: while returns ok with invariant
+          intro s h_inv _
+          exact h_inv
+      · -- teardown: ret := 0; throw
+        intro s h_inv
+        have h_mt := L1_modify_throw_result rb_contains_set_ret0 s
+        constructor
+        · exact h_mt.2
+        · intro r s' h_mem
+          rw [h_mt.1] at h_mem
+          have ⟨hr, hs⟩ := Prod.mk.inj h_mem
+          subst hr; subst hs
+          unfold rb_contains_ret_bool
+          left
+          rw [rb_contains_set_ret0_locals_ret]
+  · -- handler: skip
+    intro s h_ret
+    constructor
+    · intro hf
+      exact hf
+    · intro r s' h_mem
+      have ⟨hr, hs⟩ := Prod.mk.inj h_mem
+      subst hr; subst hs
+      intro _
+      constructor
+      · exact h_ret
+      · trivial
 
 -- rb_find_index: loop
 theorem rb_find_index_validHoare :
