@@ -98,13 +98,119 @@ private theorem ht_update_retval_ht (s : ProgramState) (v : UInt32) :
     ({ s with locals := { s.locals with ret__val := v } } : ProgramState).locals.ht = s.locals.ht := rfl
 private theorem ht_update_retval_val (s : ProgramState) (v : UInt32) :
     ({ s with locals := { s.locals with ret__val := v } } : ProgramState).locals.ret__val = v := rfl
--- ht_hash is a pure function: h := key*M; ret := (h>>>16) & mask
--- The 13-field Locals struct causes kernel deep recursion when composing
--- two structure updates. The proof works tactically but the kernel checker fails.
--- Blocked on Lean 4 kernel limitation with deeply nested structure constructors.
+
+-- ht_hash step 1: h := key * 2654435769
+private noncomputable def ht_hash_f1 (s : ProgramState) : ProgramState :=
+  ⟨s.globals, ⟨s.locals.cap_mask, s.locals.capacity, s.locals.key * 2654435769,
+    s.locals.ht, s.locals.i, s.locals.idx, s.locals.key, s.locals.keys, s.locals.out,
+    s.locals.probes, s.locals.ret__val, s.locals.value, s.locals.values⟩⟩
+
+-- ht_hash step 2: ret__val := (h >>> 16) &&& cap_mask
+private noncomputable def ht_hash_f2 (s : ProgramState) : ProgramState :=
+  ⟨s.globals, ⟨s.locals.cap_mask, s.locals.capacity, s.locals.h, s.locals.ht, s.locals.i,
+    s.locals.idx, s.locals.key, s.locals.keys, s.locals.out, s.locals.probes,
+    (s.locals.h >>> 16) &&& s.locals.cap_mask, s.locals.value, s.locals.values⟩⟩
+
+attribute [local irreducible] hVal in
+private theorem ht_hash_f1_locals_eq (s : ProgramState) :
+    (ht_hash_f1 s).locals = ⟨s.locals.cap_mask, s.locals.capacity, s.locals.key * 2654435769,
+      s.locals.ht, s.locals.i, s.locals.idx, s.locals.key, s.locals.keys, s.locals.out,
+      s.locals.probes, s.locals.ret__val, s.locals.value, s.locals.values⟩ := by
+  show (⟨s.globals, ⟨s.locals.cap_mask, s.locals.capacity, s.locals.key * 2654435769,
+    s.locals.ht, s.locals.i, s.locals.idx, s.locals.key, s.locals.keys, s.locals.out,
+    s.locals.probes, s.locals.ret__val, s.locals.value, s.locals.values⟩⟩ :
+    ProgramState).locals = _
+  rfl
+
+attribute [local irreducible] hVal in
+@[simp] private theorem ht_hash_f1_locals_cap_mask (s : ProgramState) :
+    (ht_hash_f1 s).locals.cap_mask = s.locals.cap_mask := by
+  rw [ht_hash_f1_locals_eq]
+
+attribute [local irreducible] hVal in
+@[simp] private theorem ht_hash_f1_locals_h (s : ProgramState) :
+    (ht_hash_f1 s).locals.h = s.locals.key * 2654435769 := by
+  rw [ht_hash_f1_locals_eq]
+
+attribute [local irreducible] hVal in
+@[simp] private theorem ht_hash_f1_locals_key (s : ProgramState) :
+    (ht_hash_f1 s).locals.key = s.locals.key := by
+  rw [ht_hash_f1_locals_eq]
+
+attribute [local irreducible] hVal in
+private theorem ht_hash_f2_locals_eq (s : ProgramState) :
+    (ht_hash_f2 s).locals = ⟨s.locals.cap_mask, s.locals.capacity, s.locals.h, s.locals.ht,
+      s.locals.i, s.locals.idx, s.locals.key, s.locals.keys, s.locals.out, s.locals.probes,
+      (s.locals.h >>> 16) &&& s.locals.cap_mask, s.locals.value, s.locals.values⟩ := by
+  show (⟨s.globals, ⟨s.locals.cap_mask, s.locals.capacity, s.locals.h, s.locals.ht, s.locals.i,
+    s.locals.idx, s.locals.key, s.locals.keys, s.locals.out, s.locals.probes,
+    (s.locals.h >>> 16) &&& s.locals.cap_mask, s.locals.value, s.locals.values⟩⟩ :
+    ProgramState).locals = _
+  rfl
+
+attribute [local irreducible] hVal in
+@[simp] private theorem ht_hash_f2_locals_ret__val (s : ProgramState) :
+    (ht_hash_f2 s).locals.ret__val = (s.locals.h >>> 16) &&& s.locals.cap_mask := by
+  rw [ht_hash_f2_locals_eq]
+
+attribute [local irreducible] hVal in
+@[simp] private theorem ht_hash_f2_locals_cap_mask (s : ProgramState) :
+    (ht_hash_f2 s).locals.cap_mask = s.locals.cap_mask := by
+  rw [ht_hash_f2_locals_eq]
+
+attribute [local irreducible] hVal in
+@[simp] private theorem ht_hash_f2_locals_key (s : ProgramState) :
+    (ht_hash_f2 s).locals.key = s.locals.key := by
+  rw [ht_hash_f2_locals_eq]
+
+private theorem ht_hash_f1_funext :
+    (fun s : ProgramState => { s with locals := { s.locals with h := s.locals.key * 2654435769 } }) =
+      ht_hash_f1 := by
+  funext s
+  unfold ht_hash_f1
+  rfl
+
+private theorem ht_hash_f2_funext :
+    (fun s : ProgramState =>
+      { s with locals := { s.locals with ret__val := (s.locals.h >>> 16) &&& s.locals.cap_mask } }) =
+      ht_hash_f2 := by
+  funext s
+  unfold ht_hash_f2
+  rfl
+
+attribute [local irreducible] hVal in
 theorem ht_hash_correct :
     ht_hash_spec.satisfiedBy HashTable.l1_ht_hash_body := by
-  sorry -- kernel deep recursion on 13-field Locals struct; see backlog task
+  unfold FuncSpec.satisfiedBy ht_hash_spec validHoare
+  intro s _
+  unfold HashTable.l1_ht_hash_body
+  simp only [ht_hash_f1_funext, ht_hash_f2_funext]
+  have h_step2 := L1_modify_throw_result ht_hash_f2 (ht_hash_f1 s)
+  have h_step1_res : (L1.modify ht_hash_f1 s).results = {(Except.ok (), ht_hash_f1 s)} := rfl
+  have h_step1_nf : ¬(L1.modify ht_hash_f1 s).failed := by
+    intro h
+    exact h
+  have h_seq := L1_seq_singleton_ok h_step1_res h_step1_nf
+    (m₂ := L1.seq (L1.modify ht_hash_f2) L1.throw)
+  have h_body_res :
+      (L1.seq (L1.modify ht_hash_f1) (L1.seq (L1.modify ht_hash_f2) L1.throw) s).results =
+        {(Except.error (), ht_hash_f2 (ht_hash_f1 s))} := by
+    rw [h_seq.1, h_step2.1]
+  have h_body_nf :
+      ¬(L1.seq (L1.modify ht_hash_f1) (L1.seq (L1.modify ht_hash_f2) L1.throw) s).failed := by
+    intro hf
+    exact h_step2.2 (h_seq.2.mp hf)
+  have h_catch := L1_catch_error_singleton h_body_res h_body_nf
+  constructor
+  · exact h_catch.2
+  · intro r s' h_mem _
+    rw [h_catch.1] at h_mem
+    have ⟨hr, hs⟩ := Prod.mk.inj h_mem
+    subst hr
+    subst hs
+    rw [ht_hash_f2_locals_ret__val, ht_hash_f1_locals_h, ht_hash_f1_locals_cap_mask,
+      ht_hash_f2_locals_key, ht_hash_f2_locals_cap_mask, ht_hash_f1_locals_key,
+      ht_hash_f1_locals_cap_mask]
 
 attribute [local irreducible] hVal heapPtrValid in
 theorem ht_count_correct :
@@ -149,4 +255,16 @@ This is the key property for task 0186: the bitwise mask ensures bounds. -/
     assuming capacity is a power of 2. -/
 theorem hash_index_bounded (idx cap : UInt32) (h_pow2 : cap > 0) :
     (idx &&& (cap - 1)).toNat < cap.toNat := by
-  sorry -- requires UInt32 bitvector reasoning (Nat.bitwise_and_lt_of_lt_pow2)
+  have h_one_le_nat : (1 : Nat) ≤ cap.toNat := by
+    have h_cap_nat : 0 < cap.toNat := (UInt32.lt_iff_toNat_lt).1 h_pow2
+    exact Nat.succ_le_of_lt h_cap_nat
+  have h_one_le : (1 : UInt32) ≤ cap := by
+    exact (UInt32.le_iff_toNat_le).2 (by simpa using h_one_le_nat)
+  have h_sub_lt : cap - 1 < cap :=
+    UInt32.sub_lt (a := cap) (b := 1) (by decide) h_one_le
+  have h_sub_nat_lt : (cap - 1).toNat < cap.toNat :=
+    (UInt32.lt_iff_toNat_lt).1 h_sub_lt
+  have h_and_le : (idx &&& (cap - 1)).toNat ≤ (cap - 1).toNat := by
+    rw [UInt32.toNat_and]
+    exact Nat.and_le_right
+  omega
