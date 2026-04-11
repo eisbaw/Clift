@@ -15,7 +15,7 @@ import Clift.Lifting.Pipeline
 import Clift.Lifting.FuncSpec
 
 set_option maxHeartbeats 12800000
-set_option maxRecDepth 4096
+set_option maxRecDepth 16384
 
 open HashTable
 
@@ -91,21 +91,20 @@ def ht_contains_spec : FuncSpec ProgramState where
 
 /-! # Step 4: validHoare theorems -/
 
-theorem ht_hash_correct :
-    ht_hash_spec.satisfiedBy HashTable.l1_ht_hash_body := by
-  sorry
-
--- Projection lemma: updating ret__val preserves globals
+-- Projection lemmas for structure updates
 private theorem ht_update_retval_globals (s : ProgramState) (v : UInt32) :
     ({ s with locals := { s.locals with ret__val := v } } : ProgramState).globals = s.globals := rfl
-
--- Projection lemma: updating ret__val preserves locals.ht
 private theorem ht_update_retval_ht (s : ProgramState) (v : UInt32) :
     ({ s with locals := { s.locals with ret__val := v } } : ProgramState).locals.ht = s.locals.ht := rfl
-
--- Projection lemma: updating ret__val gives v
 private theorem ht_update_retval_val (s : ProgramState) (v : UInt32) :
     ({ s with locals := { s.locals with ret__val := v } } : ProgramState).locals.ret__val = v := rfl
+-- ht_hash is a pure function: h := key*M; ret := (h>>>16) & mask
+-- The 13-field Locals struct causes kernel deep recursion when composing
+-- two structure updates. The proof works tactically but the kernel checker fails.
+-- Blocked on Lean 4 kernel limitation with deeply nested structure constructors.
+theorem ht_hash_correct :
+    ht_hash_spec.satisfiedBy HashTable.l1_ht_hash_body := by
+  sorry -- kernel deep recursion on 13-field Locals struct; see backlog task
 
 attribute [local irreducible] hVal heapPtrValid in
 theorem ht_count_correct :
@@ -126,13 +125,15 @@ theorem ht_count_correct :
     subst hr; subst hs
     rw [ht_update_retval_val, ht_update_retval_globals, ht_update_retval_ht]
 
+-- requires while loop invariant machinery (linear probing loop)
 theorem ht_insert_correct :
     ht_insert_spec.satisfiedBy HashTable.l1_ht_insert_body := by
-  sorry
+  sorry -- requires while loop invariant
 
+-- requires while loop invariant machinery (linear probing loop)
 theorem ht_lookup_correct :
     ht_lookup_spec.satisfiedBy HashTable.l1_ht_lookup_body := by
-  sorry
+  sorry -- requires while loop invariant
 
 /-! # Step 5: Array bounds property (task 0186)
 
@@ -148,4 +149,4 @@ This is the key property for task 0186: the bitwise mask ensures bounds. -/
     assuming capacity is a power of 2. -/
 theorem hash_index_bounded (idx cap : UInt32) (h_pow2 : cap > 0) :
     (idx &&& (cap - 1)).toNat < cap.toNat := by
-  sorry
+  sorry -- requires UInt32 bitvector reasoning (Nat.bitwise_and_lt_of_lt_pow2)
