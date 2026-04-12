@@ -377,7 +377,9 @@ def rb_remove_first_match_spec : FuncSpec ProgramState where
 def rb_equal_spec : FuncSpec ProgramState where
   pre := fun s =>
     heapPtrValid s.globals.rawHeap s.locals.a ∧
-    heapPtrValid s.globals.rawHeap s.locals.b
+    heapPtrValid s.globals.rawHeap s.locals.b ∧
+    LinkedListValid s.globals.rawHeap (hVal s.globals.rawHeap s.locals.a).head ∧
+    LinkedListValid s.globals.rawHeap (hVal s.globals.rawHeap s.locals.b).head
   post := fun r s =>
     r = Except.ok () →
     (s.locals.ret__val = 0 ∨ s.locals.ret__val = 1) ∧
