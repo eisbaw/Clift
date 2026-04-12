@@ -25,10 +25,11 @@ Every proof is checked by the Lean 4 kernel. The proofs apply to the **actual C 
 
 ## Status
 
-- **50,778 LOC** (Lean 38.9K + Python 4.4K + C tests 4.4K + docs 2.4K)
+- **55K+ LOC** (Lean 42K + Python 4.4K + C tests 4.4K + docs 2.4K)
 - **260 C functions** across 13 verification domains
 - **Zero sorry in core library** (Clift/)
-- **187/219 backlog tasks done**, 32 remaining
+- **27 sorry remaining** in example proofs (down from 65, actively being eliminated)
+- **215+ backlog tasks done**
 - **Soundness tested**: attempted to prove False, all attempts failed
 
 ## Verified examples
@@ -53,7 +54,10 @@ Every proof is checked by the Lean 4 kernel. The proofs apply to the **actual C 
 
 - **gcd_correct_nat**: C `gcd()` computes GCD over natural numbers (full pipeline, zero sorry)
 - **swap_correct**: Pointer exchange with heap reasoning (zero sorry)
-- **ring_buffer_ext refinement**: Abstract FIFO queue spec refines to C (framework complete, per-function proofs in progress)
+- **rbt_lookup_correct**: Red-black tree BST search through L1_hoare_while (zero sorry)
+- **rb_push/rb_find_index**: Ring buffer linked-list mutation and traversal with loop invariants
+- **uart_init**: 11-field struct initialization with chained heapUpdate (zero sorry)
+- **ring_buffer_ext refinement**: Abstract FIFO queue spec refines to C (21/40 functions proven)
 - **Partition isolation**: Security property for two-partition ring buffer
 
 ## Architecture
@@ -82,6 +86,8 @@ lake build           # Build everything
 just import test/c_sources/gcd.c Gcd   # Import a C file
 just e2e             # Run end-to-end tests
 just regression      # Run full regression suite
+just lint            # Check for sorry + tautological postconditions
+just sorry-count     # Quick sorry audit
 ```
 
 See [docs/user-guide.md](docs/user-guide.md) for the full walkthrough.
