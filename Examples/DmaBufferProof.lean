@@ -279,10 +279,323 @@ private theorem L1_elim_cond_false {S : Type}
     L1.catch (L1.seq e m) handler s := by
   unfold L1.catch L1.seq L1.condition; simp [h]
 
--- Proof requires deeper kernel recursion than the current limit allows.
--- The spec is strengthened with correct preconditions (heapPtrValid for data array).
--- The proof structure is: eliminate false condition, chain 5 guard+modify steps,
--- catch the modify+throw error → ok with ret__val = 0.
+/-! ## Step functions with anonymous constructors (avoiding kernel deep recursion)
+
+  Locals fields in order: buf, cap_mask, capacity, data, n, out, ret__val, value, values, written
+  CState fields: globals, locals
+  Globals fields: rawHeap -/
+
+/-- Set cap_mask := (hVal buf).capacity - 1 (locals-only update). -/
+private noncomputable def dma_set_cap_mask (s : ProgramState) : ProgramState :=
+  ⟨s.globals, ⟨s.locals.buf, (hVal s.globals.rawHeap s.locals.buf).capacity - 1,
+    s.locals.capacity, s.locals.data, s.locals.n, s.locals.out,
+    s.locals.ret__val, s.locals.value, s.locals.values, s.locals.written⟩⟩
+
+/-- Set ret__val := 0 (locals-only update). -/
+private noncomputable def dma_set_ret0 (s : ProgramState) : ProgramState :=
+  ⟨s.globals, ⟨s.locals.buf, s.locals.cap_mask, s.locals.capacity, s.locals.data,
+    s.locals.n, s.locals.out, 0, s.locals.value, s.locals.values, s.locals.written⟩⟩
+
+/-- Write value to data[write_idx] (heap-only update). -/
+private noncomputable def dw_heap_data (s : ProgramState) : ProgramState :=
+  ⟨⟨heapUpdate s.globals.rawHeap
+    (Ptr.elemOffset s.locals.data (hVal s.globals.rawHeap s.locals.buf).write_idx.toNat)
+    s.locals.value⟩, s.locals⟩
+
+/-- Update buf.write_idx := (write_idx + 1) &&& cap_mask (heap-only update). -/
+private noncomputable def dw_heap_write_idx (s : ProgramState) : ProgramState :=
+  ⟨⟨heapUpdate s.globals.rawHeap s.locals.buf
+    ({ hVal s.globals.rawHeap s.locals.buf with
+       write_idx := ((hVal s.globals.rawHeap s.locals.buf).write_idx + 1) &&& s.locals.cap_mask })⟩,
+   s.locals⟩
+
+/-- Update buf.count := count + 1 (heap-only update). -/
+private noncomputable def dw_heap_count (s : ProgramState) : ProgramState :=
+  ⟨⟨heapUpdate s.globals.rawHeap s.locals.buf
+    ({ hVal s.globals.rawHeap s.locals.buf with
+       count := (hVal s.globals.rawHeap s.locals.buf).count + 1 })⟩,
+   s.locals⟩
+
+/-- Write hVal(data[read_idx]) to out ptr (heap-only update). -/
+private noncomputable def dr_heap_out (s : ProgramState) : ProgramState :=
+  ⟨⟨heapUpdate s.globals.rawHeap s.locals.out
+    (hVal s.globals.rawHeap
+      (Ptr.elemOffset s.locals.data (hVal s.globals.rawHeap s.locals.buf).read_idx.toNat))⟩,
+   s.locals⟩
+
+/-- Update buf.read_idx := (read_idx + 1) &&& cap_mask (heap-only update). -/
+private noncomputable def dr_heap_read_idx (s : ProgramState) : ProgramState :=
+  ⟨⟨heapUpdate s.globals.rawHeap s.locals.buf
+    ({ hVal s.globals.rawHeap s.locals.buf with
+       read_idx := ((hVal s.globals.rawHeap s.locals.buf).read_idx + 1) &&& s.locals.cap_mask })⟩,
+   s.locals⟩
+
+/-- Update buf.count := count - 1 (heap-only update). -/
+private noncomputable def dr_heap_count (s : ProgramState) : ProgramState :=
+  ⟨⟨heapUpdate s.globals.rawHeap s.locals.buf
+    ({ hVal s.globals.rawHeap s.locals.buf with
+       count := (hVal s.globals.rawHeap s.locals.buf).count - 1 })⟩,
+   s.locals⟩
+
+/-! ### Projection lemmas for dma_set_cap_mask -/
+
+attribute [local irreducible] hVal in
+private theorem dma_set_cap_mask_locals_eq (s : ProgramState) :
+    (dma_set_cap_mask s).locals =
+      ⟨s.locals.buf, (hVal s.globals.rawHeap s.locals.buf).capacity - 1,
+       s.locals.capacity, s.locals.data, s.locals.n, s.locals.out,
+       s.locals.ret__val, s.locals.value, s.locals.values, s.locals.written⟩ := by
+  show (⟨s.globals, ⟨s.locals.buf, (hVal s.globals.rawHeap s.locals.buf).capacity - 1,
+    s.locals.capacity, s.locals.data, s.locals.n, s.locals.out,
+    s.locals.ret__val, s.locals.value, s.locals.values, s.locals.written⟩⟩ :
+    ProgramState).locals = _; rfl
+
+attribute [local irreducible] hVal in
+@[simp] private theorem dma_set_cap_mask_globals (s : ProgramState) :
+    (dma_set_cap_mask s).globals = s.globals := by
+  show (⟨s.globals, ⟨s.locals.buf, (hVal s.globals.rawHeap s.locals.buf).capacity - 1,
+    s.locals.capacity, s.locals.data, s.locals.n, s.locals.out,
+    s.locals.ret__val, s.locals.value, s.locals.values, s.locals.written⟩⟩ :
+    ProgramState).globals = _; rfl
+
+@[simp] private theorem dma_set_cap_mask_buf (s : ProgramState) :
+    (dma_set_cap_mask s).locals.buf = s.locals.buf := by rw [dma_set_cap_mask_locals_eq]
+@[simp] private theorem dma_set_cap_mask_data (s : ProgramState) :
+    (dma_set_cap_mask s).locals.data = s.locals.data := by rw [dma_set_cap_mask_locals_eq]
+@[simp] private theorem dma_set_cap_mask_out (s : ProgramState) :
+    (dma_set_cap_mask s).locals.out = s.locals.out := by rw [dma_set_cap_mask_locals_eq]
+@[simp] private theorem dma_set_cap_mask_value (s : ProgramState) :
+    (dma_set_cap_mask s).locals.value = s.locals.value := by rw [dma_set_cap_mask_locals_eq]
+attribute [local irreducible] hVal in
+@[simp] private theorem dma_set_cap_mask_cap_mask (s : ProgramState) :
+    (dma_set_cap_mask s).locals.cap_mask =
+      (hVal s.globals.rawHeap s.locals.buf).capacity - 1 := by rw [dma_set_cap_mask_locals_eq]
+@[simp] private theorem dma_set_cap_mask_ret__val (s : ProgramState) :
+    (dma_set_cap_mask s).locals.ret__val = s.locals.ret__val := by rw [dma_set_cap_mask_locals_eq]
+
+/-! ### Projection lemmas for dma_set_ret0 -/
+
+@[simp] private theorem dma_set_ret0_globals (s : ProgramState) :
+    (dma_set_ret0 s).globals = s.globals := by
+  show (⟨s.globals, ⟨s.locals.buf, s.locals.cap_mask, s.locals.capacity, s.locals.data,
+    s.locals.n, s.locals.out, 0, s.locals.value, s.locals.values, s.locals.written⟩⟩ :
+    ProgramState).globals = _; rfl
+
+private theorem dma_set_ret0_locals_eq (s : ProgramState) :
+    (dma_set_ret0 s).locals =
+      ⟨s.locals.buf, s.locals.cap_mask, s.locals.capacity, s.locals.data,
+       s.locals.n, s.locals.out, 0, s.locals.value, s.locals.values, s.locals.written⟩ := by
+  show (⟨s.globals, ⟨s.locals.buf, s.locals.cap_mask, s.locals.capacity, s.locals.data,
+    s.locals.n, s.locals.out, 0, s.locals.value, s.locals.values, s.locals.written⟩⟩ :
+    ProgramState).locals = _; rfl
+
+@[simp] private theorem dma_set_ret0_buf (s : ProgramState) :
+    (dma_set_ret0 s).locals.buf = s.locals.buf := by rw [dma_set_ret0_locals_eq]
+@[simp] private theorem dma_set_ret0_ret__val (s : ProgramState) :
+    (dma_set_ret0 s).locals.ret__val = 0 := by rw [dma_set_ret0_locals_eq]
+
+/-! ### Projection lemmas for heap-update step functions -/
+
+-- dw_heap_data: ⟨⟨heapUpdate ...⟩, s.locals⟩
+attribute [local irreducible] hVal heapUpdate in
+@[simp] private theorem dw_heap_data_locals (s : ProgramState) :
+    (dw_heap_data s).locals = s.locals := by
+  show (⟨⟨heapUpdate s.globals.rawHeap
+    (Ptr.elemOffset s.locals.data (hVal s.globals.rawHeap s.locals.buf).write_idx.toNat)
+    s.locals.value⟩, s.locals⟩ : ProgramState).locals = _; rfl
+
+attribute [local irreducible] hVal heapUpdate in
+private theorem dw_heap_data_globals_eq (s : ProgramState) :
+    (dw_heap_data s).globals =
+      ⟨heapUpdate s.globals.rawHeap
+        (Ptr.elemOffset s.locals.data (hVal s.globals.rawHeap s.locals.buf).write_idx.toNat)
+        s.locals.value⟩ := by
+  show (⟨⟨heapUpdate s.globals.rawHeap
+    (Ptr.elemOffset s.locals.data (hVal s.globals.rawHeap s.locals.buf).write_idx.toNat)
+    s.locals.value⟩, s.locals⟩ : ProgramState).globals = _; rfl
+
+attribute [local irreducible] hVal heapUpdate in
+@[simp] private theorem dw_heap_data_rawHeap (s : ProgramState) :
+    (dw_heap_data s).globals.rawHeap =
+      heapUpdate s.globals.rawHeap
+        (Ptr.elemOffset s.locals.data (hVal s.globals.rawHeap s.locals.buf).write_idx.toNat)
+        s.locals.value := by rw [dw_heap_data_globals_eq]
+
+-- dw_heap_write_idx: ⟨⟨heapUpdate ... buf ...⟩, s.locals⟩
+attribute [local irreducible] hVal heapUpdate in
+@[simp] private theorem dw_heap_write_idx_locals (s : ProgramState) :
+    (dw_heap_write_idx s).locals = s.locals := by
+  show (⟨⟨heapUpdate s.globals.rawHeap s.locals.buf
+    ({ hVal s.globals.rawHeap s.locals.buf with
+       write_idx := ((hVal s.globals.rawHeap s.locals.buf).write_idx + 1) &&& s.locals.cap_mask })⟩,
+    s.locals⟩ : ProgramState).locals = _; rfl
+
+attribute [local irreducible] hVal heapUpdate in
+private theorem dw_heap_write_idx_globals_eq (s : ProgramState) :
+    (dw_heap_write_idx s).globals =
+      ⟨heapUpdate s.globals.rawHeap s.locals.buf
+        ({ hVal s.globals.rawHeap s.locals.buf with
+           write_idx := ((hVal s.globals.rawHeap s.locals.buf).write_idx + 1) &&& s.locals.cap_mask })⟩ := by
+  show (⟨⟨heapUpdate s.globals.rawHeap s.locals.buf
+    ({ hVal s.globals.rawHeap s.locals.buf with
+       write_idx := ((hVal s.globals.rawHeap s.locals.buf).write_idx + 1) &&& s.locals.cap_mask })⟩,
+    s.locals⟩ : ProgramState).globals = _; rfl
+
+attribute [local irreducible] hVal heapUpdate in
+@[simp] private theorem dw_heap_write_idx_rawHeap (s : ProgramState) :
+    (dw_heap_write_idx s).globals.rawHeap =
+      heapUpdate s.globals.rawHeap s.locals.buf
+        ({ hVal s.globals.rawHeap s.locals.buf with
+           write_idx := ((hVal s.globals.rawHeap s.locals.buf).write_idx + 1) &&& s.locals.cap_mask }) := by
+  rw [dw_heap_write_idx_globals_eq]
+
+-- dw_heap_count: ⟨⟨heapUpdate ... buf ...⟩, s.locals⟩
+attribute [local irreducible] hVal heapUpdate in
+@[simp] private theorem dw_heap_count_locals (s : ProgramState) :
+    (dw_heap_count s).locals = s.locals := by
+  show (⟨⟨heapUpdate s.globals.rawHeap s.locals.buf
+    ({ hVal s.globals.rawHeap s.locals.buf with
+       count := (hVal s.globals.rawHeap s.locals.buf).count + 1 })⟩,
+    s.locals⟩ : ProgramState).locals = _; rfl
+
+attribute [local irreducible] hVal heapUpdate in
+private theorem dw_heap_count_globals_eq (s : ProgramState) :
+    (dw_heap_count s).globals =
+      ⟨heapUpdate s.globals.rawHeap s.locals.buf
+        ({ hVal s.globals.rawHeap s.locals.buf with
+           count := (hVal s.globals.rawHeap s.locals.buf).count + 1 })⟩ := by
+  show (⟨⟨heapUpdate s.globals.rawHeap s.locals.buf
+    ({ hVal s.globals.rawHeap s.locals.buf with
+       count := (hVal s.globals.rawHeap s.locals.buf).count + 1 })⟩,
+    s.locals⟩ : ProgramState).globals = _; rfl
+
+attribute [local irreducible] hVal heapUpdate in
+@[simp] private theorem dw_heap_count_rawHeap (s : ProgramState) :
+    (dw_heap_count s).globals.rawHeap =
+      heapUpdate s.globals.rawHeap s.locals.buf
+        ({ hVal s.globals.rawHeap s.locals.buf with
+           count := (hVal s.globals.rawHeap s.locals.buf).count + 1 }) := by
+  rw [dw_heap_count_globals_eq]
+
+-- dr_heap_out: ⟨⟨heapUpdate ... out ...⟩, s.locals⟩
+attribute [local irreducible] hVal heapUpdate in
+@[simp] private theorem dr_heap_out_locals (s : ProgramState) :
+    (dr_heap_out s).locals = s.locals := by
+  show (⟨⟨heapUpdate s.globals.rawHeap s.locals.out
+    (hVal s.globals.rawHeap
+      (Ptr.elemOffset s.locals.data (hVal s.globals.rawHeap s.locals.buf).read_idx.toNat))⟩,
+    s.locals⟩ : ProgramState).locals = _; rfl
+
+attribute [local irreducible] hVal heapUpdate in
+private theorem dr_heap_out_globals_eq (s : ProgramState) :
+    (dr_heap_out s).globals =
+      ⟨heapUpdate s.globals.rawHeap s.locals.out
+        (hVal s.globals.rawHeap
+          (Ptr.elemOffset s.locals.data (hVal s.globals.rawHeap s.locals.buf).read_idx.toNat))⟩ := by
+  show (⟨⟨heapUpdate s.globals.rawHeap s.locals.out
+    (hVal s.globals.rawHeap
+      (Ptr.elemOffset s.locals.data (hVal s.globals.rawHeap s.locals.buf).read_idx.toNat))⟩,
+    s.locals⟩ : ProgramState).globals = _; rfl
+
+attribute [local irreducible] hVal heapUpdate in
+@[simp] private theorem dr_heap_out_rawHeap (s : ProgramState) :
+    (dr_heap_out s).globals.rawHeap =
+      heapUpdate s.globals.rawHeap s.locals.out
+        (hVal s.globals.rawHeap
+          (Ptr.elemOffset s.locals.data (hVal s.globals.rawHeap s.locals.buf).read_idx.toNat)) := by
+  rw [dr_heap_out_globals_eq]
+
+-- dr_heap_read_idx: ⟨⟨heapUpdate ... buf ...⟩, s.locals⟩
+attribute [local irreducible] hVal heapUpdate in
+@[simp] private theorem dr_heap_read_idx_locals (s : ProgramState) :
+    (dr_heap_read_idx s).locals = s.locals := by
+  show (⟨⟨heapUpdate s.globals.rawHeap s.locals.buf
+    ({ hVal s.globals.rawHeap s.locals.buf with
+       read_idx := ((hVal s.globals.rawHeap s.locals.buf).read_idx + 1) &&& s.locals.cap_mask })⟩,
+    s.locals⟩ : ProgramState).locals = _; rfl
+
+attribute [local irreducible] hVal heapUpdate in
+private theorem dr_heap_read_idx_globals_eq (s : ProgramState) :
+    (dr_heap_read_idx s).globals =
+      ⟨heapUpdate s.globals.rawHeap s.locals.buf
+        ({ hVal s.globals.rawHeap s.locals.buf with
+           read_idx := ((hVal s.globals.rawHeap s.locals.buf).read_idx + 1) &&& s.locals.cap_mask })⟩ := by
+  show (⟨⟨heapUpdate s.globals.rawHeap s.locals.buf
+    ({ hVal s.globals.rawHeap s.locals.buf with
+       read_idx := ((hVal s.globals.rawHeap s.locals.buf).read_idx + 1) &&& s.locals.cap_mask })⟩,
+    s.locals⟩ : ProgramState).globals = _; rfl
+
+attribute [local irreducible] hVal heapUpdate in
+@[simp] private theorem dr_heap_read_idx_rawHeap (s : ProgramState) :
+    (dr_heap_read_idx s).globals.rawHeap =
+      heapUpdate s.globals.rawHeap s.locals.buf
+        ({ hVal s.globals.rawHeap s.locals.buf with
+           read_idx := ((hVal s.globals.rawHeap s.locals.buf).read_idx + 1) &&& s.locals.cap_mask }) := by
+  rw [dr_heap_read_idx_globals_eq]
+
+-- dr_heap_count: ⟨⟨heapUpdate ... buf ...⟩, s.locals⟩
+attribute [local irreducible] hVal heapUpdate in
+@[simp] private theorem dr_heap_count_locals (s : ProgramState) :
+    (dr_heap_count s).locals = s.locals := by
+  show (⟨⟨heapUpdate s.globals.rawHeap s.locals.buf
+    ({ hVal s.globals.rawHeap s.locals.buf with
+       count := (hVal s.globals.rawHeap s.locals.buf).count - 1 })⟩,
+    s.locals⟩ : ProgramState).locals = _; rfl
+
+attribute [local irreducible] hVal heapUpdate in
+private theorem dr_heap_count_globals_eq (s : ProgramState) :
+    (dr_heap_count s).globals =
+      ⟨heapUpdate s.globals.rawHeap s.locals.buf
+        ({ hVal s.globals.rawHeap s.locals.buf with
+           count := (hVal s.globals.rawHeap s.locals.buf).count - 1 })⟩ := by
+  show (⟨⟨heapUpdate s.globals.rawHeap s.locals.buf
+    ({ hVal s.globals.rawHeap s.locals.buf with
+       count := (hVal s.globals.rawHeap s.locals.buf).count - 1 })⟩,
+    s.locals⟩ : ProgramState).globals = _; rfl
+
+attribute [local irreducible] hVal heapUpdate in
+@[simp] private theorem dr_heap_count_rawHeap (s : ProgramState) :
+    (dr_heap_count s).globals.rawHeap =
+      heapUpdate s.globals.rawHeap s.locals.buf
+        ({ hVal s.globals.rawHeap s.locals.buf with
+           count := (hVal s.globals.rawHeap s.locals.buf).count - 1 }) := by
+  rw [dr_heap_count_globals_eq]
+
+/-! ### heapPtrValid preservation through step functions -/
+
+private theorem dma_set_cap_mask_ptrValid_buf (s : ProgramState)
+    (h : heapPtrValid s.globals.rawHeap s.locals.buf) :
+    heapPtrValid (dma_set_cap_mask s).globals.rawHeap (dma_set_cap_mask s).locals.buf := by
+  simp only [dma_set_cap_mask_globals, dma_set_cap_mask_buf]; exact h
+
+private theorem dma_set_cap_mask_ptrValid_data (s : ProgramState)
+    (h : heapPtrValid s.globals.rawHeap
+      (Ptr.elemOffset s.locals.data (hVal s.globals.rawHeap s.locals.buf).write_idx.toNat)) :
+    heapPtrValid (dma_set_cap_mask s).globals.rawHeap
+      (Ptr.elemOffset (dma_set_cap_mask s).locals.data
+        (hVal (dma_set_cap_mask s).globals.rawHeap (dma_set_cap_mask s).locals.buf).write_idx.toNat) := by
+  simp only [dma_set_cap_mask_globals, dma_set_cap_mask_data, dma_set_cap_mask_buf]; exact h
+
+private theorem dw_heap_data_ptrValid_buf (s : ProgramState)
+    (h : heapPtrValid s.globals.rawHeap s.locals.buf) :
+    heapPtrValid (dw_heap_data s).globals.rawHeap (dw_heap_data s).locals.buf := by
+  simp only [dw_heap_data_rawHeap, dw_heap_data_locals]
+  exact heapUpdate_preserves_heapPtrValid _ _ _ _ h
+
+private theorem dw_heap_write_idx_ptrValid_buf (s : ProgramState)
+    (h : heapPtrValid s.globals.rawHeap s.locals.buf) :
+    heapPtrValid (dw_heap_write_idx s).globals.rawHeap (dw_heap_write_idx s).locals.buf := by
+  simp only [dw_heap_write_idx_rawHeap, dw_heap_write_idx_locals]
+  exact heapUpdate_preserves_heapPtrValid _ _ _ _ h
+
+private theorem dw_heap_count_ptrValid_buf (s : ProgramState)
+    (h : heapPtrValid s.globals.rawHeap s.locals.buf) :
+    heapPtrValid (dw_heap_count s).globals.rawHeap (dw_heap_count s).locals.buf := by
+  simp only [dw_heap_count_rawHeap, dw_heap_count_locals]
+  exact heapUpdate_preserves_heapPtrValid _ _ _ _ h
+
+/-! ### dma_write proof -/
+
 theorem dma_write_correct :
     dma_write_spec.satisfiedBy DmaBuffer.l1_dma_write_body := by
   unfold FuncSpec.satisfiedBy dma_write_spec validHoare
@@ -295,7 +608,110 @@ theorem dma_write_correct :
   rw [L1_elim_cond_false
     (fun st : ProgramState => decide ((hVal st.globals.rawHeap st.locals.buf).count >=
       (hVal st.globals.rawHeap st.locals.buf).capacity)) hcond]
-  sorry
+  -- After cond false: catch (seq skip rest) skip
+  -- Abbreviate guard predicates
+  let p := fun s : ProgramState => heapPtrValid s.globals.rawHeap s.locals.buf
+  let pd := fun s : ProgramState => heapPtrValid s.globals.rawHeap
+    (Ptr.elemOffset s.locals.data (hVal s.globals.rawHeap s.locals.buf).write_idx.toNat)
+  -- Step 1: guard buf, modify cap_mask
+  let s1 := dma_set_cap_mask s
+  have hbuf1 : p s1 := dma_set_cap_mask_ptrValid_buf s hbuf
+  have hdata1 : pd s1 := dma_set_cap_mask_ptrValid_data s hdata
+  have h1 := L1_guard_modify_result p dma_set_cap_mask s hbuf
+  -- Step 2: guard data_elem, modify data write
+  let s2 := dw_heap_data s1
+  have hbuf2 : p s2 := dw_heap_data_ptrValid_buf s1 hbuf1
+  have h2 := L1_guard_modify_result pd dw_heap_data s1 hdata1
+  -- Step 3: guard buf, guard buf, modify write_idx
+  let s3 := dw_heap_write_idx s2
+  have hbuf3 : p s3 := dw_heap_write_idx_ptrValid_buf s2 hbuf2
+  have h3 := L1_guard_guard_modify_result p p dw_heap_write_idx s2 hbuf2 hbuf2
+  -- Step 4: guard buf, guard buf, modify count
+  let s4 := dw_heap_count s3
+  have h4 := L1_guard_guard_modify_result p p dw_heap_count s3 hbuf3 hbuf3
+  -- Step 5: modify ret0, throw
+  let s5 := dma_set_ret0 s4
+  have h5 := L1_modify_throw_result dma_set_ret0 s4
+  -- Define monad terms
+  let m5 : L1Monad ProgramState := L1.seq (L1.modify dma_set_ret0) L1.throw
+  let m4 : L1Monad ProgramState := L1.seq (L1.seq (L1.guard p) (L1.seq (L1.guard p) (L1.modify dw_heap_count))) m5
+  let m3 : L1Monad ProgramState := L1.seq (L1.seq (L1.guard p) (L1.seq (L1.guard p) (L1.modify dw_heap_write_idx))) m4
+  let m2 : L1Monad ProgramState := L1.seq (L1.seq (L1.guard pd) (L1.modify dw_heap_data)) m3
+  let m1 : L1Monad ProgramState := L1.seq (L1.seq (L1.guard p) (L1.modify dma_set_cap_mask)) m2
+  -- Chain steps 4+5
+  have hm4 := L1_seq_singleton_ok h4.1 h4.2 (m₂ := m5)
+  have hm4_res : (m4 s3).results = {(Except.error (), s5)} := by
+    dsimp [m4, m5]; rw [hm4.1, h5.1]
+  have hm4_nf : ¬(m4 s3).failed := by
+    dsimp [m4, m5]; intro hf; exact h5.2 (hm4.2.mp hf)
+  -- Chain 3+4+5
+  have hm3 := L1_seq_singleton_ok h3.1 h3.2 (m₂ := m4)
+  have hm3_res : (m3 s2).results = {(Except.error (), s5)} := by
+    dsimp [m3]; rw [hm3.1, hm4_res]
+  have hm3_nf : ¬(m3 s2).failed := by
+    dsimp [m3]; intro hf; exact hm4_nf (hm3.2.mp hf)
+  -- Chain 2+3+4+5
+  have hm2 := L1_seq_singleton_ok h2.1 h2.2 (m₂ := m3)
+  have hm2_res : (m2 s1).results = {(Except.error (), s5)} := by
+    dsimp [m2]; rw [hm2.1, hm3_res]
+  have hm2_nf : ¬(m2 s1).failed := by
+    dsimp [m2]; intro hf; exact hm3_nf (hm2.2.mp hf)
+  -- Chain 1+2+3+4+5
+  have hm1 := L1_seq_singleton_ok h1.1 h1.2 (m₂ := m2)
+  have hm1_res : (m1 s).results = {(Except.error (), s5)} := by
+    dsimp [m1]; rw [hm1.1, hm2_res]
+  have hm1_nf : ¬(m1 s).failed := by
+    dsimp [m1]; intro hf; exact hm2_nf (hm1.2.mp hf)
+  -- Chain skip + body
+  have h_skip := L1_seq_singleton_ok
+    (show (L1.skip s).results = {(Except.ok (), s)} from rfl)
+    (show ¬(L1.skip s).failed from not_false) (m₂ := m1)
+  have h_body_res : (L1.seq L1.skip m1 s).results = {(Except.error (), s5)} := by
+    rw [h_skip.1, hm1_res]
+  have h_body_nf : ¬(L1.seq L1.skip m1 s).failed := by
+    intro hf; exact hm1_nf (h_skip.2.mp hf)
+  -- Catch converts error to ok
+  have ⟨h_res, h_nf⟩ := L1_catch_error_singleton h_body_res h_body_nf
+  constructor
+  · exact h_nf
+  · intro r s' h_mem _
+    have h_mem' : (r, s') ∈ ({(Except.ok (), s5)} : Set _) := h_res ▸ h_mem
+    obtain ⟨rfl, rfl⟩ := Prod.mk.inj (Set.mem_singleton_iff.mp h_mem')
+    exact dma_set_ret0_ret__val _
+
+/-! ### dma_read proof -/
+
+-- heapPtrValid preservation for read step functions
+private theorem dma_set_cap_mask_ptrValid_out (s : ProgramState)
+    (h : heapPtrValid s.globals.rawHeap s.locals.out) :
+    heapPtrValid (dma_set_cap_mask s).globals.rawHeap (dma_set_cap_mask s).locals.out := by
+  simp only [dma_set_cap_mask_globals, dma_set_cap_mask_out]; exact h
+
+private theorem dma_set_cap_mask_ptrValid_data_read (s : ProgramState)
+    (h : heapPtrValid s.globals.rawHeap
+      (Ptr.elemOffset s.locals.data (hVal s.globals.rawHeap s.locals.buf).read_idx.toNat)) :
+    heapPtrValid (dma_set_cap_mask s).globals.rawHeap
+      (Ptr.elemOffset (dma_set_cap_mask s).locals.data
+        (hVal (dma_set_cap_mask s).globals.rawHeap (dma_set_cap_mask s).locals.buf).read_idx.toNat) := by
+  simp only [dma_set_cap_mask_globals, dma_set_cap_mask_data, dma_set_cap_mask_buf]; exact h
+
+private theorem dr_heap_out_ptrValid_buf (s : ProgramState)
+    (h : heapPtrValid s.globals.rawHeap s.locals.buf) :
+    heapPtrValid (dr_heap_out s).globals.rawHeap (dr_heap_out s).locals.buf := by
+  simp only [dr_heap_out_rawHeap, dr_heap_out_locals]
+  exact heapUpdate_preserves_heapPtrValid _ _ _ _ h
+
+private theorem dr_heap_read_idx_ptrValid_buf (s : ProgramState)
+    (h : heapPtrValid s.globals.rawHeap s.locals.buf) :
+    heapPtrValid (dr_heap_read_idx s).globals.rawHeap (dr_heap_read_idx s).locals.buf := by
+  simp only [dr_heap_read_idx_rawHeap, dr_heap_read_idx_locals]
+  exact heapUpdate_preserves_heapPtrValid _ _ _ _ h
+
+private theorem dr_heap_count_ptrValid_buf (s : ProgramState)
+    (h : heapPtrValid s.globals.rawHeap s.locals.buf) :
+    heapPtrValid (dr_heap_count s).globals.rawHeap (dr_heap_count s).locals.buf := by
+  simp only [dr_heap_count_rawHeap, dr_heap_count_locals]
+  exact heapUpdate_preserves_heapPtrValid _ _ _ _ h
 
 theorem dma_read_correct :
     dma_read_spec.satisfiedBy DmaBuffer.l1_dma_read_body := by
@@ -308,4 +724,74 @@ theorem dma_read_correct :
   unfold DmaBuffer.l1_dma_read_body
   rw [L1_elim_cond_false
     (fun st : ProgramState => decide ((hVal st.globals.rawHeap st.locals.buf).count = 0)) hcond]
-  sorry
+  -- After cond false: catch (seq skip rest) skip
+  let p := fun s : ProgramState => heapPtrValid s.globals.rawHeap s.locals.buf
+  let po := fun s : ProgramState => heapPtrValid s.globals.rawHeap s.locals.out
+  let prd := fun s : ProgramState => heapPtrValid s.globals.rawHeap
+    (Ptr.elemOffset s.locals.data (hVal s.globals.rawHeap s.locals.buf).read_idx.toNat)
+  -- Step 1: guard buf, modify cap_mask
+  let s1 := dma_set_cap_mask s
+  have hbuf1 : p s1 := dma_set_cap_mask_ptrValid_buf s hbuf
+  have hout1 : po s1 := dma_set_cap_mask_ptrValid_out s hout
+  have hdata1 : prd s1 := dma_set_cap_mask_ptrValid_data_read s hdata
+  have h1 := L1_guard_modify_result p dma_set_cap_mask s hbuf
+  -- Step 2: guard out, guard data[read_idx], guard buf, modify heap (write to out)
+  let s2 := dr_heap_out s1
+  have hbuf2 : p s2 := dr_heap_out_ptrValid_buf s1 hbuf1
+  have h2 := L1_guard_guard_guard_modify_result po prd p dr_heap_out s1 hout1 hdata1 hbuf1
+  -- Step 3: guard buf, guard buf, modify read_idx
+  let s3 := dr_heap_read_idx s2
+  have hbuf3 : p s3 := dr_heap_read_idx_ptrValid_buf s2 hbuf2
+  have h3 := L1_guard_guard_modify_result p p dr_heap_read_idx s2 hbuf2 hbuf2
+  -- Step 4: guard buf, guard buf, modify count
+  let s4 := dr_heap_count s3
+  have h4 := L1_guard_guard_modify_result p p dr_heap_count s3 hbuf3 hbuf3
+  -- Step 5: modify ret0, throw
+  let s5 := dma_set_ret0 s4
+  have h5 := L1_modify_throw_result dma_set_ret0 s4
+  -- Define monad terms
+  let m5 : L1Monad ProgramState := L1.seq (L1.modify dma_set_ret0) L1.throw
+  let m4 : L1Monad ProgramState := L1.seq (L1.seq (L1.guard p) (L1.seq (L1.guard p) (L1.modify dr_heap_count))) m5
+  let m3 : L1Monad ProgramState := L1.seq (L1.seq (L1.guard p) (L1.seq (L1.guard p) (L1.modify dr_heap_read_idx))) m4
+  let m2 : L1Monad ProgramState := L1.seq (L1.seq (L1.guard po) (L1.seq (L1.guard prd) (L1.seq (L1.guard p) (L1.modify dr_heap_out)))) m3
+  let m1 : L1Monad ProgramState := L1.seq (L1.seq (L1.guard p) (L1.modify dma_set_cap_mask)) m2
+  -- Chain steps 4+5
+  have hm4 := L1_seq_singleton_ok h4.1 h4.2 (m₂ := m5)
+  have hm4_res : (m4 s3).results = {(Except.error (), s5)} := by
+    dsimp [m4, m5]; rw [hm4.1, h5.1]
+  have hm4_nf : ¬(m4 s3).failed := by
+    dsimp [m4, m5]; intro hf; exact h5.2 (hm4.2.mp hf)
+  -- Chain 3+4+5
+  have hm3 := L1_seq_singleton_ok h3.1 h3.2 (m₂ := m4)
+  have hm3_res : (m3 s2).results = {(Except.error (), s5)} := by
+    dsimp [m3]; rw [hm3.1, hm4_res]
+  have hm3_nf : ¬(m3 s2).failed := by
+    dsimp [m3]; intro hf; exact hm4_nf (hm3.2.mp hf)
+  -- Chain 2+3+4+5
+  have hm2 := L1_seq_singleton_ok h2.1 h2.2 (m₂ := m3)
+  have hm2_res : (m2 s1).results = {(Except.error (), s5)} := by
+    dsimp [m2]; rw [hm2.1, hm3_res]
+  have hm2_nf : ¬(m2 s1).failed := by
+    dsimp [m2]; intro hf; exact hm3_nf (hm2.2.mp hf)
+  -- Chain 1+2+3+4+5
+  have hm1 := L1_seq_singleton_ok h1.1 h1.2 (m₂ := m2)
+  have hm1_res : (m1 s).results = {(Except.error (), s5)} := by
+    dsimp [m1]; rw [hm1.1, hm2_res]
+  have hm1_nf : ¬(m1 s).failed := by
+    dsimp [m1]; intro hf; exact hm2_nf (hm1.2.mp hf)
+  -- Chain skip + body
+  have h_skip := L1_seq_singleton_ok
+    (show (L1.skip s).results = {(Except.ok (), s)} from rfl)
+    (show ¬(L1.skip s).failed from not_false) (m₂ := m1)
+  have h_body_res : (L1.seq L1.skip m1 s).results = {(Except.error (), s5)} := by
+    rw [h_skip.1, hm1_res]
+  have h_body_nf : ¬(L1.seq L1.skip m1 s).failed := by
+    intro hf; exact hm1_nf (h_skip.2.mp hf)
+  -- Catch converts error to ok
+  have ⟨h_res, h_nf⟩ := L1_catch_error_singleton h_body_res h_body_nf
+  constructor
+  · exact h_nf
+  · intro r s' h_mem _
+    have h_mem' : (r, s') ∈ ({(Except.ok (), s5)} : Set _) := h_res ▸ h_mem
+    obtain ⟨rfl, rfl⟩ := Prod.mk.inj (Set.mem_singleton_iff.mp h_mem')
+    exact dma_set_ret0_ret__val _

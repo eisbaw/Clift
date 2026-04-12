@@ -141,6 +141,18 @@ theorem L1_catch_singleton_ok {body : L1Monad σ} {s s' : σ}
     · rw [h_res] at h_err
       exact absurd (Prod.mk.inj h_err).1 (by intro h; cases h)
 
+/-- L1.seq (guard p) (seq (guard q) (seq (guard r) (modify f))) produces {(ok, f s)}. -/
+theorem L1_guard_guard_guard_modify_result (p q r : σ → Prop)
+    [DecidablePred p] [DecidablePred q] [DecidablePred r]
+    (f : σ → σ) (s : σ) (hp : p s) (hq : q s) (hr : r s) :
+    (L1.seq (L1.guard p) (L1.seq (L1.guard q) (L1.seq (L1.guard r) (L1.modify f))) s).results =
+      {(Except.ok (), f s)} ∧
+    ¬(L1.seq (L1.guard p) (L1.seq (L1.guard q) (L1.seq (L1.guard r) (L1.modify f))) s).failed := by
+  have h_inner := L1_guard_guard_modify_result q r f s hq hr
+  have h_chain := L1_seq_singleton_ok (L1_guard_results hp) (L1_guard_not_failed hp)
+    (m₂ := L1.seq (L1.guard q) (L1.seq (L1.guard r) (L1.modify f)))
+  exact ⟨by rw [h_chain.1, h_inner.1], fun hf => h_inner.2 (h_chain.2.mp hf)⟩
+
 /-- seq (modify f) throw produces exactly {(error, f s)}, not failed. -/
 theorem L1_modify_throw_result (f : σ → σ) (s : σ) :
     (L1.seq (L1.modify f) L1.throw s).results = {(Except.error (), f s)} ∧
