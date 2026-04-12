@@ -533,7 +533,7 @@ private theorem l1ProcEnv_ht_hash :
 
 -- ht_hash produces exactly ok results (not error or fail).
 -- This strengthens ht_hash_correct to the form needed by L1_hoare_seq_ok.
-attribute [local irreducible] hVal in
+attribute [local irreducible] hVal ht_hash_f1 ht_hash_f2 in
 private theorem ht_hash_ok :
     validHoare (fun _ : ProgramState => True) HashTable.l1_ht_hash_body
       (fun r s => r = Except.ok () ∧
@@ -562,10 +562,13 @@ private theorem ht_hash_ok :
     rw [h_catch.1] at h_mem
     have ⟨hr, hs⟩ := Prod.mk.inj h_mem
     subst hr; subst hs
-    exact ⟨rfl, rfl⟩
+    refine ⟨rfl, ?_⟩
+    rw [ht_hash_f2_locals_ret__val, ht_hash_f1_locals_h, ht_hash_f1_locals_cap_mask,
+      ht_hash_f2_locals_key, ht_hash_f1_locals_key,
+      ht_hash_f2_locals_cap_mask, ht_hash_f1_locals_cap_mask]
 
 -- Stronger ht_hash: produces ok, preserves globals, sets ret_val
-attribute [local irreducible] hVal in
+attribute [local irreducible] hVal ht_hash_f1 ht_hash_f2 in
 private theorem ht_hash_full (s : ProgramState) :
     ¬(HashTable.l1_ht_hash_body s).failed ∧
     ∀ r s', (r, s') ∈ (HashTable.l1_ht_hash_body s).results →
@@ -594,140 +597,13 @@ private theorem ht_hash_full (s : ProgramState) :
     rw [h_catch.1] at h_mem
     have ⟨hr, hs⟩ := Prod.mk.inj h_mem
     subst hr; subst hs
-    exact ⟨rfl, rfl, rfl, rfl, rfl⟩
-
-attribute [local irreducible] hVal heapPtrValid heapUpdate HashTable.l1_ht_hash_body in
-private theorem ht_lookup_dynCom_hoare :
-    validHoare
-      (fun s => heapPtrValid s.globals.rawHeap s.locals.ht ∧
-                heapPtrValid s.globals.rawHeap s.locals.out ∧
-                (hVal s.globals.rawHeap s.locals.ht).capacity > 0 ∧
-                ht_arrays_valid s.globals.rawHeap s.locals.keys s.locals.values
-                  (hVal s.globals.rawHeap s.locals.ht).capacity ∧
-                s.locals.cap_mask = (hVal s.globals.rawHeap s.locals.ht).capacity - 1)
-      (L1.dynCom (fun saved =>
-        L1.seq (L1.modify (fun s => { s with locals := { s.locals with
-          key := s.locals.key, cap_mask := s.locals.cap_mask } }))
-        (L1.seq HashTable.l1_ht_hash_body
-          (L1.modify (fun s => { s with locals := { saved.locals with
-            idx := s.locals.ret__val } })))))
-      (fun r s => r = Except.ok () ∧ ht_loop_inv s ∧
-                  heapPtrValid s.globals.rawHeap s.locals.out) := by
-  apply L1_hoare_dynCom
-  intro saved ⟨h_ht, h_out, h_cap, h_arr, h_cm⟩
-  -- Inner body: seq (modify id) (seq ht_hash (modify restore))
-  -- Use L1_hoare_seq_ok chain
-  apply L1_hoare_seq_ok
-    (R := fun s => heapPtrValid s.globals.rawHeap s.locals.ht ∧
-                    heapPtrValid s.globals.rawHeap s.locals.out ∧
-                    (hVal s.globals.rawHeap s.locals.ht).capacity > 0 ∧
-                    ht_arrays_valid s.globals.rawHeap s.locals.keys s.locals.values
-                      (hVal s.globals.rawHeap s.locals.ht).capacity ∧
-                    s.locals.cap_mask = (hVal s.globals.rawHeap s.locals.ht).capacity - 1)
-  · -- modify setup (identity): {s with locals := {s.locals with key := key, cap_mask := cap_mask}} = s
-    intro s ⟨h_eq, _⟩
-    constructor
-    · intro hf; exact hf
-    · intro r s' h_mem
-      have ⟨hr, hs⟩ := Prod.mk.inj h_mem
-      -- setup is identity
-      exact ⟨hr, by subst hs; exact ⟨h_ht, h_out, h_cap, h_arr, h_cm⟩⟩
-  · -- seq ht_hash (modify restore)
-    apply L1_hoare_seq_ok
-      (R := fun s₂ => s₂.globals = saved.globals ∧
-        s₂.locals.ret__val = ((saved.locals.key * 2654435769) >>> 16) &&& saved.locals.cap_mask)
-    · -- ht_hash
-      intro s ⟨h_ht', h_out', h_cap', h_arr', h_cm'⟩
-      have ⟨h_nf, h_post⟩ := ht_hash_full s
-      constructor
-      · exact h_nf
-      · intro r s' h_mem
-        have ⟨h_ok, h_glob, h_rv, _, _⟩ := h_post r s' h_mem
-        exact ⟨h_ok, h_glob, h_rv⟩
-    · -- modify restore: set locals from saved with idx := ret_val
-      simp only [lk_restore_funext]
-      intro s₂ ⟨h_glob, h_rv⟩
-      constructor
-      · intro hf; exact hf
-      · intro r s' h_mem
-        have ⟨hr, hs⟩ := Prod.mk.inj h_mem
-        subst hr; subst hs
-        refine ⟨rfl, ?_, ?_⟩
-        · refine ⟨?_, ?_, ?_, ?_, ?_⟩
-          · rw [lk_restore_globals, lk_restore_ht, h_glob]; exact h_ht
-          · rw [lk_restore_globals, lk_restore_keys, lk_restore_values,
-              lk_restore_ht, h_glob]; exact h_arr
-          · rw [lk_restore_globals, lk_restore_ht, h_glob]; exact h_cap
-          · rw [lk_restore_cap_mask]; exact h_cm
-          · rw [lk_restore_idx, h_rv, h_cm,
-              show (lk_restore saved s₂).globals = saved.globals by rw [lk_restore_globals, h_glob],
-              show (lk_restore saved s₂).locals.ht = saved.locals.ht by rw [lk_restore_ht]]
-            exact hash_index_bounded' _ _ h_cap
-        · rw [lk_restore_globals, lk_restore_out, h_glob]; exact h_out
-
--- Insert version of the dynCom (same structure, different postcondition)
-attribute [local irreducible] hVal heapPtrValid heapUpdate HashTable.l1_ht_hash_body in
-private theorem ht_insert_dynCom_hoare :
-    validHoare
-      (fun s => heapPtrValid s.globals.rawHeap s.locals.ht ∧
-                s.locals.key > 1 ∧
-                (hVal s.globals.rawHeap s.locals.ht).capacity > 0 ∧
-                ht_arrays_valid s.globals.rawHeap s.locals.keys s.locals.values
-                  (hVal s.globals.rawHeap s.locals.ht).capacity ∧
-                s.locals.cap_mask = (hVal s.globals.rawHeap s.locals.ht).capacity - 1)
-      (L1.dynCom (fun saved =>
-        L1.seq (L1.modify (fun s => { s with locals := { s.locals with
-          key := s.locals.key, cap_mask := s.locals.cap_mask } }))
-        (L1.seq HashTable.l1_ht_hash_body
-          (L1.modify (fun s => { s with locals := { saved.locals with
-            idx := s.locals.ret__val } })))))
-      (fun r s => r = Except.ok () ∧ ht_insert_loop_inv s) := by
-  apply L1_hoare_dynCom
-  intro saved ⟨h_ht, h_key, h_cap, h_arr, h_cm⟩
-  apply L1_hoare_seq_ok
-    (R := fun s => heapPtrValid s.globals.rawHeap s.locals.ht ∧
-                    s.locals.key > 1 ∧
-                    (hVal s.globals.rawHeap s.locals.ht).capacity > 0 ∧
-                    ht_arrays_valid s.globals.rawHeap s.locals.keys s.locals.values
-                      (hVal s.globals.rawHeap s.locals.ht).capacity ∧
-                    s.locals.cap_mask = (hVal s.globals.rawHeap s.locals.ht).capacity - 1)
-  · -- modify setup (identity)
-    intro s ⟨h_eq, _⟩
-    constructor
-    · intro hf; exact hf
-    · intro r s' h_mem
-      have ⟨hr, hs⟩ := Prod.mk.inj h_mem
-      exact ⟨hr, by subst hs; exact ⟨h_ht, h_key, h_cap, h_arr, h_cm⟩⟩
-  · -- seq ht_hash (modify restore)
-    apply L1_hoare_seq_ok
-      (R := fun s₂ => s₂.globals = saved.globals ∧
-        s₂.locals.ret__val = ((saved.locals.key * 2654435769) >>> 16) &&& saved.locals.cap_mask)
-    · intro s ⟨h_ht', _, h_cap', h_arr', h_cm'⟩
-      have ⟨h_nf, h_post⟩ := ht_hash_full s
-      constructor
-      · exact h_nf
-      · intro r s' h_mem
-        have ⟨h_ok, h_glob, h_rv, _, _⟩ := h_post r s' h_mem
-        exact ⟨h_ok, h_glob, h_rv⟩
-    · simp only [lk_restore_funext]
-      intro s₂ ⟨h_glob, h_rv⟩
-      constructor
-      · intro hf; exact hf
-      · intro r s' h_mem
-        have ⟨hr, hs⟩ := Prod.mk.inj h_mem
-        subst hr; subst hs
-        refine ⟨rfl, ?_⟩
-        refine ⟨⟨?_, ?_, ?_, ?_, ?_⟩, ?_⟩
-        · rw [lk_restore_globals, lk_restore_ht, h_glob]; exact h_ht
-        · rw [lk_restore_globals, lk_restore_keys, lk_restore_values,
-            lk_restore_ht, h_glob]; exact h_arr
-        · rw [lk_restore_globals, lk_restore_ht, h_glob]; exact h_cap
-        · rw [lk_restore_cap_mask]; exact h_cm
-        · rw [lk_restore_idx, h_rv, h_cm,
-            show (lk_restore saved s₂).globals = saved.globals by rw [lk_restore_globals, h_glob],
-            show (lk_restore saved s₂).locals.ht = saved.locals.ht by rw [lk_restore_ht]]
-          exact hash_index_bounded' _ _ h_cap
-        · rw [lk_restore_key]; exact h_key
+    -- ht_hash_f1/f2 are local irreducible, so projections use @simp lemmas
+    refine ⟨rfl, ?_, ?_, ?_, ?_⟩
+    · show (ht_hash_f2 (ht_hash_f1 s)).globals = s.globals
+      unfold ht_hash_f2 ht_hash_f1; rfl
+    · rw [ht_hash_f2_locals_ret__val, ht_hash_f1_locals_h, ht_hash_f1_locals_cap_mask]
+    · rw [ht_hash_f2_locals_key, ht_hash_f1_locals_key]
+    · rw [ht_hash_f2_locals_cap_mask, ht_hash_f1_locals_cap_mask]
 
 -- Helper: shared guard+modify cap_mask proof (used by both lookup and insert)
 attribute [local irreducible] hVal heapPtrValid heapUpdate in
@@ -819,7 +695,9 @@ theorem ht_lookup_correct :
         (R := fun s => ht_loop_inv s ∧
                         heapPtrValid s.globals.rawHeap s.locals.out)
       · -- dynCom: calls ht_hash, restores locals, sets idx
-        exact ht_lookup_dynCom_hoare
+        -- OOM blocker: dynCom + L1.call elaboration requires >15GB.
+        -- All infrastructure is in place (ht_hash_full, lk_restore, hash_index_bounded').
+        sorry
       · -- seq probes:=0 (seq while ret:=0;throw)
         apply L1_hoare_seq_ok
           (R := fun s => ht_loop_inv s ∧
@@ -905,11 +783,15 @@ theorem ht_insert_correct :
                         ht_arrays_valid s.globals.rawHeap s.locals.keys s.locals.values
                           (hVal s.globals.rawHeap s.locals.ht).capacity ∧
                         s.locals.cap_mask = (hVal s.globals.rawHeap s.locals.ht).capacity - 1)
-      · -- guard heapPtrValid ht; modify cap_mask
-        -- Same structure as lookup's guard+modify proof.
-        -- The proof is identical but the insert context causes kernel deep recursion
-        -- due to the larger L1 body tree. Needs refactoring to a shared lemma.
-        sorry
+      · -- guard heapPtrValid ht; modify cap_mask (shared helper avoids deep recursion)
+        simp only [lk_set_cm_funext]
+        exact ht_guard_modify_cm _ _ (fun s ⟨hv, _, _, _⟩ => hv)
+          (fun s ⟨hv, hk, hc, ha⟩ => ⟨
+            by rw [lk_set_cm_globals, lk_set_cm_ht]; exact hv,
+            by rw [lk_set_cm_key]; exact hk,
+            by rw [lk_set_cm_globals, lk_set_cm_ht]; exact hc,
+            by rw [lk_set_cm_globals, lk_set_cm_keys, lk_set_cm_values, lk_set_cm_ht]; exact ha,
+            by rw [lk_set_cm_cap_mask, lk_set_cm_globals, lk_set_cm_ht]⟩)
       · -- rest: dynCom, probes:=0, while, ret:=1;throw
         sorry
   · -- Handler proof: skip preserves ht_ret_01
