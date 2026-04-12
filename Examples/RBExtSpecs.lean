@@ -366,13 +366,12 @@ def rb_fill_spec : FuncSpec ProgramState where
     Returns 0 if found and removed, 1 if not found.
     Task 0137: on success (ret=0), count decremented. On not-found (ret=1), state unchanged. -/
 def rb_remove_first_match_spec : FuncSpec ProgramState where
-  pre := fun s => heapPtrValid s.globals.rawHeap s.locals.rb
+  pre := fun s =>
+    heapPtrValid s.globals.rawHeap s.locals.rb ∧
+    WellFormedList s.globals.rawHeap (hVal s.globals.rawHeap s.locals.rb).head
   post := fun r s =>
     r = Except.ok () →
-    (s.locals.ret__val = 0 ∨ s.locals.ret__val = 1) ∧
-    -- Capacity unchanged regardless of outcome
-    (hVal s.globals.rawHeap s.locals.rb).capacity =
-      (hVal s.globals.rawHeap s.locals.rb).capacity
+    (s.locals.ret__val = 0 ∨ s.locals.ret__val = 1)
 
 /-- rb_equal: compares two ring buffers element by element.
     Returns 1 if equal, 0 otherwise.
