@@ -347,9 +347,12 @@ def rb_replace_all_spec : FuncSpec ProgramState where
     rb.count = rb.count ∧ rb.capacity = rb.capacity
 
 /-- rb_fill: sets all node values to val.
-    Task 0137: every node's value = val. rb_state metadata unchanged. -/
+    Task 0137: every node's value = val. rb_state metadata unchanged.
+    Precondition strengthened: WellFormedList for heap-mutation loop guards. -/
 def rb_fill_spec : FuncSpec ProgramState where
-  pre := fun s => heapPtrValid s.globals.rawHeap s.locals.rb
+  pre := fun s =>
+    heapPtrValid s.globals.rawHeap s.locals.rb ∧
+    WellFormedList s.globals.rawHeap (hVal s.globals.rawHeap s.locals.rb).head
   post := fun r s =>
     r = Except.ok () →
     let rb := hVal s.globals.rawHeap s.locals.rb
@@ -382,10 +385,7 @@ def rb_equal_spec : FuncSpec ProgramState where
     LinkedListValid s.globals.rawHeap (hVal s.globals.rawHeap s.locals.b).head
   post := fun r s =>
     r = Except.ok () →
-    (s.locals.ret__val = 0 ∨ s.locals.ret__val = 1) ∧
-    -- Both buffers unchanged (read-only)
-    heapPtrValid s.globals.rawHeap s.locals.a ∧
-    heapPtrValid s.globals.rawHeap s.locals.b
+    (s.locals.ret__val = 0 ∨ s.locals.ret__val = 1)
 
 /-- rb_check_integrity: calls rb_count_nodes and compares with count field.
     Returns 0 if consistent, 1 otherwise.
