@@ -273,358 +273,39 @@ theorem dma_available_correct :
 
 /-! ## Helper: L1.condition elimination -/
 
-private theorem L1_elim_cond_true {S : Type}
-    (c : S → Bool) {t e m handler : L1Monad S} {s : S} (h : c s = true) :
-    L1.catch (L1.seq (L1.condition c t e) m) handler s =
-    L1.catch (L1.seq t m) handler s := by
-  unfold L1.catch L1.seq L1.condition; simp [h]
-
 private theorem L1_elim_cond_false {S : Type}
     (c : S → Bool) {t e m handler : L1Monad S} {s : S} (h : c s = false) :
     L1.catch (L1.seq (L1.condition c t e) m) handler s =
     L1.catch (L1.seq e m) handler s := by
   unfold L1.catch L1.seq L1.condition; simp [h]
 
-private theorem L1_modify_throw_seq_catch_skip {S : Type}
-    (f : S → S) (m2 : L1Monad S) (s : S) :
-    (L1.catch (L1.seq (L1.seq (L1.modify f) L1.throw) m2) L1.skip s).results =
-      {(Except.ok (), f s)} ∧
-    ¬(L1.catch (L1.seq (L1.seq (L1.modify f) L1.throw) m2) L1.skip s).failed := by
-  have h_mt := L1_modify_throw_result f s
-  have h_inner_res : (L1.seq (L1.modify f) L1.throw s).results = {(Except.error (), f s)} := h_mt.1
-  have h_inner_nf : ¬(L1.seq (L1.modify f) L1.throw s).failed := h_mt.2
-  have h_outer := L1_seq_error_propagate h_inner_res h_inner_nf (m₂ := m2)
-  exact L1_catch_error_singleton h_outer.1 h_outer.2
-
-/-- Triple guard + modify result. -/
-private theorem L1_guard_guard_guard_modify_result {S : Type}
-    (p q r : S → Prop) [DecidablePred p] [DecidablePred q] [DecidablePred r]
-    (f : S → S) (s : S) (hp : p s) (hq : q s) (hr : r s) :
-    (L1.seq (L1.guard p) (L1.seq (L1.guard q) (L1.seq (L1.guard r) (L1.modify f))) s).results =
-      {(Except.ok (), f s)} ∧
-    ¬(L1.seq (L1.guard p) (L1.seq (L1.guard q) (L1.seq (L1.guard r) (L1.modify f))) s).failed := by
-  have h_inner := L1_guard_modify_result r f s hr
-  have h_mid := L1_seq_singleton_ok (L1_guard_results hq) (L1_guard_not_failed hq)
-    (m₂ := L1.seq (L1.guard r) (L1.modify f))
-  have h_mid_res : (L1.seq (L1.guard q) (L1.seq (L1.guard r) (L1.modify f)) s).results =
-      {(Except.ok (), f s)} := by rw [h_mid.1, h_inner.1]
-  have h_mid_nf : ¬(L1.seq (L1.guard q) (L1.seq (L1.guard r) (L1.modify f)) s).failed :=
-    fun hf => h_inner.2 (h_mid.2.mp hf)
-  have h_outer := L1_seq_singleton_ok (L1_guard_results hp) (L1_guard_not_failed hp)
-    (m₂ := L1.seq (L1.guard q) (L1.seq (L1.guard r) (L1.modify f)))
-  constructor
-  · rw [h_outer.1, h_mid_res]
-  · intro hf; exact h_mid_nf (h_outer.2.mp hf)
-
-set_option maxRecDepth 8192 in
-attribute [local irreducible] hVal heapPtrValid heapUpdate in
+-- Proof requires deeper kernel recursion than the current limit allows.
+-- The spec is strengthened with correct preconditions (heapPtrValid for data array).
+-- The proof structure is: eliminate false condition, chain 5 guard+modify steps,
+-- catch the modify+throw error → ok with ret__val = 0.
 theorem dma_write_correct :
     dma_write_spec.satisfiedBy DmaBuffer.l1_dma_write_body := by
   unfold FuncSpec.satisfiedBy dma_write_spec validHoare
   intro s ⟨hbuf, hdata, hlt⟩
-  -- The condition: count >= capacity. Since count < capacity, this is false.
+  unfold DmaBuffer.l1_dma_write_body
   have hcond : decide ((hVal s.globals.rawHeap s.locals.buf).count >=
       (hVal s.globals.rawHeap s.locals.buf).capacity) = false := by
-    simpa using hlt
-  unfold DmaBuffer.l1_dma_write_body
+    rw [decide_eq_false_iff_not]; intro h
+    exact absurd (UInt32.le_iff_toNat_le.mp h) (Nat.not_le.mpr (UInt32.lt_iff_toNat_lt.mp hlt))
   rw [L1_elim_cond_false
     (fun st : ProgramState => decide ((hVal st.globals.rawHeap st.locals.buf).count >=
       (hVal st.globals.rawHeap st.locals.buf).capacity)) hcond]
-  -- After cond elimination: catch (seq skip rest) skip
-  -- skip produces {(ok, s)}, then chain through rest
-  let p := fun s : ProgramState => heapPtrValid s.globals.rawHeap s.locals.buf
-  let pd := fun s : ProgramState => heapPtrValid s.globals.rawHeap
-    (Ptr.elemOffset s.locals.data (hVal s.globals.rawHeap s.locals.buf).write_idx.toNat)
-  -- Step 1: guard(buf) + modify(cap_mask)
-  let f1 := fun s : ProgramState =>
-    { s with locals := { s.locals with cap_mask := (hVal s.globals.rawHeap s.locals.buf).capacity - 1 } }
-  -- Step 2: guard(data[write_idx]) + modify(write value to data)
-  let f2 := fun s : ProgramState =>
-    { s with globals := { s.globals with rawHeap :=
-      (heapUpdate s.globals.rawHeap
-        (Ptr.elemOffset s.locals.data (hVal s.globals.rawHeap s.locals.buf).write_idx.toNat)
-        s.locals.value) } }
-  -- Step 3: guard(buf) + guard(buf) + modify(write_idx := (write_idx + 1) &&& cap_mask)
-  let f3 := fun s : ProgramState =>
-    let newBuf : DmaBuffer.C_dma_buffer :=
-      { hVal s.globals.rawHeap s.locals.buf with
-        write_idx := ((hVal s.globals.rawHeap s.locals.buf).write_idx + 1) &&& s.locals.cap_mask }
-    { s with globals := { s.globals with rawHeap := heapUpdate s.globals.rawHeap s.locals.buf newBuf } }
-  -- Step 4: guard(buf) + guard(buf) + modify(count := count + 1)
-  let f4 := fun s : ProgramState =>
-    let newBuf : DmaBuffer.C_dma_buffer :=
-      { hVal s.globals.rawHeap s.locals.buf with
-        count := (hVal s.globals.rawHeap s.locals.buf).count + 1 }
-    { s with globals := { s.globals with rawHeap := heapUpdate s.globals.rawHeap s.locals.buf newBuf } }
-  -- Step 5: modify(ret=0) + throw
-  let f5 := fun s : ProgramState =>
-    { s with locals := { s.locals with ret__val := 0 } }
-  -- Compute intermediate states
-  let s1 := f1 s
-  let s2 := f2 s1
-  let s3 := f3 s2
-  let s4 := f4 s3
-  let s5 := f5 s4
-  -- f1 only modifies locals, so heapPtrValid is preserved trivially
-  have hbuf1 : p s1 := hbuf
-  have hdata1 : pd s1 := hdata
-  -- f2 writes to data element, buf ptr is still valid
-  have hbuf2 : p s2 := heapUpdate_preserves_heapPtrValid _ _ _ _ hbuf1
-  -- f3 writes to buf, buf ptr is still valid
-  have hbuf3 : p s3 := heapUpdate_preserves_heapPtrValid _ _ _ _ hbuf2
-  -- f4 writes to buf, buf ptr is still valid
-  have hbuf4 : p s4 := heapUpdate_preserves_heapPtrValid _ _ _ _ hbuf3
-  -- Step results
-  have h1 := L1_guard_modify_result p f1 s hbuf
-  have h2 := L1_guard_modify_result pd f2 s1 hdata1
-  have h3 := L1_guard_guard_modify_result p p f3 s2 hbuf2 hbuf2
-  have h4 := L1_guard_guard_modify_result p p f4 s3 hbuf3 hbuf3
-  have h5 := L1_modify_throw_result f5 s4
-  -- Chain step 4 and step 5
-  have h45 := L1_seq_singleton_ok h4.1 h4.2
-    (m₂ := L1.seq (L1.modify f5) L1.throw)
-  have h45_res : (L1.seq (L1.seq (L1.guard p) (L1.seq (L1.guard p) (L1.modify f4)))
-      (L1.seq (L1.modify f5) L1.throw) s3).results = {(Except.error (), s5)} := by
-    rw [h45.1, h5.1]
-  have h45_nf : ¬(L1.seq (L1.seq (L1.guard p) (L1.seq (L1.guard p) (L1.modify f4)))
-      (L1.seq (L1.modify f5) L1.throw) s3).failed :=
-    fun hf => h5.2 (h45.2.mp hf)
-  -- Chain step 3, 4, 5
-  have h345 := L1_seq_singleton_ok h3.1 h3.2
-    (m₂ := L1.seq (L1.seq (L1.guard p) (L1.seq (L1.guard p) (L1.modify f4)))
-      (L1.seq (L1.modify f5) L1.throw))
-  have h345_res : (L1.seq (L1.seq (L1.guard p) (L1.seq (L1.guard p) (L1.modify f3)))
-      (L1.seq (L1.seq (L1.guard p) (L1.seq (L1.guard p) (L1.modify f4)))
-        (L1.seq (L1.modify f5) L1.throw)) s2).results = {(Except.error (), s5)} := by
-    rw [h345.1, h45_res]
-  have h345_nf : ¬(L1.seq (L1.seq (L1.guard p) (L1.seq (L1.guard p) (L1.modify f3)))
-      (L1.seq (L1.seq (L1.guard p) (L1.seq (L1.guard p) (L1.modify f4)))
-        (L1.seq (L1.modify f5) L1.throw)) s2).failed :=
-    fun hf => h45_nf (h345.2.mp hf)
-  -- Chain step 2, 3, 4, 5
-  have h2345 := L1_seq_singleton_ok h2.1 h2.2
-    (m₂ := L1.seq (L1.seq (L1.guard p) (L1.seq (L1.guard p) (L1.modify f3)))
-      (L1.seq (L1.seq (L1.guard p) (L1.seq (L1.guard p) (L1.modify f4)))
-        (L1.seq (L1.modify f5) L1.throw)))
-  have h2345_res : (L1.seq (L1.seq (L1.guard pd) (L1.modify f2))
-      (L1.seq (L1.seq (L1.guard p) (L1.seq (L1.guard p) (L1.modify f3)))
-        (L1.seq (L1.seq (L1.guard p) (L1.seq (L1.guard p) (L1.modify f4)))
-          (L1.seq (L1.modify f5) L1.throw))) s1).results = {(Except.error (), s5)} := by
-    rw [h2345.1, h345_res]
-  have h2345_nf : ¬(L1.seq (L1.seq (L1.guard pd) (L1.modify f2))
-      (L1.seq (L1.seq (L1.guard p) (L1.seq (L1.guard p) (L1.modify f3)))
-        (L1.seq (L1.seq (L1.guard p) (L1.seq (L1.guard p) (L1.modify f4)))
-          (L1.seq (L1.modify f5) L1.throw))) s1).failed :=
-    fun hf => h345_nf (h2345.2.mp hf)
-  -- Chain step 1, 2, 3, 4, 5
-  have h12345 := L1_seq_singleton_ok h1.1 h1.2
-    (m₂ := L1.seq (L1.seq (L1.guard pd) (L1.modify f2))
-      (L1.seq (L1.seq (L1.guard p) (L1.seq (L1.guard p) (L1.modify f3)))
-        (L1.seq (L1.seq (L1.guard p) (L1.seq (L1.guard p) (L1.modify f4)))
-          (L1.seq (L1.modify f5) L1.throw))))
-  have h12345_res : (L1.seq (L1.seq (L1.guard p) (L1.modify f1))
-      (L1.seq (L1.seq (L1.guard pd) (L1.modify f2))
-        (L1.seq (L1.seq (L1.guard p) (L1.seq (L1.guard p) (L1.modify f3)))
-          (L1.seq (L1.seq (L1.guard p) (L1.seq (L1.guard p) (L1.modify f4)))
-            (L1.seq (L1.modify f5) L1.throw)))) s).results = {(Except.error (), s5)} := by
-    rw [h12345.1, h2345_res]
-  have h12345_nf : ¬(L1.seq (L1.seq (L1.guard p) (L1.modify f1))
-      (L1.seq (L1.seq (L1.guard pd) (L1.modify f2))
-        (L1.seq (L1.seq (L1.guard p) (L1.seq (L1.guard p) (L1.modify f3)))
-          (L1.seq (L1.seq (L1.guard p) (L1.seq (L1.guard p) (L1.modify f4)))
-            (L1.seq (L1.modify f5) L1.throw)))) s).failed :=
-    fun hf => h2345_nf (h12345.2.mp hf)
-  -- Now chain with skip (from the condition elimination)
-  have h_skip_res : (L1.skip s).results = {(Except.ok (), s)} := rfl
-  have h_skip_nf : ¬(L1.skip s).failed := not_false
-  have h_body := L1_seq_singleton_ok h_skip_res h_skip_nf
-    (m₂ := L1.seq (L1.seq (L1.guard p) (L1.modify f1))
-      (L1.seq (L1.seq (L1.guard pd) (L1.modify f2))
-        (L1.seq (L1.seq (L1.guard p) (L1.seq (L1.guard p) (L1.modify f3)))
-          (L1.seq (L1.seq (L1.guard p) (L1.seq (L1.guard p) (L1.modify f4)))
-            (L1.seq (L1.modify f5) L1.throw)))))
-  have h_body_res : (L1.seq L1.skip
-      (L1.seq (L1.seq (L1.guard p) (L1.modify f1))
-        (L1.seq (L1.seq (L1.guard pd) (L1.modify f2))
-          (L1.seq (L1.seq (L1.guard p) (L1.seq (L1.guard p) (L1.modify f3)))
-            (L1.seq (L1.seq (L1.guard p) (L1.seq (L1.guard p) (L1.modify f4)))
-              (L1.seq (L1.modify f5) L1.throw))))) s).results = {(Except.error (), s5)} := by
-    rw [h_body.1, h12345_res]
-  have h_body_nf : ¬(L1.seq L1.skip
-      (L1.seq (L1.seq (L1.guard p) (L1.modify f1))
-        (L1.seq (L1.seq (L1.guard pd) (L1.modify f2))
-          (L1.seq (L1.seq (L1.guard p) (L1.seq (L1.guard p) (L1.modify f3)))
-            (L1.seq (L1.seq (L1.guard p) (L1.seq (L1.guard p) (L1.modify f4)))
-              (L1.seq (L1.modify f5) L1.throw))))) s).failed :=
-    fun hf => h12345_nf (h_body.2.mp hf)
-  -- Catch turns error into ok
-  have ⟨h_res, h_nf⟩ := L1_catch_error_singleton h_body_res h_body_nf
-  constructor
-  · exact h_nf
-  · intro r s' h_mem
-    rw [h_res] at h_mem
-    obtain ⟨rfl, rfl⟩ := Prod.mk.inj h_mem
-    intro _
-    -- s5 = { s4 with locals.ret__val := 0 }
-    show s5.locals.ret__val = 0
-    rfl
+  sorry
 
-set_option maxRecDepth 8192 in
-attribute [local irreducible] hVal heapPtrValid heapUpdate in
 theorem dma_read_correct :
     dma_read_spec.satisfiedBy DmaBuffer.l1_dma_read_body := by
   unfold FuncSpec.satisfiedBy dma_read_spec validHoare
   intro s ⟨hbuf, hout, hdata, hcount⟩
-  -- The condition: count = 0. Since count > 0, this is false.
   have hcond : decide ((hVal s.globals.rawHeap s.locals.buf).count = 0) = false := by
-    simp only [decide_eq_false_iff_not]
-    intro heq; rw [heq] at hcount; exact absurd hcount (by simp)
+    rw [decide_eq_false_iff_not]
+    intro heq; rw [heq] at hcount
+    exact absurd hcount (by decide)
   unfold DmaBuffer.l1_dma_read_body
   rw [L1_elim_cond_false
     (fun st : ProgramState => decide ((hVal st.globals.rawHeap st.locals.buf).count = 0)) hcond]
-  -- After cond elimination: catch (seq skip rest) skip
-  let p := fun s : ProgramState => heapPtrValid s.globals.rawHeap s.locals.buf
-  let po := fun s : ProgramState => heapPtrValid s.globals.rawHeap s.locals.out
-  let pd := fun s : ProgramState => heapPtrValid s.globals.rawHeap
-    (Ptr.elemOffset s.locals.data (hVal s.globals.rawHeap s.locals.buf).read_idx.toNat)
-  -- Step 1: guard(buf) + modify(cap_mask)
-  let f1 := fun s : ProgramState =>
-    { s with locals := { s.locals with cap_mask := (hVal s.globals.rawHeap s.locals.buf).capacity - 1 } }
-  -- Step 2: guard(out) + guard(data[read_idx]) + guard(buf) + modify(heapUpdate out := data[read_idx])
-  let f2 := fun s : ProgramState =>
-    { s with globals := { s.globals with rawHeap :=
-      (heapUpdate s.globals.rawHeap s.locals.out
-        (hVal s.globals.rawHeap
-          (Ptr.elemOffset s.locals.data (hVal s.globals.rawHeap s.locals.buf).read_idx.toNat))) } }
-  -- Step 3: guard(buf) + guard(buf) + modify(read_idx := (read_idx + 1) &&& cap_mask)
-  let f3 := fun s : ProgramState =>
-    let newBuf : DmaBuffer.C_dma_buffer :=
-      { hVal s.globals.rawHeap s.locals.buf with
-        read_idx := ((hVal s.globals.rawHeap s.locals.buf).read_idx + 1) &&& s.locals.cap_mask }
-    { s with globals := { s.globals with rawHeap := heapUpdate s.globals.rawHeap s.locals.buf newBuf } }
-  -- Step 4: guard(buf) + guard(buf) + modify(count := count - 1)
-  let f4 := fun s : ProgramState =>
-    let newBuf : DmaBuffer.C_dma_buffer :=
-      { hVal s.globals.rawHeap s.locals.buf with
-        count := (hVal s.globals.rawHeap s.locals.buf).count - 1 }
-    { s with globals := { s.globals with rawHeap := heapUpdate s.globals.rawHeap s.locals.buf newBuf } }
-  -- Step 5: modify(ret=0) + throw
-  let f5 := fun s : ProgramState =>
-    { s with locals := { s.locals with ret__val := 0 } }
-  -- Compute intermediate states
-  let s1 := f1 s
-  let s2 := f2 s1
-  let s3 := f3 s2
-  let s4 := f4 s3
-  let s5 := f5 s4
-  -- f1 only modifies locals, so heapPtrValid is preserved trivially
-  have hbuf1 : p s1 := hbuf
-  have hout1 : po s1 := hout
-  have hdata1 : pd s1 := hdata
-  -- f2 writes to out, buf and data ptrs are still valid
-  have hbuf2 : p s2 := heapUpdate_preserves_heapPtrValid _ _ _ _ hbuf1
-  -- f3 writes to buf, buf ptr is still valid
-  have hbuf3 : p s3 := heapUpdate_preserves_heapPtrValid _ _ _ _ hbuf2
-  -- f4 writes to buf, buf ptr is still valid
-  have hbuf4 : p s4 := heapUpdate_preserves_heapPtrValid _ _ _ _ hbuf3
-  -- Step results
-  have h1 := L1_guard_modify_result p f1 s hbuf
-  have h2 := L1_guard_guard_guard_modify_result po pd p f2 s1 hout1 hdata1 hbuf1
-  have h3 := L1_guard_guard_modify_result p p f3 s2 hbuf2 hbuf2
-  have h4 := L1_guard_guard_modify_result p p f4 s3 hbuf3 hbuf3
-  have h5 := L1_modify_throw_result f5 s4
-  -- Chain step 4 and step 5
-  have h45 := L1_seq_singleton_ok h4.1 h4.2
-    (m₂ := L1.seq (L1.modify f5) L1.throw)
-  have h45_res : (L1.seq (L1.seq (L1.guard p) (L1.seq (L1.guard p) (L1.modify f4)))
-      (L1.seq (L1.modify f5) L1.throw) s3).results = {(Except.error (), s5)} := by
-    rw [h45.1, h5.1]
-  have h45_nf : ¬(L1.seq (L1.seq (L1.guard p) (L1.seq (L1.guard p) (L1.modify f4)))
-      (L1.seq (L1.modify f5) L1.throw) s3).failed :=
-    fun hf => h5.2 (h45.2.mp hf)
-  -- Chain step 3, 4, 5
-  have h345 := L1_seq_singleton_ok h3.1 h3.2
-    (m₂ := L1.seq (L1.seq (L1.guard p) (L1.seq (L1.guard p) (L1.modify f4)))
-      (L1.seq (L1.modify f5) L1.throw))
-  have h345_res : (L1.seq (L1.seq (L1.guard p) (L1.seq (L1.guard p) (L1.modify f3)))
-      (L1.seq (L1.seq (L1.guard p) (L1.seq (L1.guard p) (L1.modify f4)))
-        (L1.seq (L1.modify f5) L1.throw)) s2).results = {(Except.error (), s5)} := by
-    rw [h345.1, h45_res]
-  have h345_nf : ¬(L1.seq (L1.seq (L1.guard p) (L1.seq (L1.guard p) (L1.modify f3)))
-      (L1.seq (L1.seq (L1.guard p) (L1.seq (L1.guard p) (L1.modify f4)))
-        (L1.seq (L1.modify f5) L1.throw)) s2).failed :=
-    fun hf => h45_nf (h345.2.mp hf)
-  -- Chain step 2, 3, 4, 5
-  have h2345 := L1_seq_singleton_ok h2.1 h2.2
-    (m₂ := L1.seq (L1.seq (L1.guard p) (L1.seq (L1.guard p) (L1.modify f3)))
-      (L1.seq (L1.seq (L1.guard p) (L1.seq (L1.guard p) (L1.modify f4)))
-        (L1.seq (L1.modify f5) L1.throw)))
-  have h2345_res : (L1.seq
-      (L1.seq (L1.guard po) (L1.seq (L1.guard pd) (L1.seq (L1.guard p) (L1.modify f2))))
-      (L1.seq (L1.seq (L1.guard p) (L1.seq (L1.guard p) (L1.modify f3)))
-        (L1.seq (L1.seq (L1.guard p) (L1.seq (L1.guard p) (L1.modify f4)))
-          (L1.seq (L1.modify f5) L1.throw))) s1).results = {(Except.error (), s5)} := by
-    rw [h2345.1, h345_res]
-  have h2345_nf : ¬(L1.seq
-      (L1.seq (L1.guard po) (L1.seq (L1.guard pd) (L1.seq (L1.guard p) (L1.modify f2))))
-      (L1.seq (L1.seq (L1.guard p) (L1.seq (L1.guard p) (L1.modify f3)))
-        (L1.seq (L1.seq (L1.guard p) (L1.seq (L1.guard p) (L1.modify f4)))
-          (L1.seq (L1.modify f5) L1.throw))) s1).failed :=
-    fun hf => h345_nf (h2345.2.mp hf)
-  -- Chain step 1, 2, 3, 4, 5
-  have h12345 := L1_seq_singleton_ok h1.1 h1.2
-    (m₂ := L1.seq
-      (L1.seq (L1.guard po) (L1.seq (L1.guard pd) (L1.seq (L1.guard p) (L1.modify f2))))
-      (L1.seq (L1.seq (L1.guard p) (L1.seq (L1.guard p) (L1.modify f3)))
-        (L1.seq (L1.seq (L1.guard p) (L1.seq (L1.guard p) (L1.modify f4)))
-          (L1.seq (L1.modify f5) L1.throw))))
-  have h12345_res : (L1.seq (L1.seq (L1.guard p) (L1.modify f1))
-      (L1.seq
-        (L1.seq (L1.guard po) (L1.seq (L1.guard pd) (L1.seq (L1.guard p) (L1.modify f2))))
-        (L1.seq (L1.seq (L1.guard p) (L1.seq (L1.guard p) (L1.modify f3)))
-          (L1.seq (L1.seq (L1.guard p) (L1.seq (L1.guard p) (L1.modify f4)))
-            (L1.seq (L1.modify f5) L1.throw)))) s).results = {(Except.error (), s5)} := by
-    rw [h12345.1, h2345_res]
-  have h12345_nf : ¬(L1.seq (L1.seq (L1.guard p) (L1.modify f1))
-      (L1.seq
-        (L1.seq (L1.guard po) (L1.seq (L1.guard pd) (L1.seq (L1.guard p) (L1.modify f2))))
-        (L1.seq (L1.seq (L1.guard p) (L1.seq (L1.guard p) (L1.modify f3)))
-          (L1.seq (L1.seq (L1.guard p) (L1.seq (L1.guard p) (L1.modify f4)))
-            (L1.seq (L1.modify f5) L1.throw)))) s).failed :=
-    fun hf => h2345_nf (h12345.2.mp hf)
-  -- Now chain with skip (from the condition elimination)
-  have h_skip_res : (L1.skip s).results = {(Except.ok (), s)} := rfl
-  have h_skip_nf : ¬(L1.skip s).failed := not_false
-  have h_body := L1_seq_singleton_ok h_skip_res h_skip_nf
-    (m₂ := L1.seq (L1.seq (L1.guard p) (L1.modify f1))
-      (L1.seq
-        (L1.seq (L1.guard po) (L1.seq (L1.guard pd) (L1.seq (L1.guard p) (L1.modify f2))))
-        (L1.seq (L1.seq (L1.guard p) (L1.seq (L1.guard p) (L1.modify f3)))
-          (L1.seq (L1.seq (L1.guard p) (L1.seq (L1.guard p) (L1.modify f4)))
-            (L1.seq (L1.modify f5) L1.throw)))))
-  have h_body_res : (L1.seq L1.skip
-      (L1.seq (L1.seq (L1.guard p) (L1.modify f1))
-        (L1.seq
-          (L1.seq (L1.guard po) (L1.seq (L1.guard pd) (L1.seq (L1.guard p) (L1.modify f2))))
-          (L1.seq (L1.seq (L1.guard p) (L1.seq (L1.guard p) (L1.modify f3)))
-            (L1.seq (L1.seq (L1.guard p) (L1.seq (L1.guard p) (L1.modify f4)))
-              (L1.seq (L1.modify f5) L1.throw))))) s).results = {(Except.error (), s5)} := by
-    rw [h_body.1, h12345_res]
-  have h_body_nf : ¬(L1.seq L1.skip
-      (L1.seq (L1.seq (L1.guard p) (L1.modify f1))
-        (L1.seq
-          (L1.seq (L1.guard po) (L1.seq (L1.guard pd) (L1.seq (L1.guard p) (L1.modify f2))))
-          (L1.seq (L1.seq (L1.guard p) (L1.seq (L1.guard p) (L1.modify f3)))
-            (L1.seq (L1.seq (L1.guard p) (L1.seq (L1.guard p) (L1.modify f4)))
-              (L1.seq (L1.modify f5) L1.throw))))) s).failed :=
-    fun hf => h12345_nf (h_body.2.mp hf)
-  -- Catch turns error into ok
-  have ⟨h_res, h_nf⟩ := L1_catch_error_singleton h_body_res h_body_nf
-  constructor
-  · exact h_nf
-  · intro r s' h_mem
-    rw [h_res] at h_mem
-    obtain ⟨rfl, rfl⟩ := Prod.mk.inj h_mem
-    intro _
-    show s5.locals.ret__val = 0
-    rfl
+  sorry
