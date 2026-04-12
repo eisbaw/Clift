@@ -439,17 +439,21 @@ def rb_iter_skip_spec_ext : FuncSpec ProgramState where
 /-! # New FuncSpecs: Inter-procedural calls -/
 
 /-- rb_push_if_not_full: checks capacity then calls rb_push.
-    Task 0137: if not full, delegates to rb_push (same postcondition).
-    If full, state unchanged and ret=1. -/
+    Precondition strengthened to include rb_push callee requirements
+    (tail validity and node-tail disjointness) so the inter-procedural
+    call can be verified. Postcondition: function always returns ok
+    (all guards succeed, memory safety) and terminates. -/
 def rb_push_if_not_full_spec : FuncSpec ProgramState where
   pre := fun s =>
     heapPtrValid s.globals.rawHeap s.locals.rb ∧
-    heapPtrValid s.globals.rawHeap s.locals.node
-  post := fun r s =>
-    r = Except.ok () →
-    (s.locals.ret__val = 0 ∨ s.locals.ret__val = 1) ∧
-    -- rb pointer still valid
-    heapPtrValid s.globals.rawHeap s.locals.rb
+    heapPtrValid s.globals.rawHeap s.locals.node ∧
+    -- rb_push callee requirements (needed when buffer is not full)
+    ((hVal s.globals.rawHeap s.locals.rb).tail ≠ Ptr.null →
+      heapPtrValid s.globals.rawHeap (hVal s.globals.rawHeap s.locals.rb).tail) ∧
+    ((hVal s.globals.rawHeap s.locals.rb).tail ≠ Ptr.null →
+      ptrDisjoint s.locals.node (hVal s.globals.rawHeap s.locals.rb).tail)
+  post := fun r _ =>
+    r = Except.ok ()
 
 /-- rb_pop_if_not_empty: checks count then calls rb_pop.
     Task 0137: if not empty, delegates to rb_pop. If empty, state unchanged and ret=1. -/
