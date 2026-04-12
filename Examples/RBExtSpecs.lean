@@ -420,6 +420,16 @@ def rb_iter_skip_spec : FuncSpec ProgramState where
     -- Iterator validity preserved
     heapPtrValid s.globals.rawHeap s.locals.iter
 
+/-- rb_iter_skip strengthened: the iterator's current-pointer chain must be a valid
+    linked list so that guard heapPtrValid checks on each node succeed. -/
+def rb_iter_skip_spec_ext : FuncSpec ProgramState where
+  pre := fun s =>
+    heapPtrValid s.globals.rawHeap s.locals.iter ∧
+    LinkedListValid s.globals.rawHeap (hVal s.globals.rawHeap s.locals.iter).current
+  post := fun r s =>
+    r = Except.ok () →
+    heapPtrValid s.globals.rawHeap s.locals.iter
+
 /-! # New FuncSpecs: Inter-procedural calls -/
 
 /-- rb_push_if_not_full: checks capacity then calls rb_push.
