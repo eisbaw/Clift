@@ -51,13 +51,22 @@ def ht_count_spec : FuncSpec ProgramState where
     r = Except.ok () →
     s.locals.ret__val = (hVal s.globals.rawHeap s.locals.ht).count
 
+/-- Array validity: all elements of keys and values arrays are heap-valid. -/
+def ht_arrays_valid (heap : HeapRawState) (keys values : Ptr UInt32) (cap : UInt32) : Prop :=
+  ∀ (i : Nat), i < cap.toNat →
+    heapPtrValid heap (Ptr.elemOffset keys i) ∧
+    heapPtrValid heap (Ptr.elemOffset values i)
+
 /-- ht_insert: inserts key-value pair.
     Precondition: ht valid, keys/values arrays valid, key > 1 (not sentinel).
     Returns 0 on success, 1 if full. -/
 def ht_insert_spec : FuncSpec ProgramState where
   pre := fun s =>
     heapPtrValid s.globals.rawHeap s.locals.ht ∧
-    s.locals.key > 1  -- keys 0,1 reserved
+    s.locals.key > 1 ∧  -- keys 0,1 reserved
+    (hVal s.globals.rawHeap s.locals.ht).capacity > 0 ∧
+    ht_arrays_valid s.globals.rawHeap s.locals.keys s.locals.values
+      (hVal s.globals.rawHeap s.locals.ht).capacity
   post := fun r s =>
     r = Except.ok () →
     -- On success (ret_val = 0), count incremented or unchanged (if key existed)
@@ -68,7 +77,10 @@ def ht_insert_spec : FuncSpec ProgramState where
 def ht_lookup_spec : FuncSpec ProgramState where
   pre := fun s =>
     heapPtrValid s.globals.rawHeap s.locals.ht ∧
-    heapPtrValid s.globals.rawHeap s.locals.out
+    heapPtrValid s.globals.rawHeap s.locals.out ∧
+    (hVal s.globals.rawHeap s.locals.ht).capacity > 0 ∧
+    ht_arrays_valid s.globals.rawHeap s.locals.keys s.locals.values
+      (hVal s.globals.rawHeap s.locals.ht).capacity
   post := fun r s =>
     r = Except.ok () →
     (s.locals.ret__val = 0 ∨ s.locals.ret__val = 1)
@@ -231,15 +243,291 @@ theorem ht_count_correct :
     subst hr; subst hs
     rw [ht_update_retval_val, ht_update_retval_globals, ht_update_retval_ht]
 
--- requires while loop invariant machinery (linear probing loop)
-theorem ht_insert_correct :
-    ht_insert_spec.satisfiedBy HashTable.l1_ht_insert_body := by
-  sorry -- requires while loop invariant
+/-! ## Helper Hoare rules (not in L1HoareRules.lean) -/
 
--- requires while loop invariant machinery (linear probing loop)
+private theorem L1_hoare_throw (Q : Except Unit Unit → ProgramState → Prop) :
+    validHoare (fun s => Q (Except.error ()) s) (L1.throw (σ := ProgramState)) Q := by
+  intro s₀ hpre
+  constructor
+  · intro h; exact h
+  · intro r s₁ h_mem
+    have heq := Prod.mk.inj h_mem
+    rw [heq.1, heq.2]; exact hpre
+
+/-- Bridge: derive L1_hoare_while side-conditions from a single body Hoare proof. -/
+private theorem L1_hoare_while_from_body {c : ProgramState → Bool} {body : L1Monad ProgramState}
+    {I : ProgramState → Prop} {Q : Except Unit Unit → ProgramState → Prop}
+    (h_body : validHoare (fun s => I s ∧ c s = true) body
+        (fun r s => match r with | Except.ok () => I s | Except.error () => Q (Except.error ()) s))
+    (h_exit : ∀ s, I s → c s = false → Q (Except.ok ()) s) :
+    validHoare I (L1.while c body) Q := by
+  apply L1_hoare_while (I := I)
+  · intro s h; exact h
+  · intro s hi hc; exact (h_body s ⟨hi, hc⟩).1
+  · intro s s' hi hc h_mem; exact (h_body s ⟨hi, hc⟩).2 (Except.ok ()) s' h_mem
+  · exact h_exit
+  · intro s s' hi hc h_mem; exact (h_body s ⟨hi, hc⟩).2 (Except.error ()) s' h_mem
+
+/-! ## Insert and Lookup proofs
+
+Both functions follow the same high-level pattern:
+  catch (seq preamble (seq while_loop ret_throw)) skip
+
+The weak postcondition (ret_val ∈ {0, 1}) means we only need to show:
+1. No fault (guards succeed under precondition)
+2. Every exit path sets ret_val to 0 or 1
+
+Strategy: prove validHoare directly using the L1 result/failed characterization
+rather than deep Hoare rule decomposition. The body always throws (error),
+the catch handler (skip) passes through.
+-/
+
+/-- Array element validity is preserved by heapUpdate (unconditional — htd is unchanged). -/
+private theorem ht_arrays_valid_of_heapUpdate
+    {heap : HeapRawState} {keys values : Ptr UInt32} {cap : UInt32}
+    {β : Type} [MemType β] {p : Ptr β} {v : β}
+    (h_valid : ht_arrays_valid heap keys values cap) :
+    ht_arrays_valid (heapUpdate heap p v) keys values cap := by
+  intro i hi
+  have ⟨hk, hv⟩ := h_valid i hi
+  exact ⟨heapUpdate_preserves_heapPtrValid heap p v (Ptr.elemOffset keys i) hk,
+         heapUpdate_preserves_heapPtrValid heap p v (Ptr.elemOffset values i) hv⟩
+
+/-- Key lemma: index bounded by capacity means array element is valid. -/
+private theorem ht_array_elem_valid {heap : HeapRawState} {keys values : Ptr UInt32}
+    {cap idx : UInt32}
+    (h_arr : ht_arrays_valid heap keys values cap)
+    (h_bound : idx.toNat < cap.toNat) :
+    heapPtrValid heap (Ptr.elemOffset keys idx.toNat) ∧
+    heapPtrValid heap (Ptr.elemOffset values idx.toNat) :=
+  h_arr idx.toNat h_bound
+
+/-! ## Array bounds (moved here for use in loop proofs) -/
+
+/-- Array bounds: bitwise AND with (capacity - 1) is always < capacity,
+    assuming capacity is a power of 2. -/
+private theorem hash_index_bounded' (idx cap : UInt32) (h_pow2 : cap > 0) :
+    (idx &&& (cap - 1)).toNat < cap.toNat := by
+  have h_one_le_nat : (1 : Nat) ≤ cap.toNat := by
+    have h_cap_nat : 0 < cap.toNat := (UInt32.lt_iff_toNat_lt).1 h_pow2
+    exact Nat.succ_le_of_lt h_cap_nat
+  have h_one_le : (1 : UInt32) ≤ cap := by
+    exact (UInt32.le_iff_toNat_le).2 (by simpa using h_one_le_nat)
+  have h_sub_lt : cap - 1 < cap :=
+    UInt32.sub_lt (a := cap) (b := 1) (by decide) h_one_le
+  have h_sub_nat_lt : (cap - 1).toNat < cap.toNat :=
+    (UInt32.lt_iff_toNat_lt).1 h_sub_lt
+  have h_and_le : (idx &&& (cap - 1)).toNat ≤ (cap - 1).toNat := by
+    rw [UInt32.toNat_and]
+    exact Nat.and_le_right
+  omega
+
+/-! ### Shared loop invariant and postcondition -/
+
+-- Loop invariant for both insert and lookup: all heap validity conditions
+-- needed by the loop body, plus index boundedness.
+private def ht_loop_inv (s : ProgramState) : Prop :=
+  heapPtrValid s.globals.rawHeap s.locals.ht ∧
+  ht_arrays_valid s.globals.rawHeap s.locals.keys s.locals.values
+    (hVal s.globals.rawHeap s.locals.ht).capacity ∧
+  (hVal s.globals.rawHeap s.locals.ht).capacity > 0 ∧
+  s.locals.cap_mask = (hVal s.globals.rawHeap s.locals.ht).capacity - 1 ∧
+  s.locals.idx.toNat < (hVal s.globals.rawHeap s.locals.ht).capacity.toNat
+
+-- The weak postcondition: ret_val ∈ {0, 1}
+private def ht_ret_01 (s : ProgramState) : Prop :=
+  s.locals.ret__val = 0 ∨ s.locals.ret__val = 1
+
+-- heapPtrValid is preserved by heapUpdate
+private theorem heapPtrValid_preserved {α β : Type} [MemType α] [CType β]
+    {heap : HeapRawState} {p : Ptr α} {v : α} {q : Ptr β}
+    (hv : heapPtrValid heap q) :
+    heapPtrValid (heapUpdate heap p v) q :=
+  heapUpdate_preserves_heapPtrValid heap p v q hv
+
+-- After advancing idx = (idx + 1) &&& cap_mask, idx < capacity still holds
+private theorem idx_advance_bounded (idx cap_mask cap : UInt32)
+    (h_cm : cap_mask = cap - 1) (h_cap_pos : cap > 0) :
+    ((idx + 1) &&& cap_mask).toNat < cap.toNat := by
+  rw [h_cm]
+  exact hash_index_bounded' (idx + 1) cap h_cap_pos
+
+/-! ### ht_lookup_correct
+
+  Structure of l1_ht_lookup_body (CSimpl → L1 mapping):
+
+    L1.catch BODY L1.skip
+
+  where BODY =
+    L1.seq
+      (L1.seq (L1.guard heapPtrValid_ht) (L1.modify set_cap_mask))  -- preamble
+      (L1.seq
+        (L1.dynCom hash_call)                                        -- call ht_hash
+        (L1.seq
+          (L1.modify set_probes_0)
+          (L1.seq
+            (L1.while loop_cond loop_body)                           -- linear probing
+            (L1.seq (L1.modify set_ret_0) L1.throw))))               -- not found
+-/
+
+-- The lookup loop invariant: ht valid, arrays valid, idx bounded, cap_mask correct.
+-- Additionally: out pointer valid (needed for the "found" branch guard).
+private def ht_lookup_loop_inv (out : Ptr UInt32) (s : ProgramState) : Prop :=
+  ht_loop_inv s ∧
+  heapPtrValid s.globals.rawHeap out ∧
+  s.locals.out = out
+
+-- Step functions for ht_lookup body (anonymous constructors to avoid deep recursion)
+
+-- set cap_mask := (hVal heap ht).capacity - 1
+private noncomputable def lk_set_cm (s : ProgramState) : ProgramState :=
+  ⟨s.globals, ⟨(hVal s.globals.rawHeap s.locals.ht).capacity - 1, s.locals.capacity, s.locals.h,
+   s.locals.ht, s.locals.i, s.locals.idx, s.locals.key, s.locals.keys, s.locals.out,
+   s.locals.probes, s.locals.ret__val, s.locals.value, s.locals.values⟩⟩
+
+-- Projection lemmas for lk_set_cm
+attribute [local irreducible] hVal in
+private theorem lk_set_cm_locals (s : ProgramState) :
+    (lk_set_cm s).locals = ⟨(hVal s.globals.rawHeap s.locals.ht).capacity - 1, s.locals.capacity,
+      s.locals.h, s.locals.ht, s.locals.i, s.locals.idx, s.locals.key, s.locals.keys, s.locals.out,
+      s.locals.probes, s.locals.ret__val, s.locals.value, s.locals.values⟩ := by
+  show (⟨s.globals, ⟨(hVal s.globals.rawHeap s.locals.ht).capacity - 1, s.locals.capacity, s.locals.h,
+    s.locals.ht, s.locals.i, s.locals.idx, s.locals.key, s.locals.keys, s.locals.out,
+    s.locals.probes, s.locals.ret__val, s.locals.value, s.locals.values⟩⟩ : ProgramState).locals = _
+  rfl
+
+attribute [local irreducible] hVal in
+@[simp] private theorem lk_set_cm_globals (s : ProgramState) :
+    (lk_set_cm s).globals = s.globals := by
+  show (⟨s.globals, _⟩ : ProgramState).globals = _; rfl
+
+attribute [local irreducible] hVal in
+@[simp] private theorem lk_set_cm_ht (s : ProgramState) :
+    (lk_set_cm s).locals.ht = s.locals.ht := by rw [lk_set_cm_locals]
+
+attribute [local irreducible] hVal in
+@[simp] private theorem lk_set_cm_out (s : ProgramState) :
+    (lk_set_cm s).locals.out = s.locals.out := by rw [lk_set_cm_locals]
+
+attribute [local irreducible] hVal in
+@[simp] private theorem lk_set_cm_key (s : ProgramState) :
+    (lk_set_cm s).locals.key = s.locals.key := by rw [lk_set_cm_locals]
+
+attribute [local irreducible] hVal in
+@[simp] private theorem lk_set_cm_keys (s : ProgramState) :
+    (lk_set_cm s).locals.keys = s.locals.keys := by rw [lk_set_cm_locals]
+
+attribute [local irreducible] hVal in
+@[simp] private theorem lk_set_cm_values (s : ProgramState) :
+    (lk_set_cm s).locals.values = s.locals.values := by rw [lk_set_cm_locals]
+
+attribute [local irreducible] hVal in
+@[simp] private theorem lk_set_cm_cap_mask (s : ProgramState) :
+    (lk_set_cm s).locals.cap_mask = (hVal s.globals.rawHeap s.locals.ht).capacity - 1 := by
+  rw [lk_set_cm_locals]
+
+-- funext: the inline { s with ... } equals lk_set_cm
+private theorem lk_set_cm_funext :
+    (fun s : ProgramState => { s with locals := { s.locals with
+      cap_mask := (hVal s.globals.rawHeap s.locals.ht).capacity - 1 } }) = lk_set_cm := by
+  funext s; unfold lk_set_cm; rfl
+
+-- set ret__val := 0
+private noncomputable def lk_set_ret0 (s : ProgramState) : ProgramState :=
+  ⟨s.globals, ⟨s.locals.cap_mask, s.locals.capacity, s.locals.h, s.locals.ht, s.locals.i,
+   s.locals.idx, s.locals.key, s.locals.keys, s.locals.out, s.locals.probes,
+   0, s.locals.value, s.locals.values⟩⟩
+
+attribute [local irreducible] hVal in
+@[simp] private theorem lk_set_ret0_ret (s : ProgramState) :
+    (lk_set_ret0 s).locals.ret__val = 0 := by
+  show (⟨s.globals, ⟨s.locals.cap_mask, s.locals.capacity, s.locals.h, s.locals.ht, s.locals.i,
+    s.locals.idx, s.locals.key, s.locals.keys, s.locals.out, s.locals.probes,
+    0, s.locals.value, s.locals.values⟩⟩ : ProgramState).locals.ret__val = _; rfl
+
+-- set ret__val := 1
+private noncomputable def lk_set_ret1 (s : ProgramState) : ProgramState :=
+  ⟨s.globals, ⟨s.locals.cap_mask, s.locals.capacity, s.locals.h, s.locals.ht, s.locals.i,
+   s.locals.idx, s.locals.key, s.locals.keys, s.locals.out, s.locals.probes,
+   1, s.locals.value, s.locals.values⟩⟩
+
+attribute [local irreducible] hVal in
+@[simp] private theorem lk_set_ret1_ret (s : ProgramState) :
+    (lk_set_ret1 s).locals.ret__val = 1 := by
+  show (⟨s.globals, ⟨s.locals.cap_mask, s.locals.capacity, s.locals.h, s.locals.ht, s.locals.i,
+    s.locals.idx, s.locals.key, s.locals.keys, s.locals.out, s.locals.probes,
+    1, s.locals.value, s.locals.values⟩⟩ : ProgramState).locals.ret__val = _; rfl
+
+-- funext lemmas for ret0/ret1
+private theorem lk_set_ret0_funext :
+    (fun s : ProgramState => { s with locals := { s.locals with ret__val := 0 } }) = lk_set_ret0 := by
+  funext s; unfold lk_set_ret0; rfl
+
+private theorem lk_set_ret1_funext :
+    (fun s : ProgramState => { s with locals := { s.locals with ret__val := 1 } }) = lk_set_ret1 := by
+  funext s; unfold lk_set_ret1; rfl
+
+attribute [local irreducible] hVal heapPtrValid heapUpdate in
 theorem ht_lookup_correct :
     ht_lookup_spec.satisfiedBy HashTable.l1_ht_lookup_body := by
-  sorry -- requires while loop invariant
+  unfold FuncSpec.satisfiedBy ht_lookup_spec
+  show validHoare _ (L1.catch _ L1.skip) _
+  apply L1_hoare_catch (R := ht_ret_01)
+  · -- Body = seq (seq guard+modify) REST
+    -- All paths through the body set ret_val to 0 or 1 before throwing.
+    -- Prove directly from validHoare definition.
+    -- Body = seq (seq guard modify) (seq dynCom rest)
+    -- Decompose: first guard+modify (ok-only), then rest
+    apply L1_hoare_seq_ok
+      (R := fun s => heapPtrValid s.globals.rawHeap s.locals.ht ∧
+                      heapPtrValid s.globals.rawHeap s.locals.out ∧
+                      (hVal s.globals.rawHeap s.locals.ht).capacity > 0 ∧
+                      ht_arrays_valid s.globals.rawHeap s.locals.keys s.locals.values
+                        (hVal s.globals.rawHeap s.locals.ht).capacity ∧
+                      s.locals.cap_mask = (hVal s.globals.rawHeap s.locals.ht).capacity - 1)
+    · -- guard heapPtrValid ht; modify cap_mask := capacity - 1
+      simp only [lk_set_cm_funext]
+      apply L1_hoare_guard_modify'
+      intro s ⟨hv, ho, hc, ha⟩
+      -- After lk_set_cm: globals unchanged, cap_mask set, rest unchanged
+      exact ⟨by rw [lk_set_cm_globals]; exact hv,
+             by rw [lk_set_cm_globals, lk_set_cm_out]; exact ho,
+             by rw [lk_set_cm_globals, lk_set_cm_ht]; exact hc,
+             by rw [lk_set_cm_globals, lk_set_cm_keys, lk_set_cm_values, lk_set_cm_ht]; exact ha,
+             by rw [lk_set_cm_globals, lk_set_cm_ht]; exact lk_set_cm_cap_mask s⟩
+    · -- rest: seq dynCom (seq probes:=0 (seq while ret:=0;throw))
+      sorry
+  · -- Handler proof: skip preserves ht_ret_01
+    intro s h_ret
+    constructor
+    · intro hf; exact hf
+    · intro r s' h_mem
+      have ⟨hr, hs⟩ := Prod.mk.inj h_mem
+      subst hr; subst hs
+      intro _; exact h_ret
+
+/-! ### ht_insert_correct -/
+
+-- The insert loop invariant: ht valid, arrays valid, idx bounded, cap_mask correct.
+private def ht_insert_loop_inv (s : ProgramState) : Prop :=
+  ht_loop_inv s ∧ s.locals.key > 1
+
+attribute [local irreducible] hVal heapPtrValid heapUpdate in
+theorem ht_insert_correct :
+    ht_insert_spec.satisfiedBy HashTable.l1_ht_insert_body := by
+  unfold FuncSpec.satisfiedBy ht_insert_spec
+  show validHoare _ (L1.catch _ L1.skip) _
+  apply L1_hoare_catch (R := ht_ret_01)
+  · -- Body proof
+    sorry
+  · -- Handler proof: skip preserves ht_ret_01
+    intro s h_ret
+    constructor
+    · intro hf; exact hf
+    · intro r s' h_mem
+      have ⟨hr, hs⟩ := Prod.mk.inj h_mem
+      subst hr; subst hs
+      intro _; exact h_ret
 
 /-! # Step 5: Array bounds property (task 0186)
 
