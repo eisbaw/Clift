@@ -4,6 +4,7 @@ title: Implement L1ProcEnv compositional call reasoning for inter-procedural pro
 status: To Do
 assignee: []
 created_date: '2026-04-12 17:01'
+updated_date: '2026-04-12 18:53'
 labels:
   - infrastructure
   - inter-procedural
@@ -61,3 +62,9 @@ IMPLEMENTATION FILE: Clift/Lifting/L1HoareRules.lean (add L1_hoare_dynCom_call r
 - [ ] #3 Pattern documented with example (e.g. rb_check_integrity calling rb_count_nodes)
 - [ ] #4 No kernel depth or OOM issues in the proof
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-04-12: nanoda (Rust lean kernel checker) researched — it is a post-processing verifier on export files, not a drop-in kernel replacement during lake build. Cannot help with OOM during elaboration. The RAM issue is in Lean elaborator creating huge proof terms for 40-field structs, not in kernel checking. Solutions: (1) reduce proof term size via opaque helpers, (2) split import chains, (3) use lake build -j1, (4) implement L1_hoare_dynCom_call to keep callee bodies opaque.
+<!-- SECTION:NOTES:END -->
