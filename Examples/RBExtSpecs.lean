@@ -336,7 +336,9 @@ def rb_max_spec : FuncSpec ProgramState where
 /-- rb_replace_all: replaces all occurrences of old_val with new_val.
     Task 0137: rb_state metadata unchanged, only node values modified. -/
 def rb_replace_all_spec : FuncSpec ProgramState where
-  pre := fun s => heapPtrValid s.globals.rawHeap s.locals.rb
+  pre := fun s =>
+    heapPtrValid s.globals.rawHeap s.locals.rb ∧
+    WellFormedList s.globals.rawHeap (hVal s.globals.rawHeap s.locals.rb).head
   post := fun r s =>
     r = Except.ok () →
     let rb := hVal s.globals.rawHeap s.locals.rb
