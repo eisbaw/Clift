@@ -486,17 +486,81 @@ theorem ht_lookup_correct :
                         (hVal s.globals.rawHeap s.locals.ht).capacity ∧
                       s.locals.cap_mask = (hVal s.globals.rawHeap s.locals.ht).capacity - 1)
     · -- guard heapPtrValid ht; modify cap_mask := capacity - 1
-      simp only [lk_set_cm_funext]
-      apply L1_hoare_guard_modify'
+      -- Direct proof from L1 semantics, avoiding named step functions
       intro s ⟨hv, ho, hc, ha⟩
-      -- After lk_set_cm: globals unchanged, cap_mask set, rest unchanged
-      exact ⟨by rw [lk_set_cm_globals]; exact hv,
-             by rw [lk_set_cm_globals, lk_set_cm_out]; exact ho,
-             by rw [lk_set_cm_globals, lk_set_cm_ht]; exact hc,
-             by rw [lk_set_cm_globals, lk_set_cm_keys, lk_set_cm_values, lk_set_cm_ht]; exact ha,
-             by rw [lk_set_cm_globals, lk_set_cm_ht]; exact lk_set_cm_cap_mask s⟩
+      -- L1.seq (L1.guard p) (L1.modify f) at s where p s holds:
+      -- results = {(ok, f s)}, failed = False
+      -- This is L1_guard_modify_result, but we avoid referencing the modify function
+      -- to prevent deep recursion.
+      have h_guard_ok : (L1.guard (fun s : ProgramState => heapPtrValid s.globals.rawHeap s.locals.ht) s).results =
+        {(Except.ok (), s)} ∧ ¬(L1.guard (fun s : ProgramState => heapPtrValid s.globals.rawHeap s.locals.ht) s).failed := by
+        exact ⟨L1_guard_results hv, L1_guard_not_failed hv⟩
+      constructor
+      · -- not failed
+        intro hf
+        simp only [L1.seq] at hf
+        rcases hf with hf1 | ⟨s', h_mem, hf2⟩
+        · exact h_guard_ok.2 hf1
+        · exact hf2  -- L1.modify never fails
+      · -- postcondition
+        intro r s' h_mem
+        simp only [L1.seq] at h_mem
+        rcases h_mem with ⟨s1, h_g, h_m⟩ | ⟨h_err, _⟩
+        · -- ok from guard, then modify
+          rw [h_guard_ok.1] at h_g
+          -- h_g : (ok, s1) ∈ {(ok, s)}, so s1 = s
+          have h_s1 : s1 = s := (Prod.mk.inj h_g).2
+          rw [h_s1] at h_m
+          -- h_m : (r, s') ∈ (L1.modify f s).results = {(ok, f s)}
+          have ⟨h_r_ok, h_s'_eq⟩ := Prod.mk.inj h_m
+          -- Extract properties of s' via named step function projections
+          -- h_s'_eq : s' = f s, but f s is def-eq to lk_set_cm s
+          -- Use the pre-proved projection lemmas (proved with [local irreducible] hVal)
+          have h_s'_lk : s' = lk_set_cm s := h_s'_eq
+          exact ⟨h_r_ok,
+                 by rw [h_s'_lk, lk_set_cm_globals, lk_set_cm_ht]; exact hv,
+                 by rw [h_s'_lk, lk_set_cm_globals, lk_set_cm_out]; exact ho,
+                 by rw [h_s'_lk, lk_set_cm_globals, lk_set_cm_ht]; exact hc,
+                 by rw [h_s'_lk, lk_set_cm_globals, lk_set_cm_keys, lk_set_cm_values, lk_set_cm_ht]; exact ha,
+                 by rw [h_s'_lk, lk_set_cm_cap_mask, lk_set_cm_globals, lk_set_cm_ht]⟩
+        · -- error from guard: impossible
+          rw [h_guard_ok.1] at h_err
+          exact absurd h_err (by intro h; cases h)
     · -- rest: seq dynCom (seq probes:=0 (seq while ret:=0;throw))
-      sorry
+      -- The postcondition (from L1_hoare_catch body) is:
+      --   match r | ok => (ok = ok → ret ∈ {0,1}) | error => ret ∈ {0,1}
+      -- Since all paths throw, the ok case is vacuous.
+      -- All error results have ret_val set to 0 or 1 explicitly.
+
+      -- Decompose: first dynCom, then rest
+      apply L1_hoare_seq_ok
+        (R := fun s => ht_loop_inv s ∧
+                        heapPtrValid s.globals.rawHeap s.locals.out)
+      · -- dynCom: calls ht_hash, restores locals, sets idx
+        sorry
+      · -- seq probes:=0 (seq while ret:=0;throw)
+        apply L1_hoare_seq_ok
+          (R := fun s => ht_loop_inv s ∧
+                          heapPtrValid s.globals.rawHeap s.locals.out ∧
+                          s.locals.probes = 0)
+        · -- modify probes := 0: ok-only, preserves invariant
+          intro s ⟨⟨h_ht, h_arr, h_cap, h_cm, h_idx⟩, h_out⟩
+          constructor
+          · intro hf; exact hf  -- L1.modify never fails
+          · intro r s' h_mem
+            have ⟨hr, hs⟩ := Prod.mk.inj h_mem
+            subst hr; subst hs
+            -- s' = modify s. globals unchanged, probes := 0, rest unchanged.
+            refine ⟨rfl, ⟨h_ht, h_arr, h_cap, h_cm, h_idx⟩, h_out, rfl⟩
+        · -- seq while ret:=0;throw
+          -- Every path produces error with ret_val ∈ {0, 1}:
+          -- - while body throws: ret_val set to 0 or 1
+          -- - while exits normally → ret:=0;throw
+          -- Prove directly from validHoare definition
+          intro s ⟨⟨h_ht, h_arr, h_cap, h_cm, h_idx⟩, h_out, _⟩
+          -- The while + final throw always produces error results.
+          -- Use the while loop Hoare rule with invariant.
+          sorry
   · -- Handler proof: skip preserves ht_ret_01
     intro s h_ret
     constructor
@@ -518,8 +582,54 @@ theorem ht_insert_correct :
   unfold FuncSpec.satisfiedBy ht_insert_spec
   show validHoare _ (L1.catch _ L1.skip) _
   apply L1_hoare_catch (R := ht_ret_01)
-  · -- Body proof
-    sorry
+  · -- Body = seq (cond full_check ret:=1;throw skip) REST
+    -- First decompose the full check from the rest
+    apply L1_hoare_seq
+      (R := fun s => heapPtrValid s.globals.rawHeap s.locals.ht ∧
+                      s.locals.key > 1 ∧
+                      (hVal s.globals.rawHeap s.locals.ht).capacity > 0 ∧
+                      ht_arrays_valid s.globals.rawHeap s.locals.keys s.locals.values
+                        (hVal s.globals.rawHeap s.locals.ht).capacity)
+    · -- cond (count >= capacity) (ret:=1;throw) skip
+      -- Either throws with ret_val=1 (error result, Q error = ht_ret_01)
+      -- or falls through with ok (invariant preserved)
+      apply L1_hoare_condition
+      · -- true branch: count >= capacity → ret:=1; throw
+        intro s ⟨⟨hv, hk, hc, ha⟩, _⟩
+        have h_mt := L1_modify_throw_result
+          (fun s : ProgramState => ⟨s.globals, ⟨s.locals.cap_mask, s.locals.capacity, s.locals.h,
+            s.locals.ht, s.locals.i, s.locals.idx, s.locals.key, s.locals.keys, s.locals.out,
+            s.locals.probes, (1 : UInt32), s.locals.value, s.locals.values⟩⟩) s
+        constructor
+        · exact h_mt.2
+        · intro r s' h_mem
+          rw [h_mt.1] at h_mem
+          have ⟨hr, hs⟩ := Prod.mk.inj h_mem; subst hr; subst hs
+          exact Or.inr rfl
+      · -- false branch: skip (not full)
+        intro s ⟨⟨hv, hk, hc, ha⟩, _⟩
+        constructor
+        · intro hf; exact hf
+        · intro r s' h_mem
+          have ⟨hr, hs⟩ := Prod.mk.inj h_mem; subst hr; subst hs
+          exact ⟨hv, hk, hc, ha⟩
+    · -- REST: guard+modify cap_mask, dynCom, probes:=0, while, ret:=1;throw
+      -- Same structure as lookup's body.
+      -- Decompose: guard+modify, then rest
+      apply L1_hoare_seq_ok
+        (R := fun s => heapPtrValid s.globals.rawHeap s.locals.ht ∧
+                        s.locals.key > 1 ∧
+                        (hVal s.globals.rawHeap s.locals.ht).capacity > 0 ∧
+                        ht_arrays_valid s.globals.rawHeap s.locals.keys s.locals.values
+                          (hVal s.globals.rawHeap s.locals.ht).capacity ∧
+                        s.locals.cap_mask = (hVal s.globals.rawHeap s.locals.ht).capacity - 1)
+      · -- guard heapPtrValid ht; modify cap_mask
+        -- Same structure as lookup's guard+modify proof.
+        -- The proof is identical but the insert context causes kernel deep recursion
+        -- due to the larger L1 body tree. Needs refactoring to a shared lemma.
+        sorry
+      · -- rest: dynCom, probes:=0, while, ret:=1;throw
+        sorry
   · -- Handler proof: skip preserves ht_ret_01
     intro s h_ret
     constructor
