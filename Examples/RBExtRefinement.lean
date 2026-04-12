@@ -17,8 +17,7 @@ import Examples.RBExtSpecs
 import Examples.RBExtProofsSimple
 import Examples.RBExtProofsLoops
 import Examples.RBExtProofsLoops2
-import Examples.RBExtProofsMax
-import Examples.RBExtProofsMin
+import Examples.RBExtProofsMaxMin
 import Examples.RBExtProofsSorry
 import Clift.Lifting.GlobalInvariant
 import Clift.Lifting.AbstractSpec

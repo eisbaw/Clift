@@ -3908,15 +3908,17 @@ theorem rb_iter_has_next_totalHoare :
 - Pattern: totalHoare = validHoare + termination (result existence)
 
 ## validHoare proof score
-- Proven (sorry-free):  7/40 (rb_capacity, rb_size, rb_remaining, rb_stats_total_ops,
-                               rb_is_empty, rb_is_full, rb_iter_has_next)
-- Sorry (loop):         15 (count_nodes, contains, find_index, nth, sum, increment_all,
-                             count_above, count_at_or_below, min, max, replace_all, fill,
-                             reverse, equal, iter_skip)
-- Sorry (multi-heap):   4  (push, pop, swap_front_back, iter_next)
+- Proven (sorry-free): 17/40 (rb_capacity, rb_size, rb_remaining, rb_stats_total_ops,
+                               rb_is_empty, rb_is_full, rb_iter_has_next,
+                               rb_contains, rb_find_index, rb_nth, rb_sum,
+                               rb_increment_all, rb_count_above, rb_count_at_or_below,
+                               rb_push, rb_max, rb_min)
+- Sorry (loop):         7  (count_nodes, replace_all, fill, reverse, equal,
+                             iter_skip, remove_first_match)
+- Sorry (multi-heap):   3  (pop, swap_front_back, iter_next)
 - Sorry (calls):        4  (check_integrity, push_if_not_full, pop_if_not_empty, drain_to)
-- Sorry (heap+loop):    2  (clear, remove_first_match)
-- TOTAL sorry:          25 (validHoare only, down from 25+6=31 total)
+- Sorry (heap+loop):    1  (clear)
+- TOTAL sorry:          15 (validHoare only)
 
 ## What each sorry category needs
 - **Loop functions**: Loop invariant + well-founded termination + induction.

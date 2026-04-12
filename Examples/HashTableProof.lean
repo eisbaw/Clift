@@ -594,21 +594,9 @@ private theorem ht_hash_full (s : ProgramState) :
     rw [h_catch.1] at h_mem
     have ⟨hr, hs⟩ := Prod.mk.inj h_mem
     subst hr; subst hs
-    refine ⟨rfl, ?_, ?_, ?_, ?_⟩
-    · -- globals preserved: ht_hash_f2 (ht_hash_f1 s) only modifies locals
-      show (ht_hash_f2 (ht_hash_f1 s)).globals = s.globals
-      unfold ht_hash_f2 ht_hash_f1; rfl
-    · rw [ht_hash_f2_locals_ret__val, ht_hash_f1_locals_h, ht_hash_f1_locals_cap_mask,
-        ht_hash_f2_locals_key, ht_hash_f2_locals_cap_mask, ht_hash_f1_locals_key,
-        ht_hash_f1_locals_cap_mask]
-    · rw [ht_hash_f2_locals_key, ht_hash_f1_locals_key]
-    · rw [ht_hash_f2_locals_cap_mask, ht_hash_f1_locals_cap_mask]
+    exact ⟨rfl, rfl, rfl, rfl, rfl⟩
 
--- Helper: the dynCom for ht_hash establishes ht_loop_inv with idx bounded.
--- Extracted as a standalone lemma to control memory usage during elaboration.
--- The dynCom body: seq (modify setup) (seq (call ht_hash) (modify restore))
--- where setup is identity and restore sets locals from saved with idx := hash result.
-attribute [local irreducible] hVal heapPtrValid heapUpdate in
+attribute [local irreducible] hVal heapPtrValid heapUpdate HashTable.l1_ht_hash_body in
 private theorem ht_lookup_dynCom_hoare :
     validHoare
       (fun s => heapPtrValid s.globals.rawHeap s.locals.ht ∧
@@ -678,7 +666,7 @@ private theorem ht_lookup_dynCom_hoare :
         · rw [lk_restore_globals, lk_restore_out, h_glob]; exact h_out
 
 -- Insert version of the dynCom (same structure, different postcondition)
-attribute [local irreducible] hVal heapPtrValid heapUpdate in
+attribute [local irreducible] hVal heapPtrValid heapUpdate HashTable.l1_ht_hash_body in
 private theorem ht_insert_dynCom_hoare :
     validHoare
       (fun s => heapPtrValid s.globals.rawHeap s.locals.ht ∧
