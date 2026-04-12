@@ -17,7 +17,7 @@ import Examples.RBExtSpecs
 import Examples.RBExtProofsSimple
 import Examples.RBExtProofsLoops
 import Examples.RBExtProofsLoops2
-import Examples.RBExtProofsMaxMin
+-- import Examples.RBExtProofsMaxMin  -- Requires >30GB RAM; rb_max/rb_min proofs not needed here
 import Examples.RBExtProofsSorry
 import Clift.Lifting.GlobalInvariant
 import Clift.Lifting.AbstractSpec
