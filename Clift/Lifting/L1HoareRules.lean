@@ -236,6 +236,17 @@ theorem L1_guard_modify_throw_catch_skip_result
     fun hf => h_mt_nf (h_seq.2.mp hf)
   exact L1_catch_error_singleton h_body_res h_body_nf
 
+/-- L1.catch body L1.skip only produces ok results.
+    ok results from body pass through; error results go to skip which returns ok.
+    Useful for proving callees wrapped in catch+skip only return ok. -/
+theorem L1_catch_skip_ok_only (body : L1Monad σ) (s : σ) :
+    ∀ r s', (r, s') ∈ (L1.catch body L1.skip s).results → r = Except.ok () := by
+  intro r s' h_mem
+  change (_ ∨ _) at h_mem
+  rcases h_mem with ⟨_, h_eq⟩ | ⟨_, _, h_skip⟩
+  · exact h_eq
+  · exact (Prod.mk.inj h_skip).1
+
 end L1Results
 
 /-! # L1 Hoare rules (validHoare)
@@ -876,5 +887,75 @@ theorem L1_hoare_guard_modify_chain5' {σ : Type}
   exact L1_hoare_guard_modify_chain5 h_p₁ h_p₂ h_p₃ h_p₄ h_p₅
     (Q := fun r s => r = Except.ok () ∧ R s)
     (fun s hP => ⟨rfl, h_post s hP⟩) s hP
+
+/-! ## Inter-procedural Hoare rules: call, dynCom, and composed dynCom+call -/
+
+/-- L1.call Hoare rule: if the procedure environment maps `name` to `body`,
+    and `body` satisfies the Hoare triple, then L1.call satisfies it too. -/
+theorem L1_hoare_call {l1Γ : L1.L1ProcEnv σ} {name : ProcName}
+    {body : L1Monad σ} {P : σ → Prop} {Q : Except Unit Unit → σ → Prop}
+    (h_lookup : l1Γ name = some body)
+    (h_body : validHoare P body Q) :
+    validHoare P (L1.call l1Γ name) Q := by
+  have h_eq : L1.call l1Γ name = body := by simp [L1.call, h_lookup]
+  rw [h_eq]; exact h_body
+
+/-- L1.dynCom Hoare rule: dynCom f s₀ = f s₀ s₀. -/
+theorem L1_hoare_dynCom_basic {f : σ → L1Monad σ}
+    {P : σ → Prop} {Q : Except Unit Unit → σ → Prop}
+    (h : ∀ s₀, P s₀ → validHoare (fun s => s = s₀) (f s₀) Q) :
+    validHoare P (L1.dynCom f) Q := by
+  intro s₀ hp
+  have ⟨h_nf, h_post⟩ := h s₀ hp s₀ rfl
+  exact ⟨h_nf, h_post⟩
+
+/-- Composed Hoare rule for dynCom + setup + call + restore pattern.
+    Keeps callee body OPAQUE via h_lookup + h_callee. -/
+theorem L1_hoare_dynCom_call
+    {l1Γ : L1.L1ProcEnv σ} {name : ProcName} {body : L1Monad σ}
+    {setup : σ → σ} {restore : σ → σ → σ}
+    {P : σ → Prop} {R : σ → Prop}
+    {Q_callee : Except Unit Unit → σ → Prop}
+    {Q : Except Unit Unit → σ → Prop}
+    (h_lookup : l1Γ name = some body)
+    (h_setup : ∀ s₀, P s₀ → R (setup s₀))
+    (h_callee : validHoare R body Q_callee)
+    (h_restore : ∀ s₀ s', P s₀ → Q_callee (Except.ok ()) s' →
+        Q (Except.ok ()) (restore s₀ s'))
+    (h_error : ∀ s₀ s', P s₀ → Q_callee (Except.error ()) s' →
+        Q (Except.error ()) s')
+    : validHoare P (L1.dynCom (fun saved =>
+        L1.seq (L1.modify setup)
+          (L1.seq (L1.call l1Γ name)
+            (L1.modify (fun s => restore saved s))))) Q := by
+  intro s₀ hP
+  show ¬(L1.dynCom _ s₀).failed ∧ _
+  simp only [L1.dynCom]
+  have h_call_eq : L1.call l1Γ name = body := by simp [L1.call, h_lookup]
+  rw [h_call_eq]
+  have h_mod_res : (L1.modify setup s₀).results = {(Except.ok (), setup s₀)} := rfl
+  have h_mod_nf : ¬(L1.modify setup s₀).failed := not_false
+  have h_seq1 := L1_seq_singleton_ok h_mod_res h_mod_nf
+    (m₂ := L1.seq body (L1.modify (fun s => restore s₀ s)))
+  have hR := h_setup s₀ hP
+  have ⟨h_callee_nf, h_callee_post⟩ := h_callee (setup s₀) hR
+  constructor
+  · rw [h_seq1.2]
+    intro hf; change (_ ∨ _) at hf
+    rcases hf with hf1 | ⟨s', _, hf2⟩
+    · exact h_callee_nf hf1
+    · exact hf2
+  · intro r s₁ h_mem
+    rw [h_seq1.1] at h_mem
+    change (_ ∨ _) at h_mem
+    rcases h_mem with ⟨s', h_body_mem, h_mod_mem⟩ | ⟨h_err_mem, h_eq⟩
+    · have hq := h_callee_post (Except.ok ()) s' h_body_mem
+      have ⟨hr, hs⟩ := Prod.mk.inj h_mod_mem
+      rw [hr, hs]
+      exact h_restore s₀ s' hP hq
+    · have hq := h_callee_post (Except.error ()) s₁ h_err_mem
+      have : r = Except.error () := h_eq
+      rw [this]
+      exact h_error s₀ s₁ hP hq
 
 end L1Hoare
