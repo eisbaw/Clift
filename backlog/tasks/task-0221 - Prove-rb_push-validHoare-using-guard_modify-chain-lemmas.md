@@ -1,10 +1,10 @@
 ---
 id: TASK-0221
 title: Prove rb_push validHoare using guard_modify chain lemmas
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-11 15:07'
-updated_date: '2026-04-11 21:27'
+updated_date: '2026-04-12 05:28'
 labels:
   - sorry-elimination
   - ring-buffer
@@ -21,7 +21,7 @@ rb_push is an 8-step guard+modify chain: guard(valid rb) -> read count -> guard(
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 rb_push_validHoare proven with zero sorry
+- [x] #1 rb_push_validHoare proven with zero sorry
 - [ ] #2 Uses [local irreducible] hVal heapUpdate throughout
 - [ ] #3 Projection simp lemmas for each step function
 - [ ] #4 Postcondition discharged via hVal_heapUpdate_same/disjoint + ptrDisjoint
@@ -36,3 +36,9 @@ Approach: define each step as anonymous-constructor function, prove two-step pro
 
 AutoCorres2 insight: their L1_merge_assignments fuses consecutive modifies. Our equivalent: L1_guard_modify_guard_modify_result chains 2 pairs. Need chain4/chain5 for rb_push.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+rb_push_validHoare proven using chain4/5 + compose infrastructure. 8 step functions with anonymous constructors. Precondition strengthened with ptrDisjoint. Build clean.
+<!-- SECTION:FINAL_SUMMARY:END -->
