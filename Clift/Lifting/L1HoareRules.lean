@@ -563,6 +563,55 @@ theorem L1_hoare_guard_modify_fused {σ : Type}
     have ⟨hr, hs⟩ := Prod.mk.inj h_mem
     rw [hr, hs]; exact h_post s hP
 
+/-- Double guard + modify: guard p; guard p; modify f.
+    Common in generated code where the same validity check is duplicated. -/
+theorem L1_hoare_guard_guard_modify_fused {σ : Type}
+    {p : σ → Prop} [DecidablePred p]
+    {f : σ → σ} {P : σ → Prop} {Q : Except Unit Unit → σ → Prop}
+    (h_guard : ∀ s, P s → p s)
+    (h_post : ∀ s, P s → Q (Except.ok ()) (f s)) :
+    validHoare P (L1.seq (L1.guard p) (L1.seq (L1.guard p) (L1.modify f))) Q := by
+  apply L1_hoare_seq_ok (R := P)
+  · apply L1_hoare_pre (P := fun s => p s ∧ P s)
+    · intro s hP; exact ⟨h_guard s hP, hP⟩
+    · exact L1_hoare_guard' p P
+  · exact L1_hoare_guard_modify_fused h_guard h_post
+
+/-- Hoare rule for modify followed by throw.
+    Produces error postcondition: `r = error ∧ R (f s)`. -/
+theorem L1_hoare_modify_throw {σ : Type}
+    {f : σ → σ} {P : σ → Prop} {R : σ → Prop}
+    (h_post : ∀ s, P s → R (f s)) :
+    validHoare P (L1.seq (L1.modify f) L1.throw)
+      (fun r s => r = Except.error () ∧ R s) := by
+  intro s hP
+  have h := L1_modify_throw_result f s
+  constructor
+  · exact h.2
+  · intro r s' h_mem
+    rw [h.1] at h_mem
+    have ⟨hr, hs⟩ := Prod.mk.inj h_mem
+    exact ⟨hr, hs ▸ h_post s hP⟩
+
+/-- Hoare rule for modify+throw in a catch body context.
+    The postcondition matches what L1_hoare_catch expects. -/
+theorem L1_hoare_modify_throw_catch {σ : Type}
+    {f : σ → σ} {P : σ → Prop} {R : σ → Prop}
+    {Q_ok : σ → Prop}
+    (h_post : ∀ s, P s → R (f s)) :
+    validHoare P (L1.seq (L1.modify f) L1.throw)
+      (fun r s => match r with
+        | Except.ok () => Q_ok s
+        | Except.error () => R s) := by
+  intro s hP
+  have h := L1_modify_throw_result f s
+  constructor
+  · exact h.2
+  · intro r s' h_mem
+    rw [h.1] at h_mem
+    have ⟨hr, hs⟩ := Prod.mk.inj h_mem
+    subst hr; subst hs; exact h_post s hP
+
 /-- Chain two guard+modify pairs: `{P} guard p; modify f; guard q; modify g {Q}`.
     The guards and modifies compose: q is checked on f(s), not on s. -/
 theorem L1_hoare_guard_modify_chain2 {σ : Type}
