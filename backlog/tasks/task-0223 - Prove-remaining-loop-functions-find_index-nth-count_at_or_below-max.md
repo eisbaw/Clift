@@ -4,7 +4,7 @@ title: 'Prove remaining loop functions: find_index, nth, count_at_or_below, max'
 status: To Do
 assignee: []
 created_date: '2026-04-11 15:07'
-updated_date: '2026-04-11 22:33'
+updated_date: '2026-04-12 04:17'
 labels:
   - sorry-elimination
   - loops
@@ -22,7 +22,7 @@ Same pattern as task-0222 but with additional complexity: rb_nth has conditional
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 rb_find_index_validHoare proven
+- [x] #1 rb_find_index_validHoare proven
 - [ ] #2 rb_nth_validHoare proven
 - [x] #3 rb_count_at_or_below_validHoare proven
 - [ ] #4 rb_max_validHoare proven
@@ -38,4 +38,8 @@ rb_count_at_or_below is same pattern as rb_count_above (just different compariso
 rb_max has heap write per iteration — needs the two-step projection pattern with heapUpdate preservation through iterations.
 
 2026-04-12: rb_count_at_or_below is NOW PROVEN (sorry-free, merged via model-race). Remaining: find_index, nth, max.
+
+2026-04-12: rb_find_index being worked on by swe-gardener agent. rb_count_at_or_below already proven (AC#3 checked). Remaining: find_index (agent), nth, max.
+
+$2026-04-12: rb_find_index_validHoare PROVEN by swe-gardener agent. Full loop proof with L1_hoare_while + L1_hoare_condition. Spec precondition strengthened with LinkedListValid.
 <!-- SECTION:NOTES:END -->
