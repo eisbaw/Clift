@@ -67,6 +67,68 @@ theorem LinkedListValid.tail {heap : HeapRawState} {p : Ptr C_rb_node}
   | null => exact absurd rfl hp
   | cons _ _ _ hn => exact hn
 
+/-! # Well-formed linked list (with pairwise disjointness)
+
+  For heap-mutating loop traversals (rb_clear, rb_increment_all, etc.),
+  LinkedListValid alone is insufficient: we also need that consecutive
+  nodes don't byte-overlap, so that heapUpdate at one node doesn't
+  corrupt the representation of another.
+
+  With C_rb_node (size=16, align=8), two aligned pointers at consecutive
+  alignment slots (e.g., addr 8k and 8(k+1)) DO byte-overlap. So we must
+  explicitly require pairwise disjointness.
+-/
+
+/-- All nodes in a linked list starting at p are byte-disjoint from pointer q. -/
+inductive AllDisjointFrom (heap : HeapRawState) (q : Ptr C_rb_node) : Ptr C_rb_node → Prop where
+  | null : AllDisjointFrom heap q Ptr.null
+  | cons (p : Ptr C_rb_node) (hp : p ≠ Ptr.null) (hv : heapPtrValid heap p)
+         (hdisj : ptrDisjoint q p)
+         (hn : AllDisjointFrom heap q (hVal heap p).next) :
+    AllDisjointFrom heap q p
+
+theorem AllDisjointFrom.headValid {heap : HeapRawState} {q p : Ptr C_rb_node}
+    (h : AllDisjointFrom heap q p) (hp : p ≠ Ptr.null) : heapPtrValid heap p := by
+  cases h with | null => exact absurd rfl hp | cons _ _ hv _ _ => exact hv
+
+theorem AllDisjointFrom.headDisjoint {heap : HeapRawState} {q p : Ptr C_rb_node}
+    (h : AllDisjointFrom heap q p) (hp : p ≠ Ptr.null) : ptrDisjoint q p := by
+  cases h with | null => exact absurd rfl hp | cons _ _ _ hdisj _ => exact hdisj
+
+theorem AllDisjointFrom.adjtail {heap : HeapRawState} {q p : Ptr C_rb_node}
+    (h : AllDisjointFrom heap q p) (hp : p ≠ Ptr.null) :
+    AllDisjointFrom heap q (hVal heap p).next := by
+  cases h with | null => exact absurd rfl hp | cons _ _ _ _ hn => exact hn
+
+/-- A well-formed linked list: valid + each node is byte-disjoint from all
+    subsequent nodes. This is the standard C linked list invariant. -/
+inductive WellFormedList (heap : HeapRawState) : Ptr C_rb_node → Prop where
+  | null : WellFormedList heap Ptr.null
+  | cons (p : Ptr C_rb_node) (hp : p ≠ Ptr.null) (hv : heapPtrValid heap p)
+         (hn : WellFormedList heap (hVal heap p).next)
+         (h_sep : AllDisjointFrom heap p (hVal heap p).next) :
+    WellFormedList heap p
+
+theorem WellFormedList.toLinkedListValid {heap : HeapRawState} {p : Ptr C_rb_node}
+    (h : WellFormedList heap p) : LinkedListValid heap p := by
+  induction h with
+  | null => exact LinkedListValid.null
+  | cons p hp hv _ _ ih => exact LinkedListValid.cons p hp hv ih
+
+theorem WellFormedList.wf_tail {heap : HeapRawState} {p : Ptr C_rb_node}
+    (h : WellFormedList heap p) (hp : p ≠ Ptr.null) :
+    WellFormedList heap (hVal heap p).next := by
+  cases h with | null => exact absurd rfl hp | cons _ _ _ hn _ => exact hn
+
+theorem WellFormedList.headSep {heap : HeapRawState} {p : Ptr C_rb_node}
+    (h : WellFormedList heap p) (hp : p ≠ Ptr.null) :
+    AllDisjointFrom heap p (hVal heap p).next := by
+  cases h with | null => exact absurd rfl hp | cons _ _ _ _ h_sep => exact h_sep
+
+theorem WellFormedList.headValid {heap : HeapRawState} {p : Ptr C_rb_node}
+    (h : WellFormedList heap p) (hp : p ≠ Ptr.null) : heapPtrValid heap p := by
+  cases h with | null => exact absurd rfl hp | cons _ _ hv _ _ => exact hv
+
 /-! # New FuncSpecs: Core heap operations -/
 
 /-- rb_push: appends a value to the ring buffer.
@@ -413,6 +475,21 @@ def rb_min_spec_ext : FuncSpec ProgramState where
   post := fun r s =>
     r = Except.ok () →
     s.locals.ret__val = 0
+
+
+-- rb_clear: loop + heap mutation (sets each node.next = null, then resets rb fields)
+-- The original rb_clear_spec (in RingBufferExtProof.lean) has a precondition too weak to prove
+-- validHoare (missing WellFormedList for loop guards + heap disjointness). We define a
+-- strengthened spec here.
+def rb_clear_spec_ext : FuncSpec ProgramState where
+  pre := fun s =>
+    heapPtrValid s.globals.rawHeap s.locals.rb ∧
+    WellFormedList s.globals.rawHeap (hVal s.globals.rawHeap s.locals.rb).head
+  post := fun r s =>
+    r = Except.ok () →
+    (hVal s.globals.rawHeap s.locals.rb).head = Ptr.null ∧
+    (hVal s.globals.rawHeap s.locals.rb).tail = Ptr.null ∧
+    (hVal s.globals.rawHeap s.locals.rb).count = 0
 
 
 /-! # Relational FuncSpec: captures pre/post state relationship
