@@ -594,45 +594,88 @@ private theorem dw_heap_count_ptrValid_buf (s : ProgramState)
   simp only [dw_heap_count_rawHeap, dw_heap_count_locals]
   exact heapUpdate_preserves_heapPtrValid _ _ _ _ h
 
+/-! ### Manual L1 bodies using anonymous-constructor step functions
+
+  The clift-generated L1 bodies use `{ s with ... }` which causes kernel deep recursion
+  on the 10-field Locals struct. We define equivalent L1 bodies using named step functions
+  with anonymous constructors, prove they're equal, then prove validHoare on the manual bodies. -/
+
+private noncomputable def l1_dma_write_manual : L1Monad ProgramState :=
+  let p := fun s : ProgramState => heapPtrValid s.globals.rawHeap s.locals.buf
+  let pd := fun s : ProgramState => heapPtrValid s.globals.rawHeap
+    (Ptr.elemOffset s.locals.data (hVal s.globals.rawHeap s.locals.buf).write_idx.toNat)
+  L1.catch
+    (L1.seq (L1.condition
+      (fun s => decide ((hVal s.globals.rawHeap s.locals.buf).count >=
+        (hVal s.globals.rawHeap s.locals.buf).capacity))
+      (L1.seq (L1.modify (fun s : ProgramState =>
+        ⟨s.globals, ⟨s.locals.buf, s.locals.cap_mask, s.locals.capacity, s.locals.data,
+          s.locals.n, s.locals.out, 1, s.locals.value, s.locals.values, s.locals.written⟩⟩))
+        L1.throw) L1.skip)
+    (L1.seq (L1.seq (L1.guard p) (L1.modify dma_set_cap_mask))
+      (L1.seq (L1.seq (L1.guard pd) (L1.modify dw_heap_data))
+        (L1.seq (L1.seq (L1.guard p) (L1.seq (L1.guard p) (L1.modify dw_heap_write_idx)))
+          (L1.seq (L1.seq (L1.guard p) (L1.seq (L1.guard p) (L1.modify dw_heap_count)))
+            (L1.seq (L1.modify dma_set_ret0) L1.throw))))))
+    L1.skip
+
+private noncomputable def l1_dma_read_manual : L1Monad ProgramState :=
+  let p := fun s : ProgramState => heapPtrValid s.globals.rawHeap s.locals.buf
+  let po := fun s : ProgramState => heapPtrValid s.globals.rawHeap s.locals.out
+  let prd := fun s : ProgramState => heapPtrValid s.globals.rawHeap
+    (Ptr.elemOffset s.locals.data (hVal s.globals.rawHeap s.locals.buf).read_idx.toNat)
+  L1.catch
+    (L1.seq (L1.condition
+      (fun s => decide ((hVal s.globals.rawHeap s.locals.buf).count = 0))
+      (L1.seq (L1.modify (fun s : ProgramState =>
+        ⟨s.globals, ⟨s.locals.buf, s.locals.cap_mask, s.locals.capacity, s.locals.data,
+          s.locals.n, s.locals.out, 1, s.locals.value, s.locals.values, s.locals.written⟩⟩))
+        L1.throw) L1.skip)
+    (L1.seq (L1.seq (L1.guard p) (L1.modify dma_set_cap_mask))
+      (L1.seq (L1.seq (L1.guard po) (L1.seq (L1.guard prd) (L1.seq (L1.guard p) (L1.modify dr_heap_out))))
+        (L1.seq (L1.seq (L1.guard p) (L1.seq (L1.guard p) (L1.modify dr_heap_read_idx)))
+          (L1.seq (L1.seq (L1.guard p) (L1.seq (L1.guard p) (L1.modify dr_heap_count)))
+            (L1.seq (L1.modify dma_set_ret0) L1.throw))))))
+    L1.skip
+
 /-! ### dma_write proof -/
 
 theorem dma_write_correct :
     dma_write_spec.satisfiedBy DmaBuffer.l1_dma_write_body := by
+  -- The manual body is definitionally equal to the generated one
+  suffices h : dma_write_spec.satisfiedBy l1_dma_write_manual from h
   unfold FuncSpec.satisfiedBy dma_write_spec validHoare
   intro s ⟨hbuf, hdata, hlt⟩
-  unfold DmaBuffer.l1_dma_write_body
   have hcond : decide ((hVal s.globals.rawHeap s.locals.buf).count >=
       (hVal s.globals.rawHeap s.locals.buf).capacity) = false := by
     rw [decide_eq_false_iff_not]; intro h
     exact absurd (UInt32.le_iff_toNat_le.mp h) (Nat.not_le.mpr (UInt32.lt_iff_toNat_lt.mp hlt))
+  unfold l1_dma_write_manual
   rw [L1_elim_cond_false
     (fun st : ProgramState => decide ((hVal st.globals.rawHeap st.locals.buf).count >=
       (hVal st.globals.rawHeap st.locals.buf).capacity)) hcond]
   -- After cond false: catch (seq skip rest) skip
-  -- Abbreviate guard predicates
   let p := fun s : ProgramState => heapPtrValid s.globals.rawHeap s.locals.buf
   let pd := fun s : ProgramState => heapPtrValid s.globals.rawHeap
     (Ptr.elemOffset s.locals.data (hVal s.globals.rawHeap s.locals.buf).write_idx.toNat)
-  -- Step 1: guard buf, modify cap_mask
+  -- Intermediate states
   let s1 := dma_set_cap_mask s
+  let s2 := dw_heap_data s1
+  let s3 := dw_heap_write_idx s2
+  let s4 := dw_heap_count s3
+  let s5 := dma_set_ret0 s4
+  -- heapPtrValid preservation
   have hbuf1 : p s1 := dma_set_cap_mask_ptrValid_buf s hbuf
   have hdata1 : pd s1 := dma_set_cap_mask_ptrValid_data s hdata
-  have h1 := L1_guard_modify_result p dma_set_cap_mask s hbuf
-  -- Step 2: guard data_elem, modify data write
-  let s2 := dw_heap_data s1
   have hbuf2 : p s2 := dw_heap_data_ptrValid_buf s1 hbuf1
-  have h2 := L1_guard_modify_result pd dw_heap_data s1 hdata1
-  -- Step 3: guard buf, guard buf, modify write_idx
-  let s3 := dw_heap_write_idx s2
   have hbuf3 : p s3 := dw_heap_write_idx_ptrValid_buf s2 hbuf2
+  -- Step results
+  have h1 := L1_guard_modify_result p dma_set_cap_mask s hbuf
+  have h2 := L1_guard_modify_result pd dw_heap_data s1 hdata1
   have h3 := L1_guard_guard_modify_result p p dw_heap_write_idx s2 hbuf2 hbuf2
-  -- Step 4: guard buf, guard buf, modify count
-  let s4 := dw_heap_count s3
   have h4 := L1_guard_guard_modify_result p p dw_heap_count s3 hbuf3 hbuf3
-  -- Step 5: modify ret0, throw
-  let s5 := dma_set_ret0 s4
   have h5 := L1_modify_throw_result dma_set_ret0 s4
-  -- Define monad terms
+  -- Define monad terms (matching the manual body structure)
   let m5 : L1Monad ProgramState := L1.seq (L1.modify dma_set_ret0) L1.throw
   let m4 : L1Monad ProgramState := L1.seq (L1.seq (L1.guard p) (L1.seq (L1.guard p) (L1.modify dw_heap_count))) m5
   let m3 : L1Monad ProgramState := L1.seq (L1.seq (L1.guard p) (L1.seq (L1.guard p) (L1.modify dw_heap_write_idx))) m4
@@ -675,8 +718,8 @@ theorem dma_write_correct :
   constructor
   · exact h_nf
   · intro r s' h_mem _
-    have h_mem' : (r, s') ∈ ({(Except.ok (), s5)} : Set _) := h_res ▸ h_mem
-    obtain ⟨rfl, rfl⟩ := Prod.mk.inj (Set.mem_singleton_iff.mp h_mem')
+    rw [h_res] at h_mem
+    obtain ⟨rfl, rfl⟩ := Prod.mk.inj h_mem
     exact dma_set_ret0_ret__val _
 
 /-! ### dma_read proof -/
@@ -715,13 +758,14 @@ private theorem dr_heap_count_ptrValid_buf (s : ProgramState)
 
 theorem dma_read_correct :
     dma_read_spec.satisfiedBy DmaBuffer.l1_dma_read_body := by
+  suffices h : dma_read_spec.satisfiedBy l1_dma_read_manual from h
   unfold FuncSpec.satisfiedBy dma_read_spec validHoare
   intro s ⟨hbuf, hout, hdata, hcount⟩
   have hcond : decide ((hVal s.globals.rawHeap s.locals.buf).count = 0) = false := by
     rw [decide_eq_false_iff_not]
     intro heq; rw [heq] at hcount
     exact absurd hcount (by decide)
-  unfold DmaBuffer.l1_dma_read_body
+  unfold l1_dma_read_manual
   rw [L1_elim_cond_false
     (fun st : ProgramState => decide ((hVal st.globals.rawHeap st.locals.buf).count = 0)) hcond]
   -- After cond false: catch (seq skip rest) skip
@@ -729,27 +773,25 @@ theorem dma_read_correct :
   let po := fun s : ProgramState => heapPtrValid s.globals.rawHeap s.locals.out
   let prd := fun s : ProgramState => heapPtrValid s.globals.rawHeap
     (Ptr.elemOffset s.locals.data (hVal s.globals.rawHeap s.locals.buf).read_idx.toNat)
-  -- Step 1: guard buf, modify cap_mask
+  -- Intermediate states
   let s1 := dma_set_cap_mask s
+  let s2 := dr_heap_out s1
+  let s3 := dr_heap_read_idx s2
+  let s4 := dr_heap_count s3
+  let s5 := dma_set_ret0 s4
+  -- heapPtrValid preservation
   have hbuf1 : p s1 := dma_set_cap_mask_ptrValid_buf s hbuf
   have hout1 : po s1 := dma_set_cap_mask_ptrValid_out s hout
   have hdata1 : prd s1 := dma_set_cap_mask_ptrValid_data_read s hdata
-  have h1 := L1_guard_modify_result p dma_set_cap_mask s hbuf
-  -- Step 2: guard out, guard data[read_idx], guard buf, modify heap (write to out)
-  let s2 := dr_heap_out s1
   have hbuf2 : p s2 := dr_heap_out_ptrValid_buf s1 hbuf1
-  have h2 := L1_guard_guard_guard_modify_result po prd p dr_heap_out s1 hout1 hdata1 hbuf1
-  -- Step 3: guard buf, guard buf, modify read_idx
-  let s3 := dr_heap_read_idx s2
   have hbuf3 : p s3 := dr_heap_read_idx_ptrValid_buf s2 hbuf2
+  -- Step results
+  have h1 := L1_guard_modify_result p dma_set_cap_mask s hbuf
+  have h2 := L1_guard_guard_guard_modify_result po prd p dr_heap_out s1 hout1 hdata1 hbuf1
   have h3 := L1_guard_guard_modify_result p p dr_heap_read_idx s2 hbuf2 hbuf2
-  -- Step 4: guard buf, guard buf, modify count
-  let s4 := dr_heap_count s3
   have h4 := L1_guard_guard_modify_result p p dr_heap_count s3 hbuf3 hbuf3
-  -- Step 5: modify ret0, throw
-  let s5 := dma_set_ret0 s4
   have h5 := L1_modify_throw_result dma_set_ret0 s4
-  -- Define monad terms
+  -- Define monad terms (matching the manual body structure)
   let m5 : L1Monad ProgramState := L1.seq (L1.modify dma_set_ret0) L1.throw
   let m4 : L1Monad ProgramState := L1.seq (L1.seq (L1.guard p) (L1.seq (L1.guard p) (L1.modify dr_heap_count))) m5
   let m3 : L1Monad ProgramState := L1.seq (L1.seq (L1.guard p) (L1.seq (L1.guard p) (L1.modify dr_heap_read_idx))) m4
@@ -792,6 +834,6 @@ theorem dma_read_correct :
   constructor
   · exact h_nf
   · intro r s' h_mem _
-    have h_mem' : (r, s') ∈ ({(Except.ok (), s5)} : Set _) := h_res ▸ h_mem
-    obtain ⟨rfl, rfl⟩ := Prod.mk.inj (Set.mem_singleton_iff.mp h_mem')
+    rw [h_res] at h_mem
+    obtain ⟨rfl, rfl⟩ := Prod.mk.inj h_mem
     exact dma_set_ret0_ret__val _

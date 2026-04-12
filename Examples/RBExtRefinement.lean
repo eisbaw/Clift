@@ -13,7 +13,13 @@
 -- than at the C level. Abstract operations are clean functional transformations.
 -- The refinement theorem then lifts these to C guarantees.
 
-import Examples.RBExtFuncSpecs
+import Examples.RBExtSpecs
+import Examples.RBExtProofsSimple
+import Examples.RBExtProofsLoops
+import Examples.RBExtProofsLoops2
+import Examples.RBExtProofsMax
+import Examples.RBExtProofsMin
+import Examples.RBExtProofsSorry
 import Clift.Lifting.GlobalInvariant
 import Clift.Lifting.AbstractSpec
 

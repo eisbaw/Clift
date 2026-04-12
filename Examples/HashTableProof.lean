@@ -467,6 +467,300 @@ private theorem lk_set_ret1_funext :
     (fun s : ProgramState => { s with locals := { s.locals with ret__val := 1 } }) = lk_set_ret1 := by
   funext s; unfold lk_set_ret1; rfl
 
+-- Restore after ht_hash call: locals from saved except idx from current ret_val
+private noncomputable def lk_restore (saved : ProgramState) (s : ProgramState) : ProgramState :=
+  ⟨s.globals, ⟨saved.locals.cap_mask, saved.locals.capacity, saved.locals.h,
+   saved.locals.ht, saved.locals.i, s.locals.ret__val, saved.locals.key, saved.locals.keys,
+   saved.locals.out, saved.locals.probes, saved.locals.ret__val, saved.locals.value,
+   saved.locals.values⟩⟩
+
+attribute [local irreducible] hVal in
+private theorem lk_restore_locals (saved s : ProgramState) :
+    (lk_restore saved s).locals = ⟨saved.locals.cap_mask, saved.locals.capacity, saved.locals.h,
+      saved.locals.ht, saved.locals.i, s.locals.ret__val, saved.locals.key, saved.locals.keys,
+      saved.locals.out, saved.locals.probes, saved.locals.ret__val, saved.locals.value,
+      saved.locals.values⟩ := by
+  show (⟨s.globals, ⟨saved.locals.cap_mask, saved.locals.capacity, saved.locals.h,
+    saved.locals.ht, saved.locals.i, s.locals.ret__val, saved.locals.key, saved.locals.keys,
+    saved.locals.out, saved.locals.probes, saved.locals.ret__val, saved.locals.value,
+    saved.locals.values⟩⟩ : ProgramState).locals = _
+  rfl
+
+attribute [local irreducible] hVal in
+@[simp] private theorem lk_restore_globals (saved s : ProgramState) :
+    (lk_restore saved s).globals = s.globals := by
+  show (⟨s.globals, _⟩ : ProgramState).globals = _; rfl
+
+attribute [local irreducible] hVal in
+@[simp] private theorem lk_restore_ht (saved s : ProgramState) :
+    (lk_restore saved s).locals.ht = saved.locals.ht := by rw [lk_restore_locals]
+
+attribute [local irreducible] hVal in
+@[simp] private theorem lk_restore_out (saved s : ProgramState) :
+    (lk_restore saved s).locals.out = saved.locals.out := by rw [lk_restore_locals]
+
+attribute [local irreducible] hVal in
+@[simp] private theorem lk_restore_keys (saved s : ProgramState) :
+    (lk_restore saved s).locals.keys = saved.locals.keys := by rw [lk_restore_locals]
+
+attribute [local irreducible] hVal in
+@[simp] private theorem lk_restore_values (saved s : ProgramState) :
+    (lk_restore saved s).locals.values = saved.locals.values := by rw [lk_restore_locals]
+
+attribute [local irreducible] hVal in
+@[simp] private theorem lk_restore_cap_mask (saved s : ProgramState) :
+    (lk_restore saved s).locals.cap_mask = saved.locals.cap_mask := by rw [lk_restore_locals]
+
+attribute [local irreducible] hVal in
+@[simp] private theorem lk_restore_idx (saved s : ProgramState) :
+    (lk_restore saved s).locals.idx = s.locals.ret__val := by rw [lk_restore_locals]
+
+attribute [local irreducible] hVal in
+@[simp] private theorem lk_restore_key (saved s : ProgramState) :
+    (lk_restore saved s).locals.key = saved.locals.key := by rw [lk_restore_locals]
+
+-- funext: the restore modify equals lk_restore
+private theorem lk_restore_funext (saved : ProgramState) :
+    (fun s : ProgramState => { s with locals := { saved.locals with idx := s.locals.ret__val } }) =
+      lk_restore saved := by
+  funext s; unfold lk_restore; rfl
+
+-- l1ProcEnv lookup lemma for ht_hash
+private theorem l1ProcEnv_ht_hash :
+    HashTable.l1ProcEnv "ht_hash" = some HashTable.l1_ht_hash_body := by
+  unfold HashTable.l1ProcEnv L1.L1ProcEnv.insert L1.L1ProcEnv.empty
+  rfl
+
+-- ht_hash produces exactly ok results (not error or fail).
+-- This strengthens ht_hash_correct to the form needed by L1_hoare_seq_ok.
+attribute [local irreducible] hVal in
+private theorem ht_hash_ok :
+    validHoare (fun _ : ProgramState => True) HashTable.l1_ht_hash_body
+      (fun r s => r = Except.ok () ∧
+        s.locals.ret__val = ((s.locals.key * 2654435769) >>> 16) &&& s.locals.cap_mask) := by
+  intro s _
+  -- l1_ht_hash_body = L1.catch (seq modify1 (seq modify2 throw)) skip
+  -- This always returns (ok, state_with_hash)
+  unfold HashTable.l1_ht_hash_body
+  simp only [ht_hash_f1_funext, ht_hash_f2_funext]
+  have h_step2 := L1_modify_throw_result ht_hash_f2 (ht_hash_f1 s)
+  have h_step1_res : (L1.modify ht_hash_f1 s).results = {(Except.ok (), ht_hash_f1 s)} := rfl
+  have h_step1_nf : ¬(L1.modify ht_hash_f1 s).failed := by intro h; exact h
+  have h_seq := L1_seq_singleton_ok h_step1_res h_step1_nf
+    (m₂ := L1.seq (L1.modify ht_hash_f2) L1.throw)
+  have h_body_res :
+      (L1.seq (L1.modify ht_hash_f1) (L1.seq (L1.modify ht_hash_f2) L1.throw) s).results =
+        {(Except.error (), ht_hash_f2 (ht_hash_f1 s))} := by
+    rw [h_seq.1, h_step2.1]
+  have h_body_nf :
+      ¬(L1.seq (L1.modify ht_hash_f1) (L1.seq (L1.modify ht_hash_f2) L1.throw) s).failed := by
+    intro hf; exact h_step2.2 (h_seq.2.mp hf)
+  have h_catch := L1_catch_error_singleton h_body_res h_body_nf
+  constructor
+  · exact h_catch.2
+  · intro r s' h_mem
+    rw [h_catch.1] at h_mem
+    have ⟨hr, hs⟩ := Prod.mk.inj h_mem
+    subst hr; subst hs
+    exact ⟨rfl, rfl⟩
+
+-- Stronger ht_hash: produces ok, preserves globals, sets ret_val
+attribute [local irreducible] hVal in
+private theorem ht_hash_full (s : ProgramState) :
+    ¬(HashTable.l1_ht_hash_body s).failed ∧
+    ∀ r s', (r, s') ∈ (HashTable.l1_ht_hash_body s).results →
+      r = Except.ok () ∧
+      s'.globals = s.globals ∧
+      s'.locals.ret__val = ((s.locals.key * 2654435769) >>> 16) &&& s.locals.cap_mask ∧
+      s'.locals.key = s.locals.key ∧
+      s'.locals.cap_mask = s.locals.cap_mask := by
+  unfold HashTable.l1_ht_hash_body
+  simp only [ht_hash_f1_funext, ht_hash_f2_funext]
+  have h_step2 := L1_modify_throw_result ht_hash_f2 (ht_hash_f1 s)
+  have h_step1_res : (L1.modify ht_hash_f1 s).results = {(Except.ok (), ht_hash_f1 s)} := rfl
+  have h_step1_nf : ¬(L1.modify ht_hash_f1 s).failed := by intro h; exact h
+  have h_seq := L1_seq_singleton_ok h_step1_res h_step1_nf
+    (m₂ := L1.seq (L1.modify ht_hash_f2) L1.throw)
+  have h_body_res :=
+    show (L1.seq (L1.modify ht_hash_f1) (L1.seq (L1.modify ht_hash_f2) L1.throw) s).results =
+        {(Except.error (), ht_hash_f2 (ht_hash_f1 s))} by rw [h_seq.1, h_step2.1]
+  have h_body_nf :=
+    show ¬(L1.seq (L1.modify ht_hash_f1) (L1.seq (L1.modify ht_hash_f2) L1.throw) s).failed from
+      fun hf => h_step2.2 (h_seq.2.mp hf)
+  have h_catch := L1_catch_error_singleton h_body_res h_body_nf
+  constructor
+  · exact h_catch.2
+  · intro r s' h_mem
+    rw [h_catch.1] at h_mem
+    have ⟨hr, hs⟩ := Prod.mk.inj h_mem
+    subst hr; subst hs
+    refine ⟨rfl, ?_, ?_, ?_, ?_⟩
+    · -- globals preserved: ht_hash_f2 (ht_hash_f1 s) only modifies locals
+      show (ht_hash_f2 (ht_hash_f1 s)).globals = s.globals
+      unfold ht_hash_f2 ht_hash_f1; rfl
+    · rw [ht_hash_f2_locals_ret__val, ht_hash_f1_locals_h, ht_hash_f1_locals_cap_mask,
+        ht_hash_f2_locals_key, ht_hash_f2_locals_cap_mask, ht_hash_f1_locals_key,
+        ht_hash_f1_locals_cap_mask]
+    · rw [ht_hash_f2_locals_key, ht_hash_f1_locals_key]
+    · rw [ht_hash_f2_locals_cap_mask, ht_hash_f1_locals_cap_mask]
+
+-- Helper: the dynCom for ht_hash establishes ht_loop_inv with idx bounded.
+-- Extracted as a standalone lemma to control memory usage during elaboration.
+-- The dynCom body: seq (modify setup) (seq (call ht_hash) (modify restore))
+-- where setup is identity and restore sets locals from saved with idx := hash result.
+attribute [local irreducible] hVal heapPtrValid heapUpdate in
+private theorem ht_lookup_dynCom_hoare :
+    validHoare
+      (fun s => heapPtrValid s.globals.rawHeap s.locals.ht ∧
+                heapPtrValid s.globals.rawHeap s.locals.out ∧
+                (hVal s.globals.rawHeap s.locals.ht).capacity > 0 ∧
+                ht_arrays_valid s.globals.rawHeap s.locals.keys s.locals.values
+                  (hVal s.globals.rawHeap s.locals.ht).capacity ∧
+                s.locals.cap_mask = (hVal s.globals.rawHeap s.locals.ht).capacity - 1)
+      (L1.dynCom (fun saved =>
+        L1.seq (L1.modify (fun s => { s with locals := { s.locals with
+          key := s.locals.key, cap_mask := s.locals.cap_mask } }))
+        (L1.seq HashTable.l1_ht_hash_body
+          (L1.modify (fun s => { s with locals := { saved.locals with
+            idx := s.locals.ret__val } })))))
+      (fun r s => r = Except.ok () ∧ ht_loop_inv s ∧
+                  heapPtrValid s.globals.rawHeap s.locals.out) := by
+  apply L1_hoare_dynCom
+  intro saved ⟨h_ht, h_out, h_cap, h_arr, h_cm⟩
+  -- Inner body: seq (modify id) (seq ht_hash (modify restore))
+  -- Use L1_hoare_seq_ok chain
+  apply L1_hoare_seq_ok
+    (R := fun s => heapPtrValid s.globals.rawHeap s.locals.ht ∧
+                    heapPtrValid s.globals.rawHeap s.locals.out ∧
+                    (hVal s.globals.rawHeap s.locals.ht).capacity > 0 ∧
+                    ht_arrays_valid s.globals.rawHeap s.locals.keys s.locals.values
+                      (hVal s.globals.rawHeap s.locals.ht).capacity ∧
+                    s.locals.cap_mask = (hVal s.globals.rawHeap s.locals.ht).capacity - 1)
+  · -- modify setup (identity): {s with locals := {s.locals with key := key, cap_mask := cap_mask}} = s
+    intro s ⟨h_eq, _⟩
+    constructor
+    · intro hf; exact hf
+    · intro r s' h_mem
+      have ⟨hr, hs⟩ := Prod.mk.inj h_mem
+      -- setup is identity
+      exact ⟨hr, by subst hs; exact ⟨h_ht, h_out, h_cap, h_arr, h_cm⟩⟩
+  · -- seq ht_hash (modify restore)
+    apply L1_hoare_seq_ok
+      (R := fun s₂ => s₂.globals = saved.globals ∧
+        s₂.locals.ret__val = ((saved.locals.key * 2654435769) >>> 16) &&& saved.locals.cap_mask)
+    · -- ht_hash
+      intro s ⟨h_ht', h_out', h_cap', h_arr', h_cm'⟩
+      have ⟨h_nf, h_post⟩ := ht_hash_full s
+      constructor
+      · exact h_nf
+      · intro r s' h_mem
+        have ⟨h_ok, h_glob, h_rv, _, _⟩ := h_post r s' h_mem
+        exact ⟨h_ok, h_glob, h_rv⟩
+    · -- modify restore: set locals from saved with idx := ret_val
+      simp only [lk_restore_funext]
+      intro s₂ ⟨h_glob, h_rv⟩
+      constructor
+      · intro hf; exact hf
+      · intro r s' h_mem
+        have ⟨hr, hs⟩ := Prod.mk.inj h_mem
+        subst hr; subst hs
+        refine ⟨rfl, ?_, ?_⟩
+        · refine ⟨?_, ?_, ?_, ?_, ?_⟩
+          · rw [lk_restore_globals, lk_restore_ht, h_glob]; exact h_ht
+          · rw [lk_restore_globals, lk_restore_keys, lk_restore_values,
+              lk_restore_ht, h_glob]; exact h_arr
+          · rw [lk_restore_globals, lk_restore_ht, h_glob]; exact h_cap
+          · rw [lk_restore_cap_mask]; exact h_cm
+          · rw [lk_restore_idx, h_rv, h_cm,
+              show (lk_restore saved s₂).globals = saved.globals by rw [lk_restore_globals, h_glob],
+              show (lk_restore saved s₂).locals.ht = saved.locals.ht by rw [lk_restore_ht]]
+            exact hash_index_bounded' _ _ h_cap
+        · rw [lk_restore_globals, lk_restore_out, h_glob]; exact h_out
+
+-- Insert version of the dynCom (same structure, different postcondition)
+attribute [local irreducible] hVal heapPtrValid heapUpdate in
+private theorem ht_insert_dynCom_hoare :
+    validHoare
+      (fun s => heapPtrValid s.globals.rawHeap s.locals.ht ∧
+                s.locals.key > 1 ∧
+                (hVal s.globals.rawHeap s.locals.ht).capacity > 0 ∧
+                ht_arrays_valid s.globals.rawHeap s.locals.keys s.locals.values
+                  (hVal s.globals.rawHeap s.locals.ht).capacity ∧
+                s.locals.cap_mask = (hVal s.globals.rawHeap s.locals.ht).capacity - 1)
+      (L1.dynCom (fun saved =>
+        L1.seq (L1.modify (fun s => { s with locals := { s.locals with
+          key := s.locals.key, cap_mask := s.locals.cap_mask } }))
+        (L1.seq HashTable.l1_ht_hash_body
+          (L1.modify (fun s => { s with locals := { saved.locals with
+            idx := s.locals.ret__val } })))))
+      (fun r s => r = Except.ok () ∧ ht_insert_loop_inv s) := by
+  apply L1_hoare_dynCom
+  intro saved ⟨h_ht, h_key, h_cap, h_arr, h_cm⟩
+  apply L1_hoare_seq_ok
+    (R := fun s => heapPtrValid s.globals.rawHeap s.locals.ht ∧
+                    s.locals.key > 1 ∧
+                    (hVal s.globals.rawHeap s.locals.ht).capacity > 0 ∧
+                    ht_arrays_valid s.globals.rawHeap s.locals.keys s.locals.values
+                      (hVal s.globals.rawHeap s.locals.ht).capacity ∧
+                    s.locals.cap_mask = (hVal s.globals.rawHeap s.locals.ht).capacity - 1)
+  · -- modify setup (identity)
+    intro s ⟨h_eq, _⟩
+    constructor
+    · intro hf; exact hf
+    · intro r s' h_mem
+      have ⟨hr, hs⟩ := Prod.mk.inj h_mem
+      exact ⟨hr, by subst hs; exact ⟨h_ht, h_key, h_cap, h_arr, h_cm⟩⟩
+  · -- seq ht_hash (modify restore)
+    apply L1_hoare_seq_ok
+      (R := fun s₂ => s₂.globals = saved.globals ∧
+        s₂.locals.ret__val = ((saved.locals.key * 2654435769) >>> 16) &&& saved.locals.cap_mask)
+    · intro s ⟨h_ht', _, h_cap', h_arr', h_cm'⟩
+      have ⟨h_nf, h_post⟩ := ht_hash_full s
+      constructor
+      · exact h_nf
+      · intro r s' h_mem
+        have ⟨h_ok, h_glob, h_rv, _, _⟩ := h_post r s' h_mem
+        exact ⟨h_ok, h_glob, h_rv⟩
+    · simp only [lk_restore_funext]
+      intro s₂ ⟨h_glob, h_rv⟩
+      constructor
+      · intro hf; exact hf
+      · intro r s' h_mem
+        have ⟨hr, hs⟩ := Prod.mk.inj h_mem
+        subst hr; subst hs
+        refine ⟨rfl, ?_⟩
+        refine ⟨⟨?_, ?_, ?_, ?_, ?_⟩, ?_⟩
+        · rw [lk_restore_globals, lk_restore_ht, h_glob]; exact h_ht
+        · rw [lk_restore_globals, lk_restore_keys, lk_restore_values,
+            lk_restore_ht, h_glob]; exact h_arr
+        · rw [lk_restore_globals, lk_restore_ht, h_glob]; exact h_cap
+        · rw [lk_restore_cap_mask]; exact h_cm
+        · rw [lk_restore_idx, h_rv, h_cm,
+            show (lk_restore saved s₂).globals = saved.globals by rw [lk_restore_globals, h_glob],
+            show (lk_restore saved s₂).locals.ht = saved.locals.ht by rw [lk_restore_ht]]
+          exact hash_index_bounded' _ _ h_cap
+        · rw [lk_restore_key]; exact h_key
+
+-- Helper: shared guard+modify cap_mask proof (used by both lookup and insert)
+attribute [local irreducible] hVal heapPtrValid heapUpdate in
+private theorem ht_guard_modify_cm
+    (P : ProgramState → Prop)
+    (R : ProgramState → Prop)
+    (h_guard : ∀ s, P s → heapPtrValid s.globals.rawHeap s.locals.ht)
+    (h_post : ∀ s, P s → R (lk_set_cm s)) :
+    validHoare P (L1.seq (L1.guard (fun s => heapPtrValid s.globals.rawHeap s.locals.ht))
+      (L1.modify lk_set_cm)) (fun r s => r = Except.ok () ∧ R s) := by
+  intro s hpre
+  have hv := h_guard s hpre
+  have hgm := L1_guard_modify_result
+    (fun s : ProgramState => heapPtrValid s.globals.rawHeap s.locals.ht) lk_set_cm s hv
+  constructor
+  · exact hgm.2
+  · intro r s' h_mem
+    rw [hgm.1] at h_mem
+    have ⟨hr, hs⟩ := Prod.mk.inj h_mem
+    exact ⟨hr, hs ▸ h_post s hpre⟩
+
 attribute [local irreducible] hVal heapPtrValid heapUpdate in
 theorem ht_lookup_correct :
     ht_lookup_spec.satisfiedBy HashTable.l1_ht_lookup_body := by
@@ -537,7 +831,7 @@ theorem ht_lookup_correct :
         (R := fun s => ht_loop_inv s ∧
                         heapPtrValid s.globals.rawHeap s.locals.out)
       · -- dynCom: calls ht_hash, restores locals, sets idx
-        sorry
+        exact ht_lookup_dynCom_hoare
       · -- seq probes:=0 (seq while ret:=0;throw)
         apply L1_hoare_seq_ok
           (R := fun s => ht_loop_inv s ∧

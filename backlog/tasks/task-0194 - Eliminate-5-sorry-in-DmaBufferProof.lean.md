@@ -1,10 +1,10 @@
 ---
 id: TASK-0194
 title: Eliminate 5 sorry in DmaBufferProof.lean
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-10 20:49'
-updated_date: '2026-04-11 22:34'
+updated_date: '2026-04-12 12:35'
 labels:
   - sorry-elimination
 dependencies: []
@@ -33,5 +33,5 @@ priority: medium
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Partially eliminated — see commit log. Remaining sorry are in init functions (multi-field heap writes), conditional heap reads, or loop-based functions requiring invariant machinery.
+All 5 sorry eliminated: dma_init (prior), dma_available (prior), dma_write, dma_read fully proven. Build clean. Added L1_guard_guard_guard_modify_result infrastructure.
 <!-- SECTION:FINAL_SUMMARY:END -->
