@@ -507,6 +507,17 @@ def rb_clear_spec_ext : FuncSpec ProgramState where
     (hVal s.globals.rawHeap s.locals.rb).tail = Ptr.null ∧
     (hVal s.globals.rawHeap s.locals.rb).count = 0
 
+/-- rb_reverse strengthened: requires WellFormedList so that heap mutations
+    (cur.next := prev each iteration) preserve validity of remaining nodes. -/
+def rb_reverse_spec_ext : FuncSpec ProgramState where
+  pre := fun s =>
+    heapPtrValid s.globals.rawHeap s.locals.rb ∧
+    WellFormedList s.globals.rawHeap (hVal s.globals.rawHeap s.locals.rb).head ∧
+    (hVal s.globals.rawHeap s.locals.rb).count ≥ 2
+  post := fun r s =>
+    r = Except.ok () →
+    s.locals.ret__val = 0
+
 
 /-! # Relational FuncSpec: captures pre/post state relationship
 
