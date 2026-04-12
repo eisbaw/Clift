@@ -18,7 +18,22 @@ import Examples.RBExtProofsSimple
 import Examples.RBExtProofsLoops
 import Examples.RBExtProofsLoops2
 -- import Examples.RBExtProofsMaxMin  -- Requires >30GB RAM; rb_max/rb_min proofs not needed here
-import Examples.RBExtProofsSorry
+-- Individual proof files (split from RBExtProofsSorry for memory)
+import Examples.RBExtProofRbPop
+import Examples.RBExtProofRbIterNext
+import Examples.RBExtProofRbIncrementAll
+import Examples.RBExtProofRbSwapFrontBack
+import Examples.RBExtProofRbReplaceAll
+import Examples.RBExtProofRbFill
+import Examples.RBExtProofRbReverse
+import Examples.RBExtProofRbRemoveFirstMatch
+import Examples.RBExtProofRbEqual
+import Examples.RBExtProofRbClear
+import Examples.RBExtProofRbCheckIntegrity
+import Examples.RBExtProofRbIterSkip
+import Examples.RBExtProofRbPushIfNotFull
+import Examples.RBExtProofRbPopIfNotEmpty
+import Examples.RBExtProofRbDrainTo
 import Clift.Lifting.GlobalInvariant
 import Clift.Lifting.AbstractSpec
 
