@@ -620,4 +620,200 @@ theorem L1_hoare_guard_modify_chain3 {σ : Type}
       · rintro s ⟨s₀, hP, rfl⟩; exact h_p₃ s₀ hP
       · rintro s ⟨s₀, hP, rfl⟩; exact h_post s₀ hP
 
+/-- Chain four guard+modify pairs. -/
+theorem L1_hoare_guard_modify_chain4 {σ : Type}
+    {p₁ : σ → Prop} [DecidablePred p₁] {f₁ : σ → σ}
+    {p₂ : σ → Prop} [DecidablePred p₂] {f₂ : σ → σ}
+    {p₃ : σ → Prop} [DecidablePred p₃] {f₃ : σ → σ}
+    {p₄ : σ → Prop} [DecidablePred p₄] {f₄ : σ → σ}
+    {P : σ → Prop} {Q : Except Unit Unit → σ → Prop}
+    (h_p₁ : ∀ s, P s → p₁ s)
+    (h_p₂ : ∀ s, P s → p₂ (f₁ s))
+    (h_p₃ : ∀ s, P s → p₃ (f₂ (f₁ s)))
+    (h_p₄ : ∀ s, P s → p₄ (f₃ (f₂ (f₁ s))))
+    (h_post : ∀ s, P s → Q (Except.ok ()) (f₄ (f₃ (f₂ (f₁ s))))) :
+    validHoare P (L1.seq (L1.guard p₁) (L1.seq (L1.modify f₁)
+                 (L1.seq (L1.guard p₂) (L1.seq (L1.modify f₂)
+                 (L1.seq (L1.guard p₃) (L1.seq (L1.modify f₃)
+                 (L1.seq (L1.guard p₄) (L1.modify f₄)))))))) Q := by
+  apply L1_hoare_seq_ok (R := fun s => P s)
+  · apply L1_hoare_pre (P := fun s => p₁ s ∧ P s)
+    · intro s hP; exact ⟨h_p₁ s hP, hP⟩
+    · exact L1_hoare_guard' p₁ P
+  · apply L1_hoare_seq_ok (R := fun s => ∃ s₀, P s₀ ∧ s = f₁ s₀)
+    · apply L1_hoare_pre (P := fun s => (∃ s₀, P s₀ ∧ f₁ s = f₁ s₀))
+      · intro s hP; exact ⟨s, hP, rfl⟩
+      · exact L1_hoare_modify' f₁ (fun s => ∃ s₀, P s₀ ∧ s = f₁ s₀)
+    · apply L1_hoare_guard_modify_chain3
+      · rintro s ⟨s₀, hP, rfl⟩; exact h_p₂ s₀ hP
+      · rintro s ⟨s₀, hP, rfl⟩; exact h_p₃ s₀ hP
+      · rintro s ⟨s₀, hP, rfl⟩; exact h_p₄ s₀ hP
+      · rintro s ⟨s₀, hP, rfl⟩; exact h_post s₀ hP
+
+/-- Chain five guard+modify pairs. -/
+theorem L1_hoare_guard_modify_chain5 {σ : Type}
+    {p₁ : σ → Prop} [DecidablePred p₁] {f₁ : σ → σ}
+    {p₂ : σ → Prop} [DecidablePred p₂] {f₂ : σ → σ}
+    {p₃ : σ → Prop} [DecidablePred p₃] {f₃ : σ → σ}
+    {p₄ : σ → Prop} [DecidablePred p₄] {f₄ : σ → σ}
+    {p₅ : σ → Prop} [DecidablePred p₅] {f₅ : σ → σ}
+    {P : σ → Prop} {Q : Except Unit Unit → σ → Prop}
+    (h_p₁ : ∀ s, P s → p₁ s)
+    (h_p₂ : ∀ s, P s → p₂ (f₁ s))
+    (h_p₃ : ∀ s, P s → p₃ (f₂ (f₁ s)))
+    (h_p₄ : ∀ s, P s → p₄ (f₃ (f₂ (f₁ s))))
+    (h_p₅ : ∀ s, P s → p₅ (f₄ (f₃ (f₂ (f₁ s)))))
+    (h_post : ∀ s, P s → Q (Except.ok ()) (f₅ (f₄ (f₃ (f₂ (f₁ s)))))) :
+    validHoare P (L1.seq (L1.guard p₁) (L1.seq (L1.modify f₁)
+                 (L1.seq (L1.guard p₂) (L1.seq (L1.modify f₂)
+                 (L1.seq (L1.guard p₃) (L1.seq (L1.modify f₃)
+                 (L1.seq (L1.guard p₄) (L1.seq (L1.modify f₄)
+                 (L1.seq (L1.guard p₅) (L1.modify f₅)))))))))) Q := by
+  apply L1_hoare_seq_ok (R := fun s => P s)
+  · apply L1_hoare_pre (P := fun s => p₁ s ∧ P s)
+    · intro s hP; exact ⟨h_p₁ s hP, hP⟩
+    · exact L1_hoare_guard' p₁ P
+  · apply L1_hoare_seq_ok (R := fun s => ∃ s₀, P s₀ ∧ s = f₁ s₀)
+    · apply L1_hoare_pre (P := fun s => (∃ s₀, P s₀ ∧ f₁ s = f₁ s₀))
+      · intro s hP; exact ⟨s, hP, rfl⟩
+      · exact L1_hoare_modify' f₁ (fun s => ∃ s₀, P s₀ ∧ s = f₁ s₀)
+    · apply L1_hoare_guard_modify_chain4
+      · rintro s ⟨s₀, hP, rfl⟩; exact h_p₂ s₀ hP
+      · rintro s ⟨s₀, hP, rfl⟩; exact h_p₃ s₀ hP
+      · rintro s ⟨s₀, hP, rfl⟩; exact h_p₄ s₀ hP
+      · rintro s ⟨s₀, hP, rfl⟩; exact h_p₅ s₀ hP
+      · rintro s ⟨s₀, hP, rfl⟩; exact h_post s₀ hP
+
+/-! ## Guard+modify chain composition
+
+When you need more than 5 steps, compose two chains using `L1_hoare_seq_ok`.
+For example, to verify 8 guard+modify steps:
+1. Split the program as `seq first_5_steps remaining_3_steps`
+2. Use `L1_hoare_guard_modify_chain5` for the first 5 steps with intermediate condition R
+3. Use `L1_hoare_guard_modify_chain3` for the remaining 3 steps from R
+
+The composition lemma below makes this pattern explicit by wrapping L1_hoare_seq_ok
+with the common guard+modify intermediate state pattern: the first N steps produce
+a state described by R, and the remaining M steps start from R. -/
+
+/-- Compose two guard+modify chain proofs.
+    `first` is proven (e.g. by chain5) to produce ok + R from P.
+    `rest` is proven (e.g. by chain3) to produce Q from R.
+    The composition `seq first rest` satisfies `{P} first; rest {Q}`.
+
+    This is the key lemma for chains longer than 5: split the program into
+    two halves, prove each with a chainN lemma, and compose with this rule. -/
+theorem L1_hoare_guard_modify_chain_compose {σ : Type}
+    {first rest : L1Monad σ}
+    {P : σ → Prop} {R : σ → Prop} {Q : Except Unit Unit → σ → Prop}
+    (h_first : validHoare P first (fun r s => r = Except.ok () ∧ R s))
+    (h_rest : validHoare R rest Q) :
+    validHoare P (L1.seq first rest) Q :=
+  L1_hoare_seq_ok P R Q first rest h_first h_rest
+
+/-- Variant of chain_compose: when the first chain is proven with a standard
+    postcondition (not the `r = ok ∧ R` form), adapt it.
+    Useful when the first chain is proven via L1_hoare_guard_modify_fused or
+    similar lemmas that produce a general Q postcondition. -/
+theorem L1_hoare_guard_modify_chain_compose' {σ : Type}
+    {first rest : L1Monad σ}
+    {P : σ → Prop} {R : σ → Prop} {Q : Except Unit Unit → σ → Prop}
+    (h_first : validHoare P first (fun r s => R s))
+    (h_first_ok : ∀ s, P s → ¬(first s).failed →
+      ∀ r s', (r, s') ∈ (first s).results → r = Except.ok ())
+    (h_rest : validHoare R rest Q) :
+    validHoare P (L1.seq first rest) Q := by
+  apply L1_hoare_seq_ok P R Q first rest
+  · intro s hP
+    have ⟨h_nf, h_post⟩ := h_first s hP
+    constructor
+    · exact h_nf
+    · intro r s' h_mem
+      exact ⟨h_first_ok s hP h_nf r s' h_mem, (h_post r s' h_mem)⟩
+  · exact h_rest
+
+/-- Chain N guard+modify pairs, ok-only postcondition variant of chain2.
+    Useful as building block for composition. -/
+theorem L1_hoare_guard_modify_chain2' {σ : Type}
+    {p : σ → Prop} [DecidablePred p] {f : σ → σ}
+    {q : σ → Prop} [DecidablePred q] {g : σ → σ}
+    {P : σ → Prop} {R : σ → Prop}
+    (h_p : ∀ s, P s → p s)
+    (h_q : ∀ s, P s → q (f s))
+    (h_post : ∀ s, P s → R (g (f s))) :
+    validHoare P (L1.seq (L1.guard p) (L1.seq (L1.modify f)
+                 (L1.seq (L1.guard q) (L1.modify g))))
+      (fun r s => r = Except.ok () ∧ R s) := by
+  intro s hP
+  have h := L1_hoare_guard_modify_chain2 h_p h_q
+    (Q := fun r s => r = Except.ok () ∧ R s)
+    (fun s hP => ⟨rfl, h_post s hP⟩) s hP
+  exact h
+
+/-- Chain N guard+modify pairs, ok-only postcondition variant of chain3. -/
+theorem L1_hoare_guard_modify_chain3' {σ : Type}
+    {p₁ : σ → Prop} [DecidablePred p₁] {f₁ : σ → σ}
+    {p₂ : σ → Prop} [DecidablePred p₂] {f₂ : σ → σ}
+    {p₃ : σ → Prop} [DecidablePred p₃] {f₃ : σ → σ}
+    {P : σ → Prop} {R : σ → Prop}
+    (h_p₁ : ∀ s, P s → p₁ s)
+    (h_p₂ : ∀ s, P s → p₂ (f₁ s))
+    (h_p₃ : ∀ s, P s → p₃ (f₂ (f₁ s)))
+    (h_post : ∀ s, P s → R (f₃ (f₂ (f₁ s)))) :
+    validHoare P (L1.seq (L1.guard p₁) (L1.seq (L1.modify f₁)
+                 (L1.seq (L1.guard p₂) (L1.seq (L1.modify f₂)
+                 (L1.seq (L1.guard p₃) (L1.modify f₃))))))
+      (fun r s => r = Except.ok () ∧ R s) := by
+  intro s hP
+  exact L1_hoare_guard_modify_chain3 h_p₁ h_p₂ h_p₃
+    (Q := fun r s => r = Except.ok () ∧ R s)
+    (fun s hP => ⟨rfl, h_post s hP⟩) s hP
+
+/-- Chain N guard+modify pairs, ok-only postcondition variant of chain4. -/
+theorem L1_hoare_guard_modify_chain4' {σ : Type}
+    {p₁ : σ → Prop} [DecidablePred p₁] {f₁ : σ → σ}
+    {p₂ : σ → Prop} [DecidablePred p₂] {f₂ : σ → σ}
+    {p₃ : σ → Prop} [DecidablePred p₃] {f₃ : σ → σ}
+    {p₄ : σ → Prop} [DecidablePred p₄] {f₄ : σ → σ}
+    {P : σ → Prop} {R : σ → Prop}
+    (h_p₁ : ∀ s, P s → p₁ s)
+    (h_p₂ : ∀ s, P s → p₂ (f₁ s))
+    (h_p₃ : ∀ s, P s → p₃ (f₂ (f₁ s)))
+    (h_p₄ : ∀ s, P s → p₄ (f₃ (f₂ (f₁ s))))
+    (h_post : ∀ s, P s → R (f₄ (f₃ (f₂ (f₁ s))))) :
+    validHoare P (L1.seq (L1.guard p₁) (L1.seq (L1.modify f₁)
+                 (L1.seq (L1.guard p₂) (L1.seq (L1.modify f₂)
+                 (L1.seq (L1.guard p₃) (L1.seq (L1.modify f₃)
+                 (L1.seq (L1.guard p₄) (L1.modify f₄))))))))
+      (fun r s => r = Except.ok () ∧ R s) := by
+  intro s hP
+  exact L1_hoare_guard_modify_chain4 h_p₁ h_p₂ h_p₃ h_p₄
+    (Q := fun r s => r = Except.ok () ∧ R s)
+    (fun s hP => ⟨rfl, h_post s hP⟩) s hP
+
+/-- Chain N guard+modify pairs, ok-only postcondition variant of chain5. -/
+theorem L1_hoare_guard_modify_chain5' {σ : Type}
+    {p₁ : σ → Prop} [DecidablePred p₁] {f₁ : σ → σ}
+    {p₂ : σ → Prop} [DecidablePred p₂] {f₂ : σ → σ}
+    {p₃ : σ → Prop} [DecidablePred p₃] {f₃ : σ → σ}
+    {p₄ : σ → Prop} [DecidablePred p₄] {f₄ : σ → σ}
+    {p₅ : σ → Prop} [DecidablePred p₅] {f₅ : σ → σ}
+    {P : σ → Prop} {R : σ → Prop}
+    (h_p₁ : ∀ s, P s → p₁ s)
+    (h_p₂ : ∀ s, P s → p₂ (f₁ s))
+    (h_p₃ : ∀ s, P s → p₃ (f₂ (f₁ s)))
+    (h_p₄ : ∀ s, P s → p₄ (f₃ (f₂ (f₁ s))))
+    (h_p₅ : ∀ s, P s → p₅ (f₄ (f₃ (f₂ (f₁ s)))))
+    (h_post : ∀ s, P s → R (f₅ (f₄ (f₃ (f₂ (f₁ s)))))) :
+    validHoare P (L1.seq (L1.guard p₁) (L1.seq (L1.modify f₁)
+                 (L1.seq (L1.guard p₂) (L1.seq (L1.modify f₂)
+                 (L1.seq (L1.guard p₃) (L1.seq (L1.modify f₃)
+                 (L1.seq (L1.guard p₄) (L1.seq (L1.modify f₄)
+                 (L1.seq (L1.guard p₅) (L1.modify f₅))))))))))
+      (fun r s => r = Except.ok () ∧ R s) := by
+  intro s hP
+  exact L1_hoare_guard_modify_chain5 h_p₁ h_p₂ h_p₃ h_p₄ h_p₅
+    (Q := fun r s => r = Except.ok () ∧ R s)
+    (fun s hP => ⟨rfl, h_post s hP⟩) s hP
+
 end L1Hoare
