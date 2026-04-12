@@ -212,6 +212,61 @@ nightly:
     echo ""
     echo "=== Nightly verification complete ==="
 
+# Lint: check for common proof quality issues
+lint:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    ISSUES=0
+    echo "=== Clift Lint ==="
+
+    # 1. Tautological postconditions (x = x pattern in FuncSpec post)
+    echo ""
+    echo "--- Tautological FuncSpec postconditions ---"
+    TAUT=$(grep -n "post := fun" Examples/ -r --include="*.lean" -A5 \
+      | grep -P '\.\w+ =\s*$' -A1 \
+      | grep -P '^\s+.*\.\1\s*$' 2>/dev/null | wc -l || true)
+    # Simpler check: find validHoare_weaken_trivial_post usage
+    WEAKEN=$(grep -rn "validHoare_weaken_trivial_post" Examples/ --include="*.lean" \
+      | grep -v "^.*:.*--" \
+      | grep -v "private theorem validHoare_weaken_trivial_post" \
+      | grep -c "validHoare_weaken_trivial_post" || true)
+    if [ "$WEAKEN" -gt 0 ]; then
+      echo "  WARN: $WEAKEN proofs use validHoare_weaken_trivial_post (trivializes postcondition)"
+      grep -rn "validHoare_weaken_trivial_post" Examples/ --include="*.lean" \
+        | grep -v "^.*:.*--" \
+        | grep -v "private theorem validHoare_weaken_trivial_post"
+      ISSUES=$((ISSUES + WEAKEN))
+    else
+      echo "  OK: No trivial postcondition weakening found"
+    fi
+
+    # 2. Sorry count
+    echo ""
+    echo "--- Sorry in proof files ---"
+    SORRY=$(grep -rn "^\s*sorry" Examples/ --include="*.lean" | grep -c "sorry" || true)
+    if [ "$SORRY" -gt 0 ]; then
+      echo "  WARN: $SORRY sorry remaining in Examples/"
+      ISSUES=$((ISSUES + SORRY))
+    else
+      echo "  OK: Zero sorry in Examples/"
+    fi
+
+    # 3. Sorry in core library (should always be 0)
+    echo ""
+    echo "--- Sorry in core library ---"
+    LIB_SORRY=$(grep -rn "^\s*sorry" Clift/ --include="*.lean" | grep -c "sorry" || true)
+    if [ "$LIB_SORRY" -gt 0 ]; then
+      echo "  FAIL: $LIB_SORRY sorry in Clift/ (core library must be sorry-free)"
+      grep -rn "^\s*sorry" Clift/ --include="*.lean"
+      ISSUES=$((ISSUES + LIB_SORRY))
+    else
+      echo "  OK: Core library sorry-free"
+    fi
+
+    echo ""
+    echo "=== Lint: $ISSUES issues found ==="
+    if [ "$ISSUES" -gt 0 ]; then exit 1; fi
+
 # Clean Lake build artifacts
 clean:
     lake clean

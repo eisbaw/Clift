@@ -4,7 +4,7 @@ title: Eliminate 3 sorry in RBExtRefinement.lean (refinement proofs)
 status: To Do
 assignee: []
 created_date: '2026-04-10 20:49'
-updated_date: '2026-04-11 08:44'
+updated_date: '2026-04-11 22:35'
 labels:
   - sorry-elimination
   - ring-buffer
@@ -25,6 +25,12 @@ priority: high
 - [ ] #3 Transfer theorem proven
 - [ ] #4 All proofs kernel-checked
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-04-12: Updated count. 12/40 validHoare now proven (was "only 4"). Still blocked on remaining 19 sorry in RBExtFuncSpecs.lean.
+<!-- SECTION:NOTES:END -->
 
 ## Final Summary
 

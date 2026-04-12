@@ -1,11 +1,11 @@
 ---
 id: TASK-0205
 title: 'Batch sorry elimination: run proof engine on all 57 sorry'
-status: To Do
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-11 06:28'
-updated_date: '2026-04-11 08:44'
+updated_date: '2026-04-11 22:33'
 labels:
   - critical-path
   - ai
@@ -31,8 +31,14 @@ Run clift-prove-by-claudecode --batch on every file with sorry. For each: extrac
 - [ ] #6 Total API cost measured
 <!-- AC:END -->
 
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-04-12: Closing as superseded. User rejected the claude-prove script approach. Sorry elimination is being done via direct proofs + /model-race skill instead. Sorry count reduced from 65 to 37 via these approaches.
+<!-- SECTION:NOTES:END -->
+
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Framework complete, awaiting API key. The clift-prove-by-claudecode script exists and implements the batch sorry elimination pipeline: extract goal, build prompt with [local irreducible] hint + projection lemma pattern + similar proofs from ProofIndex, call Claude API, apply result, check with lake build. Cannot execute without Claude API key configured. Current sorry count is 31 in RBExtFuncSpecs + 3 in RBExtRefinement + others scattered across proof files.
+Superseded by direct proof + model-race approach. The proof engine script exists but was never used for batch elimination. Sorry count went from 65 to 37 via manual proofs and AI model racing instead.
 <!-- SECTION:FINAL_SUMMARY:END -->

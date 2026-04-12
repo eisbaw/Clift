@@ -1,10 +1,10 @@
 ---
 id: TASK-0194
 title: Eliminate 5 sorry in DmaBufferProof.lean
-status: Done
+status: To Do
 assignee: []
 created_date: '2026-04-10 20:49'
-updated_date: '2026-04-11 08:21'
+updated_date: '2026-04-11 22:34'
 labels:
   - sorry-elimination
 dependencies: []
@@ -23,6 +23,12 @@ priority: medium
 - [ ] #2 validHoare proofs completed (3 sorry)
 - [ ] #3 All proofs kernel-checked
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-04-12: Reopened. Still has 2 sorry. DmaBufferProof.lean:273, :279 (both need strengthened precondition for heapPtrValid on data array elements).
+<!-- SECTION:NOTES:END -->
 
 ## Final Summary
 

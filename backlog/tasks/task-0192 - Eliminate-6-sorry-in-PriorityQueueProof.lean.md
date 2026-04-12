@@ -1,10 +1,10 @@
 ---
 id: TASK-0192
 title: Eliminate 6 sorry in PriorityQueueProof.lean
-status: Done
+status: To Do
 assignee: []
 created_date: '2026-04-10 20:49'
-updated_date: '2026-04-11 08:21'
+updated_date: '2026-04-11 22:34'
 labels:
   - sorry-elimination
 dependencies: []
@@ -22,6 +22,12 @@ priority: medium
 - [ ] #1 All 6 sorry eliminated
 - [ ] #2 All proofs kernel-checked
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-04-12: Reopened. Still has 2 sorry. PriorityQueueProof.lean:260, :265 (both require call resolution for pq_bubble_up/down).
+<!-- SECTION:NOTES:END -->
 
 ## Final Summary
 

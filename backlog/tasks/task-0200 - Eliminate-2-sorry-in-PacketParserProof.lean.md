@@ -4,7 +4,7 @@ title: Eliminate 2 sorry in PacketParserProof.lean
 status: Done
 assignee: []
 created_date: '2026-04-10 20:50'
-updated_date: '2026-04-11 08:21'
+updated_date: '2026-04-12 00:52'
 labels:
   - sorry-elimination
 dependencies: []
@@ -23,8 +23,16 @@ priority: medium
 - [ ] #2 All proofs kernel-checked
 <!-- AC:END -->
 
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-04-12: Reopened. Still has 1 sorry. PacketParserProof.lean:138 (heap read + conditional).
+
+2026-04-12: Race 5 eliminated the last sorry (ipv4_is_tcp). gpt-5.4-xhigh won. Build clean.
+<!-- SECTION:NOTES:END -->
+
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Partially eliminated — see commit log. Remaining sorry are in init functions (multi-field heap writes), conditional heap reads, or loop-based functions requiring invariant machinery.
+Sorry eliminated via model-race. gpt-5.4-xhigh proved ipv4_is_tcp_satisfies_spec using L1_elim_cond_true/false + L1_modify_throw_seq_catch_skip.
 <!-- SECTION:FINAL_SUMMARY:END -->

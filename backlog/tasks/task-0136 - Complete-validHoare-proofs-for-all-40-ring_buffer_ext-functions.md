@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-04-10 18:45'
-updated_date: '2026-04-10 19:27'
+updated_date: '2026-04-11 22:33'
 labels:
   - phase-l
   - verification
@@ -37,6 +37,11 @@ The biggest gap between us and seL4. We have FuncSpecs for 15/40 functions but v
 - 40/40 FuncSpecs defined (18 existing + 22 new in RBExtFuncSpecs.lean)
 - 25/40 validHoare proofs use sorry (loops, multi-heap, calls)
 - 0/40 fully proven yet (existing SwapProof pattern not yet applied to ring buffer)
+
+2026-04-12: Current score is 12/40 proven sorry-free (not 7 as old notes say).
+Proven: rb_capacity, rb_size, rb_remaining, rb_stats_total_ops, rb_is_empty, rb_is_full, rb_iter_has_next, rb_count_nodes, rb_contains, rb_count_above, rb_count_at_or_below.
+Sorry remaining: 19 validHoare (rb_push, rb_pop, rb_find_index, rb_nth, rb_sum, rb_increment_all, rb_swap_front_back, rb_max, rb_replace_all, rb_fill, rb_reverse, rb_remove_first_match, rb_equal, rb_check_integrity, rb_iter_next, rb_iter_skip, rb_push_if_not_full, rb_pop_if_not_empty, rb_drain_to, rb_clear, rb_min).
+Note: that is 21 items, 2 extra vs 19 sorry count because rb_count_nodes_validHoare_trivial is a helper.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

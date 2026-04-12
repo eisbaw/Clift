@@ -1,10 +1,10 @@
 ---
 id: TASK-0193
 title: Eliminate 5 sorry in HashTableProof.lean
-status: Done
+status: To Do
 assignee: []
 created_date: '2026-04-10 20:49'
-updated_date: '2026-04-11 08:21'
+updated_date: '2026-04-12 00:52'
 labels:
   - sorry-elimination
 dependencies: []
@@ -22,6 +22,14 @@ priority: medium
 - [ ] #1 All 5 sorry eliminated
 - [ ] #2 All proofs kernel-checked
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-04-12: Reopened. Still has 4 sorry (was 5, 1 eliminated). HashTableProof.lean:107 (kernel depth), :131 (while loop), :136 (while loop), :152 (bitvec).
+
+2026-04-12: Race 3 eliminated 2/4 sorry (ht_hash_correct, hash_index_bounded). Remaining 2 are while-loop proofs for linear probing — genuinely hard, need loop invariants.
+<!-- SECTION:NOTES:END -->
 
 ## Final Summary
 

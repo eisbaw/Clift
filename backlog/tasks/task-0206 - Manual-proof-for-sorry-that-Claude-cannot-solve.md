@@ -1,10 +1,10 @@
 ---
 id: TASK-0206
 title: Manual proof for sorry that Claude cannot solve
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-11 06:28'
-updated_date: '2026-04-11 08:45'
+updated_date: '2026-04-11 22:33'
 labels:
   - sorry-elimination
   - proof-depth
@@ -27,8 +27,14 @@ After the batch sorry elimination (task-0205), ~12 sorry will likely remain. The
 - [ ] #4 Proof engine improvement suggestions filed as tasks
 <!-- AC:END -->
 
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-04-12: Closing as superseded. Dependency (0205) approach was rejected by user. Sorry are being eliminated via direct proofs + /model-race skill.
+<!-- SECTION:NOTES:END -->
+
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Blocked on task 0205 (batch sorry elimination run). Cannot assess which sorry Claude fails on without running the batch first. The manual proof methodology is established: guard-modify-throw-catch-skip for simple accessors, multi-guard helper for repeated guards, conditional pattern for if-then-else returns. Each remaining sorry category (loop, multi-heap, inter-proc) needs different infrastructure.
+Superseded — sorry elimination uses direct proofs and model-race skill, not batch proof engine.
 <!-- SECTION:FINAL_SUMMARY:END -->
