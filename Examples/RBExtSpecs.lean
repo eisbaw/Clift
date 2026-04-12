@@ -254,9 +254,12 @@ def rb_sum_spec : FuncSpec ProgramState where
       (hVal s.globals.rawHeap s.locals.rb).count
 
 /-- rb_increment_all: adds delta to every node's value.
-    Task 0137: every node's value increased by delta. Count/capacity unchanged. -/
+    Task 0137: every node's value increased by delta. Count/capacity unchanged.
+    Precondition strengthened: WellFormedList for heap-mutation loop guards. -/
 def rb_increment_all_spec : FuncSpec ProgramState where
-  pre := fun s => heapPtrValid s.globals.rawHeap s.locals.rb
+  pre := fun s =>
+    heapPtrValid s.globals.rawHeap s.locals.rb ∧
+    WellFormedList s.globals.rawHeap (hVal s.globals.rawHeap s.locals.rb).head
   post := fun r s =>
     r = Except.ok () →
     -- rb_state metadata unchanged (only node values change)
