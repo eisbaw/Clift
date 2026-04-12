@@ -322,7 +322,9 @@ def rb_equal_spec : FuncSpec ProgramState where
     Returns 0 if consistent, 1 otherwise.
     Task 0137: state unchanged (read-only check). -/
 def rb_check_integrity_spec : FuncSpec ProgramState where
-  pre := fun s => heapPtrValid s.globals.rawHeap s.locals.rb
+  pre := fun s =>
+    heapPtrValid s.globals.rawHeap s.locals.rb ∧
+    LinkedListValid s.globals.rawHeap (hVal s.globals.rawHeap s.locals.rb).head
   post := fun r s =>
     r = Except.ok () →
     (s.locals.ret__val = 0 ∨ s.locals.ret__val = 1) ∧
