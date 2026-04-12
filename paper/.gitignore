@@ -1,0 +1,15 @@
+pages/
+*.aux
+*.bbl
+*.bcf
+*.blg
+*.log
+*.fls
+*.fdb_latexmk
+*.run.xml
+*.out
+*.synctex.gz
+*.lol
+# keep clift.pdf in git
+texput.log
+gitsha.tex

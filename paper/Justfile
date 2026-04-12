@@ -1,0 +1,21 @@
+# Paper build recipes — run inside nix develop .#paper
+
+build:
+    git rev-parse --short HEAD > gitsha.tex
+    lualatex -interaction=nonstopmode clift.tex || true
+    bibtex clift || true
+    lualatex -interaction=nonstopmode clift.tex || true
+    lualatex -interaction=nonstopmode clift.tex || true
+    lualatex -interaction=nonstopmode clift.tex
+    @echo "Build complete: clift.pdf"
+
+clean:
+    rm -f *.aux *.bbl *.bcf *.blg *.log *.fls *.fdb_latexmk *.run.xml *.out *.synctex.gz *.lol gitsha.tex
+
+pages: build
+    mkdir -p pages
+    pdftoppm -jpeg -r 200 clift.pdf pages/page
+    @echo "Pages extracted to pages/"
+
+view: build
+    @echo "PDF at paper/clift.pdf"

@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-04-10 18:46'
-updated_date: '2026-04-12 21:59'
+updated_date: '2026-04-12 22:42'
 labels:
   - phase-p
   - community
@@ -35,13 +35,25 @@ Target venues: CPP, ITP, or PLDI.
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Add separate LaTeX devShell environment (nix flake) with LuaTeX and packages needed for beautiful scientific papers
-- [ ] #2 Write LaTeX paper (5-8 pages): introduction, background/prior art, Clift architecture, AI-driven methodology, evaluation, related work, conclusion
-- [ ] #3 Comparison with seL4/AutoCorres2: what is same, what is different, what is better; Lean vs Isabelle adoption costs
-- [ ] #4 Evaluation section: LOC, proof ratio, automation rate, Claude success rate, sorry elimination stats
-- [ ] #5 Document AI collaboration: 99% AI-made with human guidance, reference Claude Code session transcripts as evidence
-- [ ] #6 Proper references section citing seL4, AutoCorres2, Lean 4, and relevant formal verification literature
-- [ ] #7 Generate PDF from LaTeX using LuaTeX
-- [ ] #8 Extract each PDF page as raster JPG images and visually inspect; iterate until layout and typography are perfect
+- [x] #1 Add separate LaTeX devShell environment (nix flake) with LuaTeX and packages needed for beautiful scientific papers
+- [x] #2 Write LaTeX paper (5-8 pages): introduction, background/prior art, Clift architecture, AI-driven methodology, evaluation, related work, conclusion
+- [x] #3 Comparison with seL4/AutoCorres2: what is same, what is different, what is better; Lean vs Isabelle adoption costs
+- [x] #4 Evaluation section: LOC, proof ratio, automation rate, Claude success rate, sorry elimination stats
+- [x] #5 Document AI collaboration: 99% AI-made with human guidance, reference Claude Code session transcripts as evidence
+- [x] #6 Proper references section citing seL4, AutoCorres2, Lean 4, and relevant formal verification literature
+- [x] #7 Generate PDF from LaTeX using LuaTeX
+- [x] #8 Extract each PDF page as raster JPG images and visually inspect; iterate until layout and typography are perfect
 - [ ] #9 Final paper ready for venue submission
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Add LaTeX devShell to flake.nix (done)
+2. Write paper/clift.tex with full content (done)
+3. Write paper/references.bib with 14 citations (done)
+4. Create paper/Justfile for build automation (done)
+5. Create paper/.gitignore for build artifacts (done)
+6. Build PDF, extract JPG pages, visual inspect, iterate (done)
+7. Final review pass for submission readiness
+<!-- SECTION:PLAN:END -->

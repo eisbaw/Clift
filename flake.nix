@@ -10,6 +10,11 @@
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs { inherit system; };
+        tex = pkgs.texlive.combine {
+          inherit (pkgs.texlive)
+            scheme-full
+            ;
+        };
       in {
         devShells.default = pkgs.mkShell {
           buildInputs = [
@@ -18,6 +23,16 @@
             pkgs.clang_17          # Pinned clang for JSON AST dump
             pkgs.just              # Task runner
             pkgs.jq                # Inspect clang JSON output
+          ];
+        };
+
+        devShells.paper = pkgs.mkShell {
+          buildInputs = [
+            tex
+            pkgs.biber
+            pkgs.just
+            pkgs.poppler_utils     # pdftoppm for page-to-JPG extraction
+            pkgs.imagemagick       # convert/montage for inspection
           ];
         };
       });
