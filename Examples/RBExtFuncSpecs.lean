@@ -146,7 +146,9 @@ def rb_contains_spec : FuncSpec ProgramState where
 /-- rb_find_index: finds index of first occurrence of val.
     Task 0137: returns -1 cast to uint32 if not found, else the 0-based index. -/
 def rb_find_index_spec : FuncSpec ProgramState where
-  pre := fun s => heapPtrValid s.globals.rawHeap s.locals.rb
+  pre := fun s =>
+    heapPtrValid s.globals.rawHeap s.locals.rb ∧
+    LinkedListValid s.globals.rawHeap (hVal s.globals.rawHeap s.locals.rb).head
   post := fun r s =>
     r = Except.ok () →
     -- ret_val is either a valid index (< count) or the not-found sentinel
@@ -860,9 +862,323 @@ theorem rb_contains_validHoare :
       · trivial
 
 -- rb_find_index: loop
+private def rb_find_index_inv (s : ProgramState) : Prop :=
+  LinkedListValid s.globals.rawHeap s.locals.cur
+
+private noncomputable def rb_find_index_set_idx0 (s : ProgramState) : ProgramState :=
+  ⟨s.globals, ⟨s.locals.a, s.locals.actual, s.locals.b, s.locals.ca, s.locals.cap,
+    s.locals.cb, s.locals.count, s.locals.cur, s.locals.current_count, s.locals.delta,
+    s.locals.dst, s.locals.filled, s.locals.front, (0 : UInt32), s.locals.iter,
+    s.locals.max_drain, s.locals.max_val, s.locals.min_val, s.locals.modified,
+    s.locals.n, s.locals.new_val, s.locals.node, s.locals.nxt, s.locals.old_head,
+    s.locals.old_val, s.locals.out_val, s.locals.pop_ok, s.locals.pop_result,
+    s.locals.prev, s.locals.push_ok, s.locals.push_result, s.locals.rb,
+    s.locals.removed, s.locals.replaced, s.locals.result, s.locals.ret__val,
+    s.locals.scratch, s.locals.skipped, s.locals.src, s.locals.stats,
+    s.locals.temp_node, s.locals.threshold, s.locals.tmp, s.locals.total,
+    s.locals.transferred, s.locals.val⟩⟩
+
+private noncomputable def rb_find_index_set_cur (s : ProgramState) : ProgramState :=
+  ⟨s.globals, ⟨s.locals.a, s.locals.actual, s.locals.b, s.locals.ca, s.locals.cap,
+    s.locals.cb, s.locals.count, (hVal s.globals.rawHeap s.locals.rb).head,
+    s.locals.current_count, s.locals.delta, s.locals.dst, s.locals.filled,
+    s.locals.front, s.locals.idx, s.locals.iter, s.locals.max_drain,
+    s.locals.max_val, s.locals.min_val, s.locals.modified, s.locals.n,
+    s.locals.new_val, s.locals.node, s.locals.nxt, s.locals.old_head,
+    s.locals.old_val, s.locals.out_val, s.locals.pop_ok, s.locals.pop_result,
+    s.locals.prev, s.locals.push_ok, s.locals.push_result, s.locals.rb,
+    s.locals.removed, s.locals.replaced, s.locals.result, s.locals.ret__val,
+    s.locals.scratch, s.locals.skipped, s.locals.src, s.locals.stats,
+    s.locals.temp_node, s.locals.threshold, s.locals.tmp, s.locals.total,
+    s.locals.transferred, s.locals.val⟩⟩
+
+private noncomputable def rb_find_index_set_ret_idx (s : ProgramState) : ProgramState :=
+  ⟨s.globals, ⟨s.locals.a, s.locals.actual, s.locals.b, s.locals.ca, s.locals.cap,
+    s.locals.cb, s.locals.count, s.locals.cur, s.locals.current_count, s.locals.delta,
+    s.locals.dst, s.locals.filled, s.locals.front, s.locals.idx, s.locals.iter,
+    s.locals.max_drain, s.locals.max_val, s.locals.min_val, s.locals.modified,
+    s.locals.n, s.locals.new_val, s.locals.node, s.locals.nxt, s.locals.old_head,
+    s.locals.old_val, s.locals.out_val, s.locals.pop_ok, s.locals.pop_result,
+    s.locals.prev, s.locals.push_ok, s.locals.push_result, s.locals.rb,
+    s.locals.removed, s.locals.replaced, s.locals.result, s.locals.idx,
+    s.locals.scratch, s.locals.skipped, s.locals.src, s.locals.stats,
+    s.locals.temp_node, s.locals.threshold, s.locals.tmp, s.locals.total,
+    s.locals.transferred, s.locals.val⟩⟩
+
+private noncomputable def rb_find_index_inc_idx (s : ProgramState) : ProgramState :=
+  ⟨s.globals, ⟨s.locals.a, s.locals.actual, s.locals.b, s.locals.ca, s.locals.cap,
+    s.locals.cb, s.locals.count, s.locals.cur, s.locals.current_count, s.locals.delta,
+    s.locals.dst, s.locals.filled, s.locals.front, s.locals.idx + 1, s.locals.iter,
+    s.locals.max_drain, s.locals.max_val, s.locals.min_val, s.locals.modified,
+    s.locals.n, s.locals.new_val, s.locals.node, s.locals.nxt, s.locals.old_head,
+    s.locals.old_val, s.locals.out_val, s.locals.pop_ok, s.locals.pop_result,
+    s.locals.prev, s.locals.push_ok, s.locals.push_result, s.locals.rb,
+    s.locals.removed, s.locals.replaced, s.locals.result, s.locals.ret__val,
+    s.locals.scratch, s.locals.skipped, s.locals.src, s.locals.stats,
+    s.locals.temp_node, s.locals.threshold, s.locals.tmp, s.locals.total,
+    s.locals.transferred, s.locals.val⟩⟩
+
+private noncomputable def rb_find_index_set_cur_next (s : ProgramState) : ProgramState :=
+  ⟨s.globals, ⟨s.locals.a, s.locals.actual, s.locals.b, s.locals.ca, s.locals.cap,
+    s.locals.cb, s.locals.count, (hVal s.globals.rawHeap s.locals.cur).next,
+    s.locals.current_count, s.locals.delta, s.locals.dst, s.locals.filled,
+    s.locals.front, s.locals.idx, s.locals.iter, s.locals.max_drain,
+    s.locals.max_val, s.locals.min_val, s.locals.modified, s.locals.n,
+    s.locals.new_val, s.locals.node, s.locals.nxt, s.locals.old_head,
+    s.locals.old_val, s.locals.out_val, s.locals.pop_ok, s.locals.pop_result,
+    s.locals.prev, s.locals.push_ok, s.locals.push_result, s.locals.rb,
+    s.locals.removed, s.locals.replaced, s.locals.result, s.locals.ret__val,
+    s.locals.scratch, s.locals.skipped, s.locals.src, s.locals.stats,
+    s.locals.temp_node, s.locals.threshold, s.locals.tmp, s.locals.total,
+    s.locals.transferred, s.locals.val⟩⟩
+
+private noncomputable def rb_find_index_set_ret_not_found (s : ProgramState) : ProgramState :=
+  ⟨s.globals, ⟨s.locals.a, s.locals.actual, s.locals.b, s.locals.ca, s.locals.cap,
+    s.locals.cb, s.locals.count, s.locals.cur, s.locals.current_count, s.locals.delta,
+    s.locals.dst, s.locals.filled, s.locals.front, s.locals.idx, s.locals.iter,
+    s.locals.max_drain, s.locals.max_val, s.locals.min_val, s.locals.modified,
+    s.locals.n, s.locals.new_val, s.locals.node, s.locals.nxt, s.locals.old_head,
+    s.locals.old_val, s.locals.out_val, s.locals.pop_ok, s.locals.pop_result,
+    s.locals.prev, s.locals.push_ok, s.locals.push_result, s.locals.rb,
+    s.locals.removed, s.locals.replaced, s.locals.result, (4294967295 : UInt32),
+    s.locals.scratch, s.locals.skipped, s.locals.src, s.locals.stats,
+    s.locals.temp_node, s.locals.threshold, s.locals.tmp, s.locals.total,
+    s.locals.transferred, s.locals.val⟩⟩
+
+-- funext lemmas
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rb_find_index_set_idx0_funext :
+    (fun s : ProgramState => { s with locals := { s.locals with idx := (0 : UInt32) } }) = rb_find_index_set_idx0 := by
+  funext s; unfold rb_find_index_set_idx0; rfl
+
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rb_find_index_set_cur_funext :
+    (fun s : ProgramState => { s with locals := { s.locals with cur := (hVal s.globals.rawHeap s.locals.rb).head } }) = rb_find_index_set_cur := by
+  funext s; unfold rb_find_index_set_cur; rfl
+
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rb_find_index_set_ret_idx_funext :
+    (fun s : ProgramState => { s with locals := { s.locals with ret__val := s.locals.idx } }) = rb_find_index_set_ret_idx := by
+  funext s; unfold rb_find_index_set_ret_idx; rfl
+
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rb_find_index_inc_idx_funext :
+    (fun s : ProgramState => { s with locals := { s.locals with idx := (s.locals.idx + 1) } }) = rb_find_index_inc_idx := by
+  funext s; unfold rb_find_index_inc_idx; rfl
+
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rb_find_index_set_cur_next_funext :
+    (fun s : ProgramState => { s with locals := { s.locals with cur := (hVal s.globals.rawHeap s.locals.cur).next } }) = rb_find_index_set_cur_next := by
+  funext s; unfold rb_find_index_set_cur_next; rfl
+
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rb_find_index_set_ret_not_found_funext :
+    (fun s : ProgramState => { s with locals := { s.locals with ret__val := (4294967295 : UInt32) } }) = rb_find_index_set_ret_not_found := by
+  funext s; unfold rb_find_index_set_ret_not_found; rfl
+
+-- projection lemmas for set_cur
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rb_find_index_set_cur_globals (s : ProgramState) :
+    (rb_find_index_set_cur s).globals = s.globals := by unfold rb_find_index_set_cur; rfl
+
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rb_find_index_set_cur_locals_eq (s : ProgramState) :
+    (rb_find_index_set_cur s).locals = ⟨s.locals.a, s.locals.actual, s.locals.b, s.locals.ca,
+      s.locals.cap, s.locals.cb, s.locals.count, (hVal s.globals.rawHeap s.locals.rb).head,
+      s.locals.current_count, s.locals.delta, s.locals.dst, s.locals.filled,
+      s.locals.front, s.locals.idx, s.locals.iter, s.locals.max_drain,
+      s.locals.max_val, s.locals.min_val, s.locals.modified, s.locals.n,
+      s.locals.new_val, s.locals.node, s.locals.nxt, s.locals.old_head,
+      s.locals.old_val, s.locals.out_val, s.locals.pop_ok, s.locals.pop_result,
+      s.locals.prev, s.locals.push_ok, s.locals.push_result, s.locals.rb,
+      s.locals.removed, s.locals.replaced, s.locals.result, s.locals.ret__val,
+      s.locals.scratch, s.locals.skipped, s.locals.src, s.locals.stats,
+      s.locals.temp_node, s.locals.threshold, s.locals.tmp, s.locals.total,
+      s.locals.transferred, s.locals.val⟩ := by unfold rb_find_index_set_cur; rfl
+
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rb_find_index_set_cur_locals_cur (s : ProgramState) :
+    (rb_find_index_set_cur s).locals.cur = (hVal s.globals.rawHeap s.locals.rb).head := by
+  rw [rb_find_index_set_cur_locals_eq]
+
+-- projection lemmas for set_cur_next
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rb_find_index_set_cur_next_globals (s : ProgramState) :
+    (rb_find_index_set_cur_next s).globals = s.globals := by unfold rb_find_index_set_cur_next; rfl
+
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rb_find_index_set_cur_next_locals_eq (s : ProgramState) :
+    (rb_find_index_set_cur_next s).locals = ⟨s.locals.a, s.locals.actual, s.locals.b, s.locals.ca,
+      s.locals.cap, s.locals.cb, s.locals.count, (hVal s.globals.rawHeap s.locals.cur).next,
+      s.locals.current_count, s.locals.delta, s.locals.dst, s.locals.filled,
+      s.locals.front, s.locals.idx, s.locals.iter, s.locals.max_drain,
+      s.locals.max_val, s.locals.min_val, s.locals.modified, s.locals.n,
+      s.locals.new_val, s.locals.node, s.locals.nxt, s.locals.old_head,
+      s.locals.old_val, s.locals.out_val, s.locals.pop_ok, s.locals.pop_result,
+      s.locals.prev, s.locals.push_ok, s.locals.push_result, s.locals.rb,
+      s.locals.removed, s.locals.replaced, s.locals.result, s.locals.ret__val,
+      s.locals.scratch, s.locals.skipped, s.locals.src, s.locals.stats,
+      s.locals.temp_node, s.locals.threshold, s.locals.tmp, s.locals.total,
+      s.locals.transferred, s.locals.val⟩ := by unfold rb_find_index_set_cur_next; rfl
+
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rb_find_index_set_cur_next_locals_cur (s : ProgramState) :
+    (rb_find_index_set_cur_next s).locals.cur = (hVal s.globals.rawHeap s.locals.cur).next := by
+  rw [rb_find_index_set_cur_next_locals_eq]
+
+-- projection lemmas for inc_idx (needed to show cur is preserved)
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rb_find_index_inc_idx_globals (s : ProgramState) :
+    (rb_find_index_inc_idx s).globals = s.globals := by unfold rb_find_index_inc_idx; rfl
+
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rb_find_index_inc_idx_locals_eq (s : ProgramState) :
+    (rb_find_index_inc_idx s).locals = ⟨s.locals.a, s.locals.actual, s.locals.b, s.locals.ca,
+      s.locals.cap, s.locals.cb, s.locals.count, s.locals.cur, s.locals.current_count,
+      s.locals.delta, s.locals.dst, s.locals.filled, s.locals.front, s.locals.idx + 1,
+      s.locals.iter, s.locals.max_drain, s.locals.max_val, s.locals.min_val,
+      s.locals.modified, s.locals.n, s.locals.new_val, s.locals.node, s.locals.nxt,
+      s.locals.old_head, s.locals.old_val, s.locals.out_val, s.locals.pop_ok,
+      s.locals.pop_result, s.locals.prev, s.locals.push_ok, s.locals.push_result,
+      s.locals.rb, s.locals.removed, s.locals.replaced, s.locals.result, s.locals.ret__val,
+      s.locals.scratch, s.locals.skipped, s.locals.src, s.locals.stats,
+      s.locals.temp_node, s.locals.threshold, s.locals.tmp, s.locals.total,
+      s.locals.transferred, s.locals.val⟩ := by unfold rb_find_index_inc_idx; rfl
+
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rb_find_index_inc_idx_locals_cur (s : ProgramState) :
+    (rb_find_index_inc_idx s).locals.cur = s.locals.cur := by
+  rw [rb_find_index_inc_idx_locals_eq]
+
+-- main proof
+set_option maxRecDepth 8192 in
+set_option maxHeartbeats 25600000 in
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
 theorem rb_find_index_validHoare :
     rb_find_index_spec.satisfiedBy RingBufferExt.l1_rb_find_index_body := by
-  sorry
+  unfold FuncSpec.satisfiedBy rb_find_index_spec
+  unfold RingBufferExt.l1_rb_find_index_body
+  simp only [rb_find_index_set_idx0_funext, rb_find_index_set_cur_funext,
+    rb_find_index_set_ret_idx_funext, rb_find_index_inc_idx_funext,
+    rb_find_index_set_cur_next_funext, rb_find_index_set_ret_not_found_funext]
+  apply L1_hoare_catch (R := fun _ => True)
+  · -- body of catch
+    apply L1_hoare_seq (R := fun s =>
+        heapPtrValid s.globals.rawHeap s.locals.rb ∧
+        LinkedListValid s.globals.rawHeap (hVal s.globals.rawHeap s.locals.rb).head)
+    · -- modify idx:=0
+      intro s₀ hpre
+      constructor
+      · intro h; exact h
+      · intro r s₁ h_mem
+        have ⟨hr, hs⟩ := Prod.mk.inj h_mem; subst hr; subst hs
+        exact hpre
+    · apply L1_hoare_seq (R := rb_find_index_inv)
+      · -- setup: guard rb valid, then cur := rb.head
+        intro s hpre
+        obtain ⟨h_rb, h_ll⟩ := hpre
+        have h_gm := L1_guard_modify_result
+          (fun s : ProgramState => heapPtrValid s.globals.rawHeap s.locals.rb)
+          rb_find_index_set_cur s h_rb
+        constructor
+        · exact h_gm.2
+        · intro r s' h_mem
+          rw [h_gm.1] at h_mem
+          have ⟨hr, hs⟩ := Prod.mk.inj h_mem
+          subst hr; subst hs
+          unfold rb_find_index_inv
+          rw [rb_find_index_set_cur_globals, rb_find_index_set_cur_locals_cur]
+          exact h_ll
+      · -- rest: while + teardown
+        apply L1_hoare_seq (R := fun _ => True)
+        · -- while loop
+          apply L1_hoare_while_from_body
+          · -- loop body: seq (cond ...) (seq (inc_idx) (guard cur (set_cur_next)))
+            apply L1_hoare_seq
+              (P := fun s => rb_find_index_inv s ∧ decide (s.locals.cur ≠ Ptr.null) = true)
+              (R := fun s => rb_find_index_inv s ∧ decide (s.locals.cur ≠ Ptr.null) = true)
+            · -- cond: if cur->value == val then {ret:=idx; throw} else skip
+              apply L1_hoare_condition
+              · -- true branch: seq (basic ret:=idx) throw
+                intro s hpre
+                obtain ⟨⟨h_inv, h_cond⟩, h_match⟩ := hpre
+                have h_mt := L1_modify_throw_result rb_find_index_set_ret_idx s
+                constructor
+                · exact h_mt.2
+                · intro r s' h_mem
+                  rw [h_mt.1] at h_mem
+                  have ⟨hr, hs⟩ := Prod.mk.inj h_mem
+                  subst hr; subst hs
+                  trivial
+              · -- false branch: skip
+                intro s hpre
+                obtain ⟨⟨h_inv, h_cond⟩, h_nomatch⟩ := hpre
+                constructor
+                · intro hf; exact hf
+                · intro r s' h_mem
+                  have ⟨hr, hs⟩ := Prod.mk.inj h_mem
+                  match r with
+                  | Except.ok () =>
+                    subst hs
+                    exact ⟨h_inv, h_cond⟩
+                  | Except.error () =>
+                    exact absurd hr (by intro h; cases h)
+            · -- seq (inc_idx) (guard cur valid; set_cur_next)
+              apply L1_hoare_seq
+                (P := fun s => rb_find_index_inv s ∧ decide (s.locals.cur ≠ Ptr.null) = true)
+                (R := fun s => rb_find_index_inv s ∧ decide (s.locals.cur ≠ Ptr.null) = true)
+              · -- basic idx:=idx+1
+                intro s hpre
+                obtain ⟨h_inv, h_cond⟩ := hpre
+                constructor
+                · intro hf; exact hf
+                · intro r s' h_mem
+                  have ⟨hr, hs⟩ := Prod.mk.inj h_mem
+                  match r with
+                  | Except.ok () =>
+                    subst hs
+                    unfold rb_find_index_inv at h_inv ⊢
+                    rw [rb_find_index_inc_idx_globals, rb_find_index_inc_idx_locals_cur]
+                    exact ⟨h_inv, h_cond⟩
+                  | Except.error () =>
+                    exact absurd hr (by intro h; cases h)
+              · -- guard cur valid, then cur := cur->next
+                intro s hpre
+                obtain ⟨h_inv, h_cond⟩ := hpre
+                unfold rb_find_index_inv at h_inv
+                have h_ne : s.locals.cur ≠ Ptr.null := by
+                  simp only [decide_eq_true_eq] at h_cond
+                  exact h_cond
+                have h_valid := h_inv.heapValid h_ne
+                have h_tail := h_inv.tail h_ne
+                have h_gm := L1_guard_modify_result
+                  (fun s : ProgramState => heapPtrValid s.globals.rawHeap s.locals.cur)
+                  rb_find_index_set_cur_next s h_valid
+                constructor
+                · exact h_gm.2
+                · intro r s' h_mem
+                  rw [h_gm.1] at h_mem
+                  have ⟨hr, hs⟩ := Prod.mk.inj h_mem
+                  subst hr; subst hs
+                  unfold rb_find_index_inv
+                  rw [rb_find_index_set_cur_next_globals, rb_find_index_set_cur_next_locals_cur]
+                  exact h_tail
+          · -- exit condition: while returns ok with invariant
+            intro s _ _
+            trivial
+        · -- teardown: ret := 0xFFFFFFFF; throw
+          intro s _
+          have h_mt := L1_modify_throw_result rb_find_index_set_ret_not_found s
+          constructor
+          · exact h_mt.2
+          · intro r s' h_mem
+            rw [h_mt.1] at h_mem
+            have ⟨hr, hs⟩ := Prod.mk.inj h_mem
+            subst hr; subst hs
+            trivial
+  · -- handler: skip
+    intro _ _
+    exact ⟨not_false, fun _ _ _ _ => trivial⟩
 
 -- rb_nth: loop + conditional
 theorem rb_nth_validHoare :
