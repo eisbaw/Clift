@@ -316,9 +316,91 @@ Strengthen the spec in `RBExtSpecs.lean` BEFORE attempting the proof.
 2. **Read the L1 body** — What shape? (Pattern A-E above)
 3. **Check the precondition** — Strong enough? (Section 7 checklist)
 4. **Create proof file** — One sorry per file for heavy proofs (Section 4)
-5. **Write step functions** — Anonymous constructors, NEVER `{ s with ... }`
-6. **Write projection lemmas** — Two-step: locals_eq first, then rw
-7. **Write the proof** — Follow the matching pattern (Section 2)
-8. **Build** — `pkill -f lean; sleep 2; lake build Examples.ProofFile`
-9. **Verify** — No `validHoare_weaken_trivial_post`, satisfiedBy targets original body
-10. **Commit** — One proof per commit for clean git history
+5. **Delegate to sub-agent** — See Section 9 below
+6. **Verify the result** — See Section 10 below
+7. **Commit** — One proof per commit for clean git history
+
+---
+
+## 9. Delegation Strategy (Sub-Agents)
+
+**Always delegate sorry elimination to sub-agents.** Never write proofs inline in the main
+conversation — it bloats the context window and wastes tokens on build output.
+
+### Primary: swe-gardener with Opus
+
+Launch a `swe-gardener` sub-agent with `model: "opus"` for each sorry:
+
+```
+Agent(
+  subagent_type: "swe-gardener",
+  model: "opus",
+  run_in_background: true,
+  prompt: "Prove <theorem> in <file>. Read <template> as reference. ..."
+)
+```
+
+**Include in the prompt:**
+- The exact file and line number
+- Which proof pattern (A-E) applies
+- A template proof to follow (e.g., "read rb_count_above_validHoare as template")
+- The Locals field order (or where to find it)
+- All rules: no validHoare_weaken_trivial_post, no fused bodies, anonymous constructors
+- Build command: `pkill -f lean; sleep 2; lake build Examples.<File>`
+- RAM warning: ONE build at a time, check `free -h` first
+
+**Why Opus:** These proofs require sustained multi-step reasoning (reading L1 bodies,
+defining step functions for 40 fields, writing projection lemmas, debugging build errors).
+Opus handles this better than faster models. Expect 15-60 min per proof.
+
+**Why background:** Builds take 5-15 min. Running in background lets you work on other
+tasks or launch agents on non-overlapping files.
+
+**One agent per file:** Never launch two agents on the same file — they'll conflict.
+Multiple agents on DIFFERENT files is fine (but watch RAM — each build needs 5-10GB).
+
+### Fallback: /model-race (sequential)
+
+If Opus fails on a sorry after 2 attempts, try `/model-race`:
+
+```
+/model-race
+TASK: Prove <theorem> in <file>
+TARGET_FILES: <file>
+VERIFY_CMD: lake build Examples.<Module> 2>&1 | tail -1 | grep -q "successfully"
+```
+
+**Sequential mode only** (one model at a time, 15 min timeout). Each model's `lake build`
+needs 5-15GB RAM — parallel launches cause OOM.
+
+Model-race works for:
+- Pattern A (simple accessors) — ~80% success rate
+- Pattern B (conditionals) — ~60% success rate
+- Pattern D (loops WITH a template in the same file) — ~40% success rate
+
+Model-race fails for:
+- Pattern C (8+ step chains) — models use `{ s with ... }` → kernel depth
+- Pattern D (loops WITHOUT template) — models can't invent step functions
+- Pattern E (inter-procedural) — no infrastructure exists
+
+### When to stop
+
+If both Opus agent AND model-race fail on a sorry:
+1. Check if the sorry is blocked on infrastructure (Section 2, Pattern E)
+2. Check if the spec needs strengthening (Section 7)
+3. Create a backlog task documenting what was tried and what's blocking
+4. Move on to the next sorry
+
+---
+
+## 10. Verification Checklist (After Sub-Agent Completes)
+
+Before committing a sub-agent's proof:
+
+- [ ] **Sorry count decreased**: `grep -c '  sorry\|by sorry' <file>` — must be lower
+- [ ] **Build passes**: `lake build Examples.<Module>` succeeds
+- [ ] **No validHoare_weaken_trivial_post**: `grep validHoare_weaken_trivial_post <file>`
+- [ ] **Correct satisfiedBy target**: `grep satisfiedBy <file>` shows `Module.l1_<func>_body`
+- [ ] **No fused bodies**: `grep fused <file>` — should be empty
+- [ ] **Anonymous constructors used**: `grep "{ s with locals" <file>` — should be empty in step functions
+- [ ] **RAM check**: `free -h` — kill stale lean processes if <4GB free
