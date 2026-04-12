@@ -80,7 +80,10 @@ def rb_push_spec : FuncSpec ProgramState where
     (hVal s.globals.rawHeap s.locals.rb).count <
       (hVal s.globals.rawHeap s.locals.rb).capacity ∧
     ((hVal s.globals.rawHeap s.locals.rb).tail ≠ Ptr.null →
-      heapPtrValid s.globals.rawHeap (hVal s.globals.rawHeap s.locals.rb).tail)
+      heapPtrValid s.globals.rawHeap (hVal s.globals.rawHeap s.locals.rb).tail) ∧
+    -- Node must be disjoint from current tail (node is a fresh node, not already in the list)
+    ((hVal s.globals.rawHeap s.locals.rb).tail ≠ Ptr.null →
+      ptrDisjoint s.locals.node (hVal s.globals.rawHeap s.locals.rb).tail)
   post := fun r s =>
     r = Except.ok () →
     let rb := hVal s.globals.rawHeap s.locals.rb
@@ -397,11 +400,243 @@ def rb_drain_to_spec : FuncSpec ProgramState where
 -- validHoare proofs for these are straightforward but not yet done.
 -- Using the existing specs from RingBufferExtProof.lean:
 
--- rb_push: multi-step heap mutation (8 steps)
--- SORRY: needs ~150 lines of projection lemmas (SwapProof pattern)
+/-! ## rb_push validHoare proof
+
+    Proof strategy: Hoare-level decomposition.
+    - L1_hoare_catch at the outer level
+    - L1_hoare_condition for the count>=cap check (false branch)
+    - Chain of L1_hoare_seq_ok / L1_hoare_guard_modify_fused for heap steps
+    - L1_hoare_condition for the two inner conditionals (tail≠null, head=null)
+    - Final modify+throw handled by the catch→skip handler
+
+    Heap frame reasoning:
+    - rb (C_rb_state) vs node (C_rb_node): different type tags → ptrDisjoint
+    - node vs tail: from precondition (when tail ≠ null)
+    - heapUpdate_preserves_heapPtrValid for validity through updates -/
+
+-- Helper: C_rb_state and C_rb_node have different type tags
+private theorem C_rb_state_node_typeTag_ne :
+    @CType.typeTag C_rb_state _ ≠ @CType.typeTag C_rb_node _ := by decide
+
+-- Helper: rb and node are disjoint via different types
+private theorem rb_node_disjoint {h : HeapRawState} {p : Ptr C_rb_state} {q : Ptr C_rb_node}
+    (hp : heapPtrValid h p) (hq : heapPtrValid h q) :
+    ptrDisjoint p q :=
+  heapPtrValid_different_type_disjoint hp hq C_rb_state_node_typeTag_ne
+
+set_option maxRecDepth 8192 in
+set_option maxHeartbeats 51200000 in
 theorem rb_push_validHoare :
     rb_push_spec.satisfiedBy RingBufferExt.l1_rb_push_body := by
-  sorry
+  unfold FuncSpec.satisfiedBy rb_push_spec
+  -- Use Hoare-level decomposition. Add `dsimp only` to reduce generated state projections.
+  apply L1_hoare_catch (R := fun s =>
+    s.locals.ret__val = 0 ∧
+    (hVal s.globals.rawHeap s.locals.node).value = s.locals.val ∧
+    (hVal s.globals.rawHeap s.locals.rb).tail = s.locals.node ∧
+    (hVal s.globals.rawHeap s.locals.node).next = Ptr.null)
+  · -- Body: seq(cond, rest). cond false→skip, rest ends with throw.
+    apply L1_hoare_seq (R := fun s =>
+      heapPtrValid s.globals.rawHeap s.locals.rb ∧
+      heapPtrValid s.globals.rawHeap s.locals.node ∧
+      (hVal s.globals.rawHeap s.locals.rb).count <
+        (hVal s.globals.rawHeap s.locals.rb).capacity ∧
+      ((hVal s.globals.rawHeap s.locals.rb).tail ≠ Ptr.null →
+        heapPtrValid s.globals.rawHeap (hVal s.globals.rawHeap s.locals.rb).tail) ∧
+      ((hVal s.globals.rawHeap s.locals.rb).tail ≠ Ptr.null →
+        ptrDisjoint s.locals.node (hVal s.globals.rawHeap s.locals.rb).tail))
+    · -- cond_check: condition(count>=cap, ret1+throw, skip)
+      apply L1_hoare_condition
+      · -- True: count>=cap contradicts count<cap
+        intro s ⟨⟨_, _, hlt', _, _⟩, hcond⟩
+        simp only [decide_eq_true_eq] at hcond
+        exact absurd hlt' (Nat.not_lt.mpr hcond)
+      · -- False: skip preserves state
+        intro s ⟨⟨hrb', hnode', hlt', htv, htd⟩, _⟩
+        constructor
+        · intro hf; exact hf
+        · intro r s' hmem
+          have ⟨hr, hs⟩ := Prod.mk.inj hmem; subst hr; subst hs
+          exact ⟨hrb', hnode', hlt', htv, htd⟩
+    · -- rest: guard+modify chain ending in throw
+      -- Step 1: guard(nodeV) ; modify(node.value := val)
+      apply L1_hoare_seq_ok (R := fun s =>
+        heapPtrValid s.globals.rawHeap s.locals.rb ∧
+        heapPtrValid s.globals.rawHeap s.locals.node ∧
+        (hVal s.globals.rawHeap s.locals.node).value = s.locals.val ∧
+        ((hVal s.globals.rawHeap s.locals.rb).tail ≠ Ptr.null →
+          heapPtrValid s.globals.rawHeap (hVal s.globals.rawHeap s.locals.rb).tail) ∧
+        ((hVal s.globals.rawHeap s.locals.rb).tail ≠ Ptr.null →
+          ptrDisjoint s.locals.node (hVal s.globals.rawHeap s.locals.rb).tail))
+      · apply L1_hoare_guard_modify_fused
+        · intro s ⟨_, hnode', _, _, _⟩; exact hnode'
+        · intro s ⟨hrb', hnode', _, htv, htd⟩; dsimp only; constructor; · rfl
+          have hbn := heapPtrValid_bound hnode'
+          have hbr := heapPtrValid_bound hrb'
+          refine ⟨heapUpdate_preserves_heapPtrValid _ _ _ _ hrb',
+                  heapUpdate_preserves_heapPtrValid _ _ _ _ hnode', ?_, ?_, ?_⟩
+          · rw [hVal_heapUpdate_same _ _ _ hbn]
+          · intro h
+            have h_disj := ptrDisjoint_symm (rb_node_disjoint hrb' hnode')
+            rw [hVal_heapUpdate_disjoint _ _ _ _ hbn hbr h_disj] at h
+            rw [hVal_heapUpdate_disjoint _ _ _ _ hbn hbr h_disj]
+            exact heapUpdate_preserves_heapPtrValid _ _ _ _ (htv h)
+          · intro h
+            have h_disj := ptrDisjoint_symm (rb_node_disjoint hrb' hnode')
+            rw [hVal_heapUpdate_disjoint _ _ _ _ hbn hbr h_disj] at h
+            rw [hVal_heapUpdate_disjoint _ _ _ _ hbn hbr h_disj]
+            exact htd h
+      · -- Step 2: guard(nodeV) ; modify(node.next := null)
+        apply L1_hoare_seq_ok (R := fun s =>
+          heapPtrValid s.globals.rawHeap s.locals.rb ∧
+          heapPtrValid s.globals.rawHeap s.locals.node ∧
+          (hVal s.globals.rawHeap s.locals.node).value = s.locals.val ∧
+          (hVal s.globals.rawHeap s.locals.node).next = Ptr.null ∧
+          ((hVal s.globals.rawHeap s.locals.rb).tail ≠ Ptr.null →
+            heapPtrValid s.globals.rawHeap (hVal s.globals.rawHeap s.locals.rb).tail) ∧
+          ((hVal s.globals.rawHeap s.locals.rb).tail ≠ Ptr.null →
+            ptrDisjoint s.locals.node (hVal s.globals.rawHeap s.locals.rb).tail))
+        · apply L1_hoare_guard_modify_fused
+          · intro s ⟨_, hnode', _, _, _⟩; exact hnode'
+          · intro s ⟨hrb', hnode', hval, htv, htd⟩; dsimp only; constructor; · rfl
+            have hbn := heapPtrValid_bound hnode'
+            have hbr := heapPtrValid_bound hrb'
+            refine ⟨heapUpdate_preserves_heapPtrValid _ _ _ _ hrb',
+                    heapUpdate_preserves_heapPtrValid _ _ _ _ hnode', ?_, ?_, ?_, ?_⟩
+            · rw [hVal_heapUpdate_same _ _ _ hbn]; exact hval
+            · rw [hVal_heapUpdate_same _ _ _ hbn]
+            · intro h
+              have h_disj := ptrDisjoint_symm (rb_node_disjoint hrb' hnode')
+              rw [hVal_heapUpdate_disjoint _ _ _ _ hbn hbr h_disj] at h
+              rw [hVal_heapUpdate_disjoint _ _ _ _ hbn hbr h_disj]
+              exact heapUpdate_preserves_heapPtrValid _ _ _ _ (htv h)
+            · intro h
+              have h_disj := ptrDisjoint_symm (rb_node_disjoint hrb' hnode')
+              rw [hVal_heapUpdate_disjoint _ _ _ _ hbn hbr h_disj] at h
+              rw [hVal_heapUpdate_disjoint _ _ _ _ hbn hbr h_disj]
+              exact htd h
+        · -- Step 3: cond(tail≠null, guard(tailV);modify(tail.next:=node), skip)
+          apply L1_hoare_seq_ok (R := fun s =>
+            heapPtrValid s.globals.rawHeap s.locals.rb ∧
+            heapPtrValid s.globals.rawHeap s.locals.node ∧
+            (hVal s.globals.rawHeap s.locals.node).value = s.locals.val ∧
+            (hVal s.globals.rawHeap s.locals.node).next = Ptr.null)
+          · apply L1_hoare_condition'
+            · -- True: tail≠null
+              apply L1_hoare_pre (P := fun s =>
+                heapPtrValid s.globals.rawHeap s.locals.rb ∧
+                heapPtrValid s.globals.rawHeap s.locals.node ∧
+                (hVal s.globals.rawHeap s.locals.node).value = s.locals.val ∧
+                (hVal s.globals.rawHeap s.locals.node).next = Ptr.null ∧
+                heapPtrValid s.globals.rawHeap (hVal s.globals.rawHeap s.locals.rb).tail ∧
+                ptrDisjoint s.locals.node (hVal s.globals.rawHeap s.locals.rb).tail)
+              · intro s ⟨⟨hrb', hnode', hval, hnxt, htv, htd⟩, hcond⟩
+                simp only [decide_eq_true_eq] at hcond
+                exact ⟨hrb', hnode', hval, hnxt, htv hcond, htd hcond⟩
+              · apply L1_hoare_guard_modify_fused
+                · intro s ⟨_, _, _, _, htv, _⟩; exact htv
+                · intro s ⟨hrb', hnode', hval, hnxt, htv, htd⟩; dsimp only; constructor; · rfl
+                  have hbt := heapPtrValid_bound htv
+                  have hbn := heapPtrValid_bound hnode'
+                  refine ⟨heapUpdate_preserves_heapPtrValid _ _ _ _ hrb',
+                          heapUpdate_preserves_heapPtrValid _ _ _ _ hnode', ?_, ?_⟩
+                  · rw [hVal_heapUpdate_disjoint _ _ _ _ hbt hbn (ptrDisjoint_symm htd)]; exact hval
+                  · rw [hVal_heapUpdate_disjoint _ _ _ _ hbt hbn (ptrDisjoint_symm htd)]; exact hnxt
+            · -- False: tail=null, skip
+              apply L1_hoare_pre (P := fun s =>
+                heapPtrValid s.globals.rawHeap s.locals.rb ∧
+                heapPtrValid s.globals.rawHeap s.locals.node ∧
+                (hVal s.globals.rawHeap s.locals.node).value = s.locals.val ∧
+                (hVal s.globals.rawHeap s.locals.node).next = Ptr.null)
+              · intro s ⟨⟨hrb', hnode', hval, hnxt, _, _⟩, _⟩
+                exact ⟨hrb', hnode', hval, hnxt⟩
+              · intro s hR; constructor
+                · intro hf; exact hf
+                · intro r s' hmem; have ⟨hr, hs⟩ := Prod.mk.inj hmem; subst hr; subst hs
+                  exact ⟨rfl, hR⟩
+          · -- Step 4: guard(rbV);modify(rb.tail:=node)
+            apply L1_hoare_seq_ok (R := fun s =>
+              heapPtrValid s.globals.rawHeap s.locals.rb ∧
+              heapPtrValid s.globals.rawHeap s.locals.node ∧
+              (hVal s.globals.rawHeap s.locals.node).value = s.locals.val ∧
+              (hVal s.globals.rawHeap s.locals.node).next = Ptr.null ∧
+              (hVal s.globals.rawHeap s.locals.rb).tail = s.locals.node)
+            · apply L1_hoare_guard_modify_fused
+              · intro s ⟨hrb', _, _, _⟩; exact hrb'
+              · intro s ⟨hrb', hnode', hval, hnxt⟩; dsimp only; constructor; · rfl
+                have hbr := heapPtrValid_bound hrb'
+                have hbn := heapPtrValid_bound hnode'
+                refine ⟨heapUpdate_preserves_heapPtrValid _ _ _ _ hrb',
+                        heapUpdate_preserves_heapPtrValid _ _ _ _ hnode', ?_, ?_, ?_⟩
+                · rw [hVal_heapUpdate_disjoint _ _ _ _ hbr hbn (rb_node_disjoint hrb' hnode')]; exact hval
+                · rw [hVal_heapUpdate_disjoint _ _ _ _ hbr hbn (rb_node_disjoint hrb' hnode')]; exact hnxt
+                · rw [hVal_heapUpdate_same _ _ _ hbr]
+            · -- Step 5: cond(head=null, guard(rbV);modify(rb.head:=node), skip)
+              apply L1_hoare_seq_ok (R := fun s =>
+                heapPtrValid s.globals.rawHeap s.locals.rb ∧
+                heapPtrValid s.globals.rawHeap s.locals.node ∧
+                (hVal s.globals.rawHeap s.locals.node).value = s.locals.val ∧
+                (hVal s.globals.rawHeap s.locals.node).next = Ptr.null ∧
+                (hVal s.globals.rawHeap s.locals.rb).tail = s.locals.node)
+              · apply L1_hoare_condition'
+                · -- True: head=null
+                  apply L1_hoare_pre (P := fun s =>
+                    heapPtrValid s.globals.rawHeap s.locals.rb ∧
+                    heapPtrValid s.globals.rawHeap s.locals.node ∧
+                    (hVal s.globals.rawHeap s.locals.node).value = s.locals.val ∧
+                    (hVal s.globals.rawHeap s.locals.node).next = Ptr.null ∧
+                    (hVal s.globals.rawHeap s.locals.rb).tail = s.locals.node)
+                  · intro s ⟨hpre, _⟩; exact hpre
+                  · apply L1_hoare_guard_modify_fused
+                    · intro s ⟨hrb', _, _, _, _⟩; exact hrb'
+                    · intro s ⟨hrb', hnode', hval, hnxt, htail⟩; dsimp only; constructor; · rfl
+                      have hbr := heapPtrValid_bound hrb'
+                      have hbn := heapPtrValid_bound hnode'
+                      refine ⟨heapUpdate_preserves_heapPtrValid _ _ _ _ hrb',
+                              heapUpdate_preserves_heapPtrValid _ _ _ _ hnode', ?_, ?_, ?_⟩
+                      · rw [hVal_heapUpdate_disjoint _ _ _ _ hbr hbn (rb_node_disjoint hrb' hnode')]; exact hval
+                      · rw [hVal_heapUpdate_disjoint _ _ _ _ hbr hbn (rb_node_disjoint hrb' hnode')]; exact hnxt
+                      · rw [hVal_heapUpdate_same _ _ _ hbr]; exact htail
+                · -- False: head≠null, skip
+                  apply L1_hoare_pre (P := fun s =>
+                    heapPtrValid s.globals.rawHeap s.locals.rb ∧
+                    heapPtrValid s.globals.rawHeap s.locals.node ∧
+                    (hVal s.globals.rawHeap s.locals.node).value = s.locals.val ∧
+                    (hVal s.globals.rawHeap s.locals.node).next = Ptr.null ∧
+                    (hVal s.globals.rawHeap s.locals.rb).tail = s.locals.node)
+                  · intro s ⟨hpre, _⟩; exact hpre
+                  · intro s hR; constructor
+                    · intro hf; exact hf
+                    · intro r s' hmem; have ⟨hr, hs⟩ := Prod.mk.inj hmem; subst hr; subst hs
+                      exact ⟨rfl, hR⟩
+              · -- Step 6: guard(rbV);guard(rbV);modify(rb.count:=count+1)
+                apply L1_hoare_seq_ok (R := fun s =>
+                  heapPtrValid s.globals.rawHeap s.locals.rb ∧
+                  heapPtrValid s.globals.rawHeap s.locals.node ∧
+                  (hVal s.globals.rawHeap s.locals.node).value = s.locals.val ∧
+                  (hVal s.globals.rawHeap s.locals.node).next = Ptr.null ∧
+                  (hVal s.globals.rawHeap s.locals.rb).tail = s.locals.node)
+                · apply L1_hoare_guard_guard_modify_fused
+                  · intro s ⟨hrb', _, _, _, _⟩; exact hrb'
+                  · intro s ⟨hrb', hnode', hval, hnxt, htail⟩; dsimp only; constructor; · rfl
+                    have hbr := heapPtrValid_bound hrb'
+                    have hbn := heapPtrValid_bound hnode'
+                    refine ⟨heapUpdate_preserves_heapPtrValid _ _ _ _ hrb',
+                            heapUpdate_preserves_heapPtrValid _ _ _ _ hnode', ?_, ?_, ?_⟩
+                    · rw [hVal_heapUpdate_disjoint _ _ _ _ hbr hbn (rb_node_disjoint hrb' hnode')]; exact hval
+                    · rw [hVal_heapUpdate_disjoint _ _ _ _ hbr hbn (rb_node_disjoint hrb' hnode')]; exact hnxt
+                    · rw [hVal_heapUpdate_same _ _ _ hbr]; exact htail
+                · -- Step 7: modify(ret:=0);throw
+                  apply L1_hoare_modify_throw
+                  intro s ⟨_, _, hval, hnxt, htail⟩; dsimp only
+                  exact ⟨rfl, hval, htail, hnxt⟩
+  · -- Handler: skip converts error→ok
+    intro s ⟨hret, hval, htail, hnext⟩
+    constructor
+    · intro hf; exact hf
+    · intro r s' hmem
+      have ⟨hr, hs⟩ := Prod.mk.inj hmem; subst hr; subst hs
+      intro _; exact ⟨hret, hval, htail, hnext⟩
 
 -- rb_pop: multi-step heap mutation, conditional
 -- SORRY: needs ~200 lines
