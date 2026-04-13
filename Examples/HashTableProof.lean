@@ -605,6 +605,92 @@ private theorem ht_hash_full (s : ProgramState) :
     · rw [ht_hash_f2_locals_key, ht_hash_f1_locals_key]
     · rw [ht_hash_f2_locals_cap_mask, ht_hash_f1_locals_cap_mask]
 
+-- Direct proof of the dynCom(ht_hash) part: given P, produce ok + R after restore.
+-- Uses ht_hash_full directly at the NondetM level, avoiding validHoare's loss of
+-- pre-state connection (needed for globals preservation through the hash call).
+-- After restore: globals from s₀, all locals from s₀ except idx := hash(key, cap_mask).
+-- The h_post obligation receives the restored state via projection lemmas (not an
+-- anonymous constructor) to avoid kernel deep recursion on the 13-field Locals struct.
+-- The setup function in the dynCom body is identity (key:=key, cap_mask:=cap_mask).
+-- We prove this on Locals only to avoid CState-level deep recursion.
+private theorem ht_hash_setup_locals (l : Locals) :
+    { l with key := l.key, cap_mask := l.cap_mask } = l := by
+  cases l; rfl
+
+attribute [local irreducible] hVal heapPtrValid heapUpdate ht_hash_f1 ht_hash_f2 lk_restore in
+private theorem ht_hash_dynCom_hoare
+    (P : ProgramState → Prop) (R : ProgramState → Prop)
+    (h_post : ∀ s₀ s', P s₀ →
+      s'.globals = s₀.globals →
+      s'.locals.cap_mask = s₀.locals.cap_mask →
+      s'.locals.ht = s₀.locals.ht →
+      s'.locals.key = s₀.locals.key →
+      s'.locals.keys = s₀.locals.keys →
+      s'.locals.values = s₀.locals.values →
+      s'.locals.out = s₀.locals.out →
+      s'.locals.idx = ((s₀.locals.key * 2654435769) >>> 16) &&& s₀.locals.cap_mask →
+      R s') :
+    validHoare P (L1.dynCom (fun saved =>
+      L1.seq (L1.modify (fun s => { s with locals := { s.locals with
+        key := s.locals.key, cap_mask := s.locals.cap_mask } }))
+        (L1.seq (L1.call HashTable.l1ProcEnv "ht_hash")
+          (L1.modify (fun s => { s with locals := { saved.locals with
+            idx := s.locals.ret__val } }))))) (fun r s => r = Except.ok () ∧ R s) := by
+  intro s₀ hP
+  show ¬(L1.dynCom _ s₀).failed ∧ _
+  simp only [L1.dynCom]
+  -- Resolve the call
+  have h_call_eq : L1.call HashTable.l1ProcEnv "ht_hash" = HashTable.l1_ht_hash_body := by
+    simp [L1.call, l1ProcEnv_ht_hash]
+  rw [h_call_eq]
+  -- Rewrite restore modify using lk_restore_funext
+  rw [lk_restore_funext s₀]
+  -- Setup modify results: setup is identity (key:=key, cap_mask:=cap_mask)
+  have h_mod_res :
+      (L1.modify (fun s : ProgramState => { s with locals :=
+        { s.locals with key := s.locals.key, cap_mask := s.locals.cap_mask } }) s₀).results =
+      {(Except.ok (), s₀)} := by
+    -- Use cases on s₀.locals to reduce the struct update to rfl
+    cases s₀ with | mk g l => cases l; rfl
+  have h_mod_nf :
+      ¬(L1.modify (fun s : ProgramState => { s with locals :=
+        { s.locals with key := s.locals.key, cap_mask := s.locals.cap_mask } }) s₀).failed :=
+    not_false
+  have h_seq1 := L1_seq_singleton_ok h_mod_res h_mod_nf
+    (m₂ := L1.seq HashTable.l1_ht_hash_body (L1.modify (lk_restore s₀)))
+  -- ht_hash_full at s₀
+  have ⟨h_hash_nf, h_hash_post⟩ := ht_hash_full s₀
+  constructor
+  · -- not failed
+    rw [h_seq1.2]
+    intro hf; change (_ ∨ _) at hf
+    rcases hf with hf1 | ⟨s', h_mem, hf2⟩
+    · exact h_hash_nf hf1
+    · exact hf2  -- L1.modify never fails
+  · -- postcondition
+    intro r s' h_mem
+    rw [h_seq1.1] at h_mem
+    change (_ ∨ _) at h_mem
+    rcases h_mem with ⟨s_hash, h_hash_mem, h_restore_mem⟩ | ⟨h_err, _⟩
+    · -- ok from hash, then modify restore
+      have ⟨h_ok, h_globals, h_ret, h_key, h_cm⟩ := h_hash_post _ s_hash h_hash_mem
+      have ⟨hr, hs⟩ := Prod.mk.inj h_restore_mem
+      rw [hr, hs]
+      refine ⟨rfl, ?_⟩
+      -- Apply h_post using projection lemmas on lk_restore s₀ s_hash
+      exact h_post s₀ (lk_restore s₀ s_hash) hP
+        (by rw [lk_restore_globals, h_globals])
+        (by rw [lk_restore_cap_mask])
+        (by rw [lk_restore_ht])
+        (by rw [lk_restore_key])
+        (by rw [lk_restore_keys])
+        (by rw [lk_restore_values])
+        (by rw [lk_restore_out])
+        (by rw [lk_restore_idx, h_ret])
+    · -- error from hash: impossible
+      have h_ok := (h_hash_post _ s' h_err).1
+      exact absurd h_ok (by intro h; cases h)
+
 -- Helper: shared guard+modify cap_mask proof (used by both lookup and insert)
 attribute [local irreducible] hVal heapPtrValid heapUpdate in
 private theorem ht_guard_modify_cm
@@ -625,7 +711,8 @@ private theorem ht_guard_modify_cm
     have ⟨hr, hs⟩ := Prod.mk.inj h_mem
     exact ⟨hr, hs ▸ h_post s hpre⟩
 
-attribute [local irreducible] hVal heapPtrValid heapUpdate in
+attribute [local irreducible] hVal heapPtrValid heapUpdate lk_restore
+  ht_hash_f1 ht_hash_f2 HashTable.l1_ht_hash_body in
 theorem ht_lookup_correct :
     ht_lookup_spec.satisfiedBy HashTable.l1_ht_lookup_body := by
   unfold FuncSpec.satisfiedBy ht_lookup_spec
@@ -695,9 +782,56 @@ theorem ht_lookup_correct :
         (R := fun s => ht_loop_inv s ∧
                         heapPtrValid s.globals.rawHeap s.locals.out)
       · -- dynCom: calls ht_hash, restores locals, sets idx
-        -- OOM blocker: dynCom + L1.call elaboration requires >15GB.
-        -- All infrastructure is in place (ht_hash_full, lk_restore, hash_index_bounded').
-        sorry
+        -- Use L1_hoare_dynCom_basic to get access to s₀ in the inner proof
+        apply L1_hoare_dynCom_basic
+        intro s₀ ⟨h_ht, h_out, h_cap, h_arr, h_cm⟩
+        -- Rewrite restore lambda to lk_restore
+        rw [lk_restore_funext s₀]
+        -- Goal: validHoare (fun s => s = s₀)
+        --         (seq (modify setup) (seq (call "ht_hash") (modify (lk_restore s₀))))
+        --         (fun r s => r = ok ∧ R s)
+        -- Step 1: setup modify is identity
+        apply L1_hoare_seq_ok (R := fun s => s = s₀)
+        · -- modify setup: it's identity (key:=key, cap_mask:=cap_mask)
+          intro s hs
+          constructor
+          · intro hf; exact hf
+          · intro r s' h_mem
+            have ⟨hr, hs'⟩ := Prod.mk.inj h_mem
+            exact ⟨hr, by subst hr; rw [hs', hs]⟩
+        · -- seq (call "ht_hash") (modify (lk_restore s₀))
+          -- The call term in the goal has l1ProcEnv expanded to insert chain.
+          -- Reduce the call to l1_ht_hash_body via simp on call semantics.
+          simp only [L1.call, L1.L1ProcEnv.insert, L1.L1ProcEnv.empty]
+          -- Now the goal has l1_ht_hash_body directly. Prove at s₀.
+          intro s₁ hs₁
+          -- s₁ = s₀ (from intermediate R)
+          have ⟨h_hash_nf, h_hash_post⟩ := ht_hash_full s₀
+          -- Rewrite s₁ to s₀ in the goal
+          rw [show s₁ = s₀ from hs₁]
+          constructor
+          · -- not failed
+            intro hf
+            change (_ ∨ _) at hf
+            rcases hf with hf1 | ⟨s', _, hf2⟩
+            · exact h_hash_nf hf1
+            · exact hf2
+          · intro r s' h_mem
+            change (_ ∨ _) at h_mem
+            rcases h_mem with ⟨s_hash, h_hash_mem, h_restore_mem⟩ | ⟨h_err, h_eq⟩
+            · have ⟨h_ok, h_globals, h_ret, h_key, h_cm'⟩ := h_hash_post _ s_hash h_hash_mem
+              have ⟨hr, hs_eq⟩ := Prod.mk.inj h_restore_mem
+              rw [hr, hs_eq]
+              refine ⟨rfl, ⟨?_, ?_, ?_, ?_, ?_⟩, ?_⟩
+              · rw [lk_restore_globals, h_globals, lk_restore_ht]; exact h_ht
+              · rw [lk_restore_globals, h_globals, lk_restore_keys, lk_restore_values, lk_restore_ht]; exact h_arr
+              · rw [lk_restore_globals, h_globals, lk_restore_ht]; exact h_cap
+              · rw [lk_restore_cap_mask, lk_restore_globals, h_globals, lk_restore_ht]; exact h_cm
+              · rw [lk_restore_idx, h_ret, h_cm, lk_restore_globals, h_globals, lk_restore_ht]
+                exact hash_index_bounded' _ _ h_cap
+              · rw [lk_restore_globals, h_globals, lk_restore_out]; exact h_out
+            · have h_ok := (h_hash_post _ s' h_err).1
+              exact absurd h_ok (by intro h; cases h)
       · -- seq probes:=0 (seq while ret:=0;throw)
         apply L1_hoare_seq_ok
           (R := fun s => ht_loop_inv s ∧
@@ -713,14 +847,35 @@ theorem ht_lookup_correct :
             -- s' = modify s. globals unchanged, probes := 0, rest unchanged.
             refine ⟨rfl, ⟨h_ht, h_arr, h_cap, h_cm, h_idx⟩, h_out, rfl⟩
         · -- seq while ret:=0;throw
-          -- Every path produces error with ret_val ∈ {0, 1}:
-          -- - while body throws: ret_val set to 0 or 1
-          -- - while exits normally → ret:=0;throw
-          -- Prove directly from validHoare definition
-          intro s ⟨⟨h_ht, h_arr, h_cap, h_cm, h_idx⟩, h_out, _⟩
-          -- The while + final throw always produces error results.
-          -- Use the while loop Hoare rule with invariant.
-          sorry
+          -- Decompose: while ; seq(modify_ret0, throw)
+          apply L1_hoare_seq
+            (R := fun s => ht_loop_inv s ∧ heapPtrValid s.globals.rawHeap s.locals.out)
+          · -- While loop: L1_hoare_while has 5 goals: init, body_nf, body_inv, exit, abrupt
+            apply L1_hoare_while
+              (I := fun s => ht_loop_inv s ∧ heapPtrValid s.globals.rawHeap s.locals.out)
+            · -- h_init: P → I (drop probes = 0)
+              intro s ⟨h_inv, h_out, _⟩; exact ⟨h_inv, h_out⟩
+            · -- h_body_nf: I ∧ c → ¬failed
+              intro s ⟨⟨h_ht, h_arr, h_cap, h_cm, h_idx⟩, h_out⟩ _
+              have h_elem := ht_array_elem_valid h_arr h_idx
+              -- Body guards: heapPtrValid out, heapPtrValid (elemOffset values idx)
+              -- Both satisfied. No guard can fail.
+              intro hf; sorry
+            · -- h_body_inv: I ∧ c ∧ ok → I preserved (continue path: advance idx/probes)
+              intro s s' ⟨⟨h_ht, h_arr, h_cap, h_cm, h_idx⟩, h_out⟩ _ h_mem
+              -- ok result means: cond1 was false AND cond2 was false → skip both
+              -- Then: idx := (idx+1) & cap_mask, probes := probes + 1
+              sorry
+            · -- h_exit: I ∧ ¬c → Q ok (R for seq)
+              intro s ⟨h_inv, h_out⟩ _; exact ⟨h_inv, h_out⟩
+            · -- h_abrupt: I ∧ c ∧ error → Q error (ht_ret_01)
+              intro s s' ⟨⟨h_ht, h_arr, h_cap, h_cm, h_idx⟩, h_out⟩ _ h_mem
+              -- Error results only come from modify(ret:=0);throw or modify(ret:=1);throw.
+              -- Each sets ret_val to 0 or 1. Requires NondetM decomposition.
+              sorry
+          · -- seq modify(ret:=0) throw: from R, produce ht_ret_01
+            apply L1_hoare_modify_throw_catch
+            intro s _; exact Or.inl rfl
   · -- Handler proof: skip preserves ht_ret_01
     intro s h_ret
     constructor
@@ -793,7 +948,79 @@ theorem ht_insert_correct :
             by rw [lk_set_cm_globals, lk_set_cm_keys, lk_set_cm_values, lk_set_cm_ht]; exact ha,
             by rw [lk_set_cm_cap_mask, lk_set_cm_globals, lk_set_cm_ht]⟩)
       · -- rest: dynCom, probes:=0, while, ret:=1;throw
-        sorry
+        -- Same structure as lookup: dynCom, probes:=0, while, final_throw
+        apply L1_hoare_seq_ok
+          (R := fun s => ht_loop_inv s ∧ s.locals.key > 1)
+        · -- dynCom: calls ht_hash, restores locals, sets idx
+          apply L1_hoare_dynCom_basic
+          intro s₀ ⟨h_ht, h_key, h_cap, h_arr, h_cm⟩
+          rw [lk_restore_funext s₀]
+          apply L1_hoare_seq_ok (R := fun s => s = s₀)
+          · -- modify setup: identity
+            intro s hs
+            constructor
+            · intro hf; exact hf
+            · intro r s' h_mem
+              have ⟨hr, hs'⟩ := Prod.mk.inj h_mem
+              exact ⟨hr, by subst hr; rw [hs', hs]⟩
+          · -- seq (call "ht_hash") (modify (lk_restore s₀))
+            simp only [L1.call, L1.L1ProcEnv.insert, L1.L1ProcEnv.empty]
+            intro s₁ hs₁
+            have ⟨h_hash_nf, h_hash_post⟩ := ht_hash_full s₀
+            rw [show s₁ = s₀ from hs₁]
+            constructor
+            · intro hf; change (_ ∨ _) at hf
+              rcases hf with hf1 | ⟨s', _, hf2⟩
+              · exact h_hash_nf hf1
+              · exact hf2
+            · intro r s' h_mem; change (_ ∨ _) at h_mem
+              rcases h_mem with ⟨s_hash, h_hash_mem, h_restore_mem⟩ | ⟨h_err, _⟩
+              · have ⟨h_ok, h_globals, h_ret, _, _⟩ := h_hash_post _ s_hash h_hash_mem
+                have ⟨hr, hs_eq⟩ := Prod.mk.inj h_restore_mem; rw [hr, hs_eq]
+                refine ⟨rfl, ⟨?_, ?_, ?_, ?_, ?_⟩, ?_⟩
+                · rw [lk_restore_globals, h_globals, lk_restore_ht]; exact h_ht
+                · rw [lk_restore_globals, h_globals, lk_restore_keys, lk_restore_values, lk_restore_ht]; exact h_arr
+                · rw [lk_restore_globals, h_globals, lk_restore_ht]; exact h_cap
+                · rw [lk_restore_cap_mask, lk_restore_globals, h_globals, lk_restore_ht]; exact h_cm
+                · rw [lk_restore_idx, h_ret, h_cm, lk_restore_globals, h_globals, lk_restore_ht]
+                  exact hash_index_bounded' _ _ h_cap
+                · rw [lk_restore_key]; exact h_key
+              · have h_ok := (h_hash_post _ s' h_err).1
+                exact absurd h_ok (by intro h; cases h)
+        · -- seq probes:=0 (seq while ret:=1;throw)
+          apply L1_hoare_seq_ok
+            (R := fun s => ht_loop_inv s ∧ s.locals.key > 1 ∧ s.locals.probes = 0)
+          · -- modify probes := 0
+            intro s ⟨⟨h_ht, h_arr, h_cap, h_cm, h_idx⟩, h_key⟩
+            constructor
+            · intro hf; exact hf
+            · intro r s' h_mem
+              have ⟨hr, hs⟩ := Prod.mk.inj h_mem; subst hr; subst hs
+              refine ⟨rfl, ⟨h_ht, h_arr, h_cap, h_cm, h_idx⟩, h_key, rfl⟩
+          · -- seq while ret:=1;throw
+            -- Decompose: while ; seq(modify_ret1, throw)
+            apply L1_hoare_seq
+              (R := fun s => ht_loop_inv s ∧ s.locals.key > 1)
+            · -- While loop
+              apply L1_hoare_while
+                (I := fun s => ht_loop_inv s ∧ s.locals.key > 1)
+              · -- h_init
+                intro s ⟨h_inv, h_key, _⟩; exact ⟨h_inv, h_key⟩
+              · -- h_body_nf
+                intro s ⟨⟨h_ht, h_arr, h_cap, h_cm, h_idx⟩, h_key⟩ _
+                have h_elem := ht_array_elem_valid h_arr h_idx
+                intro hf; sorry
+              · -- h_body_inv (continue: advance idx/probes)
+                intro s s' ⟨⟨h_ht, h_arr, h_cap, h_cm, h_idx⟩, h_key⟩ _ h_mem
+                sorry
+              · -- h_exit
+                intro s ⟨h_inv, h_key⟩ _; exact ⟨h_inv, h_key⟩
+              · -- h_abrupt (insert or update → ret:=0, throw → ht_ret_01)
+                intro s s' ⟨⟨h_ht, h_arr, h_cap, h_cm, h_idx⟩, h_key⟩ _ h_mem
+                sorry
+            · -- seq modify(ret:=1) throw: from R, produce ht_ret_01
+              apply L1_hoare_modify_throw_catch
+              intro s _; exact Or.inr rfl
   · -- Handler proof: skip preserves ht_ret_01
     intro s h_ret
     constructor
