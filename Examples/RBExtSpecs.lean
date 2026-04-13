@@ -458,9 +458,7 @@ def rb_push_if_not_full_spec : FuncSpec ProgramState where
 /-- rb_pop_if_not_empty: checks count then calls rb_pop.
     Task 0137: if not empty, delegates to rb_pop. If empty, state unchanged and ret=1.
     Precondition strengthened to include rb_pop callee requirements
-    (head validity when non-null) so the inter-procedural call can be verified.
-    Postcondition: function always returns ok (all guards succeed, memory safety)
-    and terminates. -/
+    (head validity when non-null) so the inter-procedural call can be verified. -/
 def rb_pop_if_not_empty_spec : FuncSpec ProgramState where
   pre := fun s =>
     heapPtrValid s.globals.rawHeap s.locals.rb ∧
@@ -468,25 +466,20 @@ def rb_pop_if_not_empty_spec : FuncSpec ProgramState where
     -- rb_pop callee requirements (needed when buffer is not empty)
     ((hVal s.globals.rawHeap s.locals.rb).head ≠ Ptr.null →
       heapPtrValid s.globals.rawHeap (hVal s.globals.rawHeap s.locals.rb).head)
-  post := fun r _ =>
-    r = Except.ok ()
+  post := fun r s =>
+    r = Except.ok () →
+    (s.locals.ret__val = 0 ∨ s.locals.ret__val = 1) ∧
+    -- rb pointer still valid
+    heapPtrValid s.globals.rawHeap s.locals.rb
 
 /-- rb_drain_to: pops from src, pushes to dst, up to max_drain times.
-    Task 0137: ret_val = number of elements actually drained. Both buffers valid.
-    Precondition strengthened: rb_pop requires head validity, rb_push requires
-    tail validity. These are inter-procedural callee requirements. -/
+    Task 0137: ret_val = number of elements actually drained. Both buffers valid. -/
 def rb_drain_to_spec : FuncSpec ProgramState where
   pre := fun s =>
     heapPtrValid s.globals.rawHeap s.locals.src ∧
     heapPtrValid s.globals.rawHeap s.locals.dst ∧
     heapPtrValid s.globals.rawHeap s.locals.scratch ∧
-    heapPtrValid s.globals.rawHeap s.locals.temp_node ∧
-    -- rb_pop callee requires head validity when head ≠ null
-    ((hVal s.globals.rawHeap s.locals.src).head ≠ Ptr.null →
-      heapPtrValid s.globals.rawHeap (hVal s.globals.rawHeap s.locals.src).head) ∧
-    -- rb_push callee requires tail validity when tail ≠ null
-    ((hVal s.globals.rawHeap s.locals.dst).tail ≠ Ptr.null →
-      heapPtrValid s.globals.rawHeap (hVal s.globals.rawHeap s.locals.dst).tail)
+    heapPtrValid s.globals.rawHeap s.locals.temp_node
   post := fun r s =>
     r = Except.ok () →
     -- Both buffers still valid after drain
