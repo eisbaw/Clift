@@ -1230,7 +1230,92 @@ theorem ht_insert_correct :
               · -- h_body_nf
                 intro s ⟨⟨h_ht, h_arr, h_cap, h_cm, h_idx⟩, h_key⟩ _
                 have h_elem := ht_array_elem_valid h_arr h_idx
-                intro hf; sorry
+                intro hf
+                rw [L1_seq_failed_iff] at hf
+                rcases hf with hf1 | ⟨s1, hs1, hf2⟩
+                · -- cond1 fails
+                  simp only [L1.condition] at hf1; split at hf1
+                  · -- cond1 true: branch1 (insert new entry) fails
+                    rw [L1_seq_failed_iff] at hf1
+                    rcases hf1 with hf_a1 | ⟨s_k, hs_k, hf_r1⟩
+                    · -- guard keys_elem; modify write_keys fails
+                      rw [L1_seq_failed_iff] at hf_a1
+                      rcases hf_a1 with hf_gk | ⟨_, _, hf_mk⟩
+                      · simp only [L1.guard, if_pos h_elem.1] at hf_gk
+                      · exact hf_mk
+                    · -- after keys write: rest1 fails
+                      change (_ ∨ _) at hs_k
+                      rcases hs_k with ⟨s_mid, h_gk, h_mk⟩ | ⟨_, h_err⟩
+                      · simp only [L1.guard, if_pos h_elem.1] at h_gk
+                        rw [(Prod.mk.inj h_gk).2] at h_mk
+                        rw [(Prod.mk.inj h_mk).2] at hf_r1
+                        have h_vals_upd := heapPtrValid_preserved (p := Ptr.elemOffset s.locals.keys s.locals.idx.toNat) (v := s.locals.key) h_elem.2
+                        have h_ht_upd := heapPtrValid_preserved (p := Ptr.elemOffset s.locals.keys s.locals.idx.toNat) (v := s.locals.key) h_ht
+                        rw [L1_seq_failed_iff] at hf_r1
+                        rcases hf_r1 with hf_a2 | ⟨s_v, hs_v, hf_r2⟩
+                        · -- guard vals; modify write_vals fails
+                          rw [L1_seq_failed_iff] at hf_a2
+                          rcases hf_a2 with hf_gv | ⟨_, _, hf_mv⟩
+                          · simp only [L1.guard, if_pos h_vals_upd] at hf_gv
+                          · exact hf_mv
+                        · -- after vals write: rest2 fails
+                          change (_ ∨ _) at hs_v
+                          rcases hs_v with ⟨s_mid2, h_gv, h_mv⟩ | ⟨_, h_err2⟩
+                          · simp only [L1.guard, if_pos h_vals_upd] at h_gv
+                            rw [(Prod.mk.inj h_gv).2] at h_mv
+                            rw [(Prod.mk.inj h_mv).2] at hf_r2
+                            have h_ht_upd2 := heapPtrValid_preserved (p := Ptr.elemOffset s.locals.values s.locals.idx.toNat) (v := s.locals.value) h_ht_upd
+                            rw [L1_seq_failed_iff] at hf_r2
+                            rcases hf_r2 with hf_a3 | ⟨_, _, hf_mt⟩
+                            · -- guard ht; guard ht; modify write_count fails
+                              rw [L1_seq_failed_iff] at hf_a3
+                              rcases hf_a3 with hf_ght | ⟨_, h_ght_ok, hf_inner⟩
+                              · simp only [L1.guard, if_pos h_ht_upd2] at hf_ght
+                              · simp only [L1.guard, if_pos h_ht_upd2] at h_ght_ok
+                                rw [(Prod.mk.inj h_ght_ok).2] at hf_inner
+                                rw [L1_seq_failed_iff] at hf_inner
+                                rcases hf_inner with hf_ght2 | ⟨_, _, hf_mc⟩
+                                · simp only [L1.guard, if_pos h_ht_upd2] at hf_ght2
+                                · exact hf_mc
+                            · exact (L1_modify_throw_only_error' _ _).2 hf_mt
+                          · exact absurd h_err2 (by intro h; cases h)
+                      · exact absurd h_err (by intro h; cases h)
+                  · exact hf1
+                · -- ok from cond1, rest fails
+                  simp only [L1.condition] at hs1; split at hs1
+                  · -- cond1 true: no ok results from branch1
+                    change (_ ∨ _) at hs1; rcases hs1 with ⟨_, _, h⟩ | ⟨_, h⟩
+                    · change (_ ∨ _) at h; rcases h with ⟨_, _, h⟩ | ⟨_, h⟩
+                      · change (_ ∨ _) at h; rcases h with ⟨_, _, h⟩ | ⟨_, h⟩
+                        · exact absurd h (L1_modify_throw_no_ok _ _ _)
+                        · exact absurd h (by intro h; cases h)
+                      · exact absurd h (by intro h; cases h)
+                    · exact absurd h (by intro h; cases h)
+                  · -- cond1 false: skip → s1 = s
+                    rw [(Prod.mk.inj hs1).2] at hf2
+                    rw [L1_seq_failed_iff] at hf2
+                    rcases hf2 with hf_c2 | ⟨s2, hs2, hf_adv⟩
+                    · simp only [L1.condition] at hf_c2; split at hf_c2
+                      · -- cond2 true: branch2 (update existing) fails
+                        rw [L1_seq_failed_iff] at hf_c2
+                        rcases hf_c2 with hf_gvm | ⟨_, _, hf_mt⟩
+                        · rw [L1_seq_failed_iff] at hf_gvm
+                          rcases hf_gvm with hf_gv | ⟨_, _, hf_mv⟩
+                          · simp only [L1.guard, if_pos h_elem.2] at hf_gv
+                          · exact hf_mv
+                        · exact (L1_modify_throw_only_error' _ _).2 hf_mt
+                      · exact hf_c2
+                    · simp only [L1.condition] at hs2; split at hs2
+                      · -- cond2 true: no ok from branch2
+                        change (_ ∨ _) at hs2; rcases hs2 with ⟨_, _, h_mt⟩ | ⟨_, h_tag⟩
+                        · exact absurd h_mt (L1_modify_throw_no_ok _ _ s2)
+                        · exact absurd h_tag (by intro h; cases h)
+                      · -- cond2 false: skip → s2 = s, advance never fails
+                        rw [(Prod.mk.inj hs2).2] at hf_adv
+                        rw [L1_seq_failed_iff] at hf_adv
+                        rcases hf_adv with hf1 | ⟨_, _, hf2⟩
+                        · exact hf1
+                        · exact hf2
               · -- h_body_inv (continue: advance idx/probes)
                 intro s s' ⟨⟨h_ht, h_arr, h_cap, h_cm, h_idx⟩, h_key⟩ _ h_mem
                 change (_ ∨ _) at h_mem
@@ -1267,7 +1352,79 @@ theorem ht_insert_correct :
                 intro s ⟨h_inv, h_key⟩ _; exact ⟨h_inv, h_key⟩
               · -- h_abrupt (insert or update → ret:=0, throw → ht_ret_01)
                 intro s s' ⟨⟨h_ht, h_arr, h_cap, h_cm, h_idx⟩, h_key⟩ _ h_mem
-                sorry
+                -- Error results come from: branch1's ret:=0;throw, or branch2's ret:=0;throw
+                rcases L1_seq_error_mem h_mem with ⟨s1, hs1, h_rest⟩ | h_err1
+                · -- ok from cond1, error from rest
+                  simp only [L1.condition] at hs1; split at hs1
+                  · -- cond1 true: no ok from branch1
+                    change (_ ∨ _) at hs1; rcases hs1 with ⟨_, _, h⟩ | ⟨_, h⟩
+                    · change (_ ∨ _) at h; rcases h with ⟨_, _, h⟩ | ⟨_, h⟩
+                      · change (_ ∨ _) at h; rcases h with ⟨_, _, h⟩ | ⟨_, h⟩
+                        · exact absurd h (L1_modify_throw_no_ok _ _ _)
+                        · exact absurd h (by intro h; cases h)
+                      · exact absurd h (by intro h; cases h)
+                    · exact absurd h (by intro h; cases h)
+                  · -- cond1 false: skip → s1 = s
+                    rw [(Prod.mk.inj hs1).2] at h_rest
+                    rcases L1_seq_error_mem h_rest with ⟨s2, hs2, h_adv_err⟩ | h_err2
+                    · -- ok from cond2, error from advance
+                      simp only [L1.condition] at hs2; split at hs2
+                      · -- cond2 true: no ok from branch2
+                        change (_ ∨ _) at hs2; rcases hs2 with ⟨_, _, h_mt⟩ | ⟨_, h_tag⟩
+                        · exact absurd h_mt (L1_modify_throw_no_ok _ _ s2)
+                        · exact absurd h_tag (by intro h; cases h)
+                      · -- cond2 false: skip → s2 = s
+                        rw [(Prod.mk.inj hs2).2] at h_adv_err
+                        rcases L1_seq_error_mem h_adv_err with ⟨_, _, h_f⟩ | h_m_err
+                        · exact absurd h_f (L1_modify_no_error _ _ _)
+                        · exact absurd h_m_err (L1_modify_no_error _ _ _)
+                    · -- error from cond2 directly
+                      simp only [L1.condition] at h_err2; split at h_err2
+                      · -- cond2 true: error from branch2 = seq (guard+modify) (ret0;throw)
+                        rcases L1_seq_error_mem h_err2 with ⟨s_mid, _, h_mid_err⟩ | h_inner_err
+                        · -- ok from guard+modify, error from ret0;throw
+                          simp only [lk_set_ret0_funext] at h_mid_err
+                          have h_mt := (L1_modify_throw_only_error' lk_set_ret0 s_mid).1
+                          rw [h_mt] at h_mid_err
+                          rw [(Prod.mk.inj h_mid_err).2]
+                          exact Or.inl (lk_set_ret0_ret s_mid)
+                        · -- error from guard+modify: impossible
+                          rcases L1_seq_error_mem h_inner_err with ⟨_, _, h_m_err⟩ | h_g_err
+                          · exact absurd h_m_err (L1_modify_no_error _ _ _)
+                          · exact absurd h_g_err (L1_guard_no_error' _ _)
+                      · -- cond2 false: skip → no error
+                        exact absurd h_err2 (L1_skip_no_error _ _)
+                · -- error from cond1 directly
+                  simp only [L1.condition] at h_err1; split at h_err1
+                  · -- cond1 true: error from branch1
+                    -- Peel through seq layers to reach ret0;throw
+                    rcases L1_seq_error_mem h_err1 with ⟨s_k, _, h_err_r1⟩ | h_err_a1
+                    · -- ok from guard+modify keys, error from rest
+                      rcases L1_seq_error_mem h_err_r1 with ⟨s_v, _, h_err_r2⟩ | h_err_a2
+                      · -- ok from guard+modify vals, error from rest
+                        rcases L1_seq_error_mem h_err_r2 with ⟨s_c, _, h_err_mt⟩ | h_err_a3
+                        · -- ok from guard+guard+modify count, error from ret0;throw
+                          simp only [lk_set_ret0_funext] at h_err_mt
+                          have h_mt := (L1_modify_throw_only_error' lk_set_ret0 s_c).1
+                          rw [h_mt] at h_err_mt
+                          rw [(Prod.mk.inj h_err_mt).2]
+                          exact Or.inl (lk_set_ret0_ret s_c)
+                        · -- error from guard+guard+modify count: impossible
+                          rcases L1_seq_error_mem h_err_a3 with ⟨_, _, h_inner⟩ | h_g_err
+                          · rcases L1_seq_error_mem h_inner with ⟨_, _, h_m_err⟩ | h_g2_err
+                            · exact absurd h_m_err (L1_modify_no_error _ _ _)
+                            · exact absurd h_g2_err (L1_guard_no_error' _ _)
+                          · exact absurd h_g_err (L1_guard_no_error' _ _)
+                      · -- error from guard+modify vals: impossible
+                        rcases L1_seq_error_mem h_err_a2 with ⟨_, _, h_m_err⟩ | h_g_err
+                        · exact absurd h_m_err (L1_modify_no_error _ _ _)
+                        · exact absurd h_g_err (L1_guard_no_error' _ _)
+                    · -- error from guard+modify keys: impossible
+                      rcases L1_seq_error_mem h_err_a1 with ⟨_, _, h_m_err⟩ | h_g_err
+                      · exact absurd h_m_err (L1_modify_no_error _ _ _)
+                      · exact absurd h_g_err (L1_guard_no_error' _ _)
+                  · -- cond1 false: skip → no error
+                    exact absurd h_err1 (L1_skip_no_error _ _)
             · -- seq modify(ret:=1) throw: from R, produce ht_ret_01
               apply L1_hoare_modify_throw_catch
               intro s _; exact Or.inr rfl
