@@ -600,6 +600,31 @@ theorem L1_hoare_guard_guard_modify_fused {σ : Type}
     · exact L1_hoare_guard' p P
   · exact L1_hoare_guard_modify_fused h_guard h_post
 
+/-- Guard + modify + rest: seq(guard p, seq(modify f, rest)).
+    Handles the common pattern where guard and modify are the first two steps
+    before delegating to a tail computation. -/
+theorem L1_hoare_guard_modify_rest {σ : Type}
+    {p : σ → Prop} [DecidablePred p] {f : σ → σ}
+    {P R : σ → Prop} {Q : Except Unit Unit → σ → Prop}
+    {rest : L1Monad σ}
+    (h_guard : ∀ s, P s → p s)
+    (h_mid : ∀ s, P s → R (f s))
+    (h_rest : validHoare R rest Q) :
+    validHoare P (L1.seq (L1.guard p) (L1.seq (L1.modify f) rest)) Q := by
+  -- Split at guard: m₁ = guard, m₂ = seq(modify, rest)
+  apply L1_hoare_seq_ok (R := fun s => P s)
+  · -- guard preserves P
+    apply L1_hoare_pre (P := fun s => p s ∧ P s)
+    · intro s hP; exact ⟨h_guard s hP, hP⟩
+    · exact L1_hoare_guard' p P
+  · -- seq(modify, rest) from P to Q
+    apply L1_hoare_seq_ok (R := R)
+    · -- modify: P → R
+      apply L1_hoare_pre (P := fun s => R (f s))
+      · intro s hP; exact h_mid s hP
+      · exact L1_hoare_modify' f R
+    · exact h_rest
+
 /-- Hoare rule for modify followed by throw.
     Produces error postcondition: `r = error ∧ R (f s)`. -/
 theorem L1_hoare_modify_throw {σ : Type}
