@@ -32,6 +32,37 @@ attribute [local irreducible]
   l1_rb_reverse_body l1_rb_count_above_body l1_rb_count_at_or_below_body
   l1_rb_fill_body
 
+/-! ## Helper: condition (modify ret=v; throw) skip in seq context
+
+Each integrity check is: condition c (modify(ret=0);throw) skip.
+In a seq context, the postcondition is a match on ok/error.
+True branch → error with ret=0 (or ret=1 for final).
+False branch → ok with True (fall through to next check). -/
+
+private theorem cond_throw_or_skip
+    (c : ProgramState → Bool) (v : UInt32)
+    (P : ProgramState → Prop) (Q_ok : ProgramState → Prop)
+    (h_val : v = 0 ∨ v = 1)
+    (h_ok : ∀ s, P s → c s = false → Q_ok s) :
+    validHoare P
+      (L1.condition c
+        (L1.seq (L1.modify (fun s => { s with locals := { s.locals with ret__val := v } })) L1.throw)
+        L1.skip)
+      (fun r s => match r with
+        | Except.ok () => Q_ok s
+        | Except.error () => s.locals.ret__val = 0 ∨ s.locals.ret__val = 1) := by
+  apply L1_hoare_condition
+  · -- true branch: modify(ret=v); throw
+    apply L1_hoare_modify_throw_catch
+    intro s ⟨_, _⟩
+    cases h_val with
+    | inl h => rw [rb_retval_val]; exact Or.inl h
+    | inr h => rw [rb_retval_val]; exact Or.inr h
+  · -- false branch: skip
+    apply L1_hoare_pre (P := fun s => Q_ok s)
+    · intro s ⟨hp, hc⟩; exact h_ok s hp hc
+    · exact L1_hoare_skip _
+
 -- Key lemma: rb_count_nodes only produces ok results
 -- (its l1 body is L1.catch (loop) L1.skip, catch+skip converts all errors to ok)
 private theorem rb_count_nodes_results_ok (s : ProgramState) :
@@ -74,9 +105,44 @@ theorem rb_check_integrity_validHoare :
       · -- error impossible: Q_callee says r = ok, but h says r = error
         intro _ _ _ h_eq; exact absurd h_eq (by intro h; cases h)
     · -- CONDITIONALS: from True, all paths set ret_val ∈ {0,1} and throw
-      -- This is standard conditional case analysis, not dependent on TASK-0235.
-      -- Each branch: cond → modify(ret=0);throw | skip, final: modify(ret=1);throw
-      sorry -- TODO: conditional case analysis (not blocked on TASK-0235)
+      -- Structure: seq cond1 (seq cond2_group (seq cond5_group final))
+      -- Each cond: condition c (modify(ret=0);throw) skip
+      -- final: modify(ret=1);throw
+      -- Decompose outer seq: cond1 ; rest
+      apply L1_hoare_seq (R := fun _ => True)
+      · -- cond1: actual ≠ count → ret=0, throw | skip
+        exact cond_throw_or_skip _ 0 _ _ (Or.inl rfl) (fun _ _ _ => trivial)
+      · -- rest: seq cond2_group (seq cond5_group final)
+        apply L1_hoare_seq (R := fun _ => True)
+        · -- cond2_group: count=0 → (seq cond3 cond4) | skip
+          apply L1_hoare_condition
+          · -- cond2 true: seq cond3 cond4
+            apply L1_hoare_seq (R := fun _ => True)
+            · -- cond3: head ≠ null → ret=0, throw | skip
+              exact cond_throw_or_skip _ 0 _ _ (Or.inl rfl) (fun _ _ _ => trivial)
+            · -- cond4: tail ≠ null → ret=0, throw | skip
+              exact cond_throw_or_skip _ 0 _ _ (Or.inl rfl) (fun _ _ _ => trivial)
+          · -- cond2 false: skip
+            apply L1_hoare_pre (P := fun s => True)
+            · intro s ⟨_, _⟩; trivial
+            · exact L1_hoare_skip _
+        · -- rest2: seq cond5_group final
+          apply L1_hoare_seq (R := fun _ => True)
+          · -- cond5_group: count ≠ 0 → (seq cond6 cond7) | skip
+            apply L1_hoare_condition
+            · -- cond5 true: seq cond6 cond7
+              apply L1_hoare_seq (R := fun _ => True)
+              · -- cond6: head = null → ret=0, throw | skip
+                exact cond_throw_or_skip _ 0 _ _ (Or.inl rfl) (fun _ _ _ => trivial)
+              · -- cond7: tail = null → ret=0, throw | skip
+                exact cond_throw_or_skip _ 0 _ _ (Or.inl rfl) (fun _ _ _ => trivial)
+            · -- cond5 false: skip
+              apply L1_hoare_pre (P := fun s => True)
+              · intro s ⟨_, _⟩; trivial
+              · exact L1_hoare_skip _
+          · -- final: modify(ret=1); throw
+            apply L1_hoare_modify_throw_catch
+            intro s _; rw [rb_retval_val]; exact Or.inr rfl
   · -- HANDLER (skip): from R (ret_val ∈ {0,1}), skip preserves state → Q
     intro s hR
     exact ⟨not_false, fun r s' h_mem => by
