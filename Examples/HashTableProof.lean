@@ -566,6 +566,10 @@ attribute [local irreducible] hVal in
 @[simp] private theorem lk_advance_out (s : ProgramState) :
     (lk_advance s).locals.out = s.locals.out := by rw [lk_advance_locals]
 
+attribute [local irreducible] hVal in
+@[simp] private theorem lk_advance_key (s : ProgramState) :
+    (lk_advance s).locals.key = s.locals.key := by rw [lk_advance_locals]
+
 -- funext: the composition of two modifies equals lk_advance
 attribute [local irreducible] hVal heapPtrValid heapUpdate in
 private theorem lk_advance_funext (s : ProgramState) :
@@ -1107,7 +1111,8 @@ theorem ht_lookup_correct :
 private def ht_insert_loop_inv (s : ProgramState) : Prop :=
   ht_loop_inv s ∧ s.locals.key > 1
 
-attribute [local irreducible] hVal heapPtrValid heapUpdate in
+attribute [local irreducible] hVal heapPtrValid heapUpdate lk_restore
+  ht_hash_f1 ht_hash_f2 HashTable.l1_ht_hash_body lk_advance lk_set_ret0 lk_set_ret1 in
 theorem ht_insert_correct :
     ht_insert_spec.satisfiedBy HashTable.l1_ht_insert_body := by
   unfold FuncSpec.satisfiedBy ht_insert_spec
@@ -1228,7 +1233,36 @@ theorem ht_insert_correct :
                 intro hf; sorry
               · -- h_body_inv (continue: advance idx/probes)
                 intro s s' ⟨⟨h_ht, h_arr, h_cap, h_cm, h_idx⟩, h_key⟩ _ h_mem
-                sorry
+                change (_ ∨ _) at h_mem
+                rcases h_mem with ⟨s1, hs1, h_rest⟩ | ⟨_, h_tag⟩
+                · simp only [L1.condition] at hs1; split at hs1
+                  · change (_ ∨ _) at hs1; rcases hs1 with ⟨_, _, h⟩ | ⟨_, h⟩
+                    · change (_ ∨ _) at h; rcases h with ⟨_, _, h⟩ | ⟨_, h⟩
+                      · change (_ ∨ _) at h; rcases h with ⟨_, _, h⟩ | ⟨_, h⟩
+                        · exact absurd h (L1_modify_throw_no_ok _ _ _)
+                        · exact absurd h (by intro h; cases h)
+                      · exact absurd h (by intro h; cases h)
+                    · exact absurd h (by intro h; cases h)
+                  · rw [(Prod.mk.inj hs1).2] at h_rest
+                    change (_ ∨ _) at h_rest; rcases h_rest with ⟨s2, hs2, h_adv⟩ | ⟨_, h⟩
+                    · simp only [L1.condition] at hs2; split at hs2
+                      · change (_ ∨ _) at hs2; rcases hs2 with ⟨_, _, h⟩ | ⟨_, h⟩
+                        · exact absurd h (L1_modify_throw_no_ok _ _ _)
+                        · exact absurd h (by intro h; cases h)
+                      · rw [(Prod.mk.inj hs2).2] at h_adv
+                        change (_ ∨ _) at h_adv; rcases h_adv with ⟨s3, hs3, hp⟩ | ⟨_, h⟩
+                        · have h_eq : s' = lk_advance s := by
+                            rw [(Prod.mk.inj hp).2, (Prod.mk.inj hs3).2]; exact lk_advance_funext s
+                          rw [h_eq]
+                          exact ⟨⟨by rw [lk_advance_globals, lk_advance_ht]; exact h_ht,
+                            by rw [lk_advance_globals, lk_advance_keys, lk_advance_values, lk_advance_ht]; exact h_arr,
+                            by rw [lk_advance_globals, lk_advance_ht]; exact h_cap,
+                            by rw [lk_advance_cap_mask, lk_advance_globals, lk_advance_ht]; exact h_cm,
+                            by rw [lk_advance_idx, lk_advance_globals, lk_advance_ht]; exact idx_advance_bounded _ _ _ h_cm h_cap⟩,
+                            by rw [lk_advance_key]; exact h_key⟩
+                        · exact absurd h (by intro h; cases h)
+                    · exact absurd h (by intro h; cases h)
+                · exact absurd h_tag (by intro h; cases h)
               · -- h_exit
                 intro s ⟨h_inv, h_key⟩ _; exact ⟨h_inv, h_key⟩
               · -- h_abrupt (insert or update → ret:=0, throw → ht_ret_01)
