@@ -70,6 +70,7 @@ lean_lib Examples where
              `Examples.RBExtProofsLoops2,
              `Examples.RBExtProofsMaxMin,
              `Examples.RBExtProofRbPop,
+             `Examples.RBPopProof,
              `Examples.RBExtProofRbIncrementAll,
              `Examples.RBExtProofRbSwapFrontBack,
              `Examples.RBExtProofRbReplaceAll,
