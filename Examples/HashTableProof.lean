@@ -243,6 +243,24 @@ theorem ht_count_correct :
     subst hr; subst hs
     rw [ht_update_retval_val, ht_update_retval_globals, ht_update_retval_ht]
 
+/-! ## NondetM-level helpers for loop body proofs -/
+
+private theorem L1_seq_failed_iff {σ : Type} (m₁ m₂ : L1Monad σ) (s : σ) :
+    (L1.seq m₁ m₂ s).failed ↔
+    ((m₁ s).failed ∨ ∃ s', (Except.ok (), s') ∈ (m₁ s).results ∧ (m₂ s').failed) :=
+  Iff.rfl
+
+private theorem L1_modify_throw_only_error' {σ : Type} (f : σ → σ) (s : σ) :
+    (L1.seq (L1.modify f) L1.throw s).results = {(Except.error (), f s)} ∧
+    ¬(L1.seq (L1.modify f) L1.throw s).failed :=
+  L1_modify_throw_result f s
+
+private theorem L1_modify_throw_no_ok {σ : Type} (f : σ → σ) (s : σ) (s' : σ) :
+    ¬(Except.ok (), s') ∈ (L1.seq (L1.modify f) L1.throw s).results := by
+  have h := (L1_modify_throw_only_error' f s).1
+  rw [h]; intro h_mem
+  exact absurd (Prod.mk.inj h_mem).1 (by intro h; cases h)
+
 /-! ## Helper Hoare rules (not in L1HoareRules.lean) -/
 
 private theorem L1_hoare_throw (Q : Except Unit Unit → ProgramState → Prop) :
@@ -858,9 +876,42 @@ theorem ht_lookup_correct :
             · -- h_body_nf: I ∧ c → ¬failed
               intro s ⟨⟨h_ht, h_arr, h_cap, h_cm, h_idx⟩, h_out⟩ _
               have h_elem := ht_array_elem_valid h_arr h_idx
-              -- Body guards: heapPtrValid out, heapPtrValid (elemOffset values idx)
-              -- Both satisfied. No guard can fail.
-              intro hf; sorry
+              intro hf
+              rw [L1_seq_failed_iff] at hf
+              rcases hf with hf1 | ⟨s1, hs1, hf2⟩
+              · simp only [L1.condition] at hf1; split at hf1
+                · exact (L1_modify_throw_only_error' _ s).2 hf1
+                · exact hf1
+              · simp only [L1.condition] at hs1; split at hs1
+                · exact absurd hs1 (L1_modify_throw_no_ok _ s s1)
+                · rw [(Prod.mk.inj hs1).2] at hf2
+                  rw [L1_seq_failed_iff] at hf2
+                  rcases hf2 with hf_c2 | ⟨s2, hs2, hf_adv⟩
+                  · simp only [L1.condition] at hf_c2; split at hf_c2
+                    · rw [L1_seq_failed_iff] at hf_c2
+                      rcases hf_c2 with hf_inner | ⟨_, _, hf_mt⟩
+                      · rw [L1_seq_failed_iff] at hf_inner
+                        rcases hf_inner with hf_g1 | ⟨_, hsg1, hf_r⟩
+                        · simp only [L1.guard, if_pos h_out] at hf_g1
+                        · simp only [L1.guard, if_pos h_out] at hsg1
+                          rw [(Prod.mk.inj hsg1).2] at hf_r
+                          rw [L1_seq_failed_iff] at hf_r
+                          rcases hf_r with hf_g2 | ⟨_, hsg2, hf_m⟩
+                          · simp only [L1.guard, if_pos h_elem.2] at hf_g2
+                          · simp only [L1.guard, if_pos h_elem.2] at hsg2
+                            rw [(Prod.mk.inj hsg2).2] at hf_m; exact hf_m
+                      · exact (L1_modify_throw_only_error' _ _).2 hf_mt
+                    · exact hf_c2
+                  · simp only [L1.condition] at hs2; split at hs2
+                    · change (_ ∨ _) at hs2
+                      rcases hs2 with ⟨_, _, h_mt⟩ | ⟨_, h_tag⟩
+                      · exact absurd h_mt (L1_modify_throw_no_ok _ _ s2)
+                      · exact absurd h_tag (by intro h; cases h)
+                    · rw [(Prod.mk.inj hs2).2] at hf_adv
+                      rw [L1_seq_failed_iff] at hf_adv
+                      rcases hf_adv with hf1 | ⟨_, _, hf2⟩
+                      · exact hf1
+                      · exact hf2
             · -- h_body_inv: I ∧ c ∧ ok → I preserved (continue path: advance idx/probes)
               intro s s' ⟨⟨h_ht, h_arr, h_cap, h_cm, h_idx⟩, h_out⟩ _ h_mem
               -- ok result means: cond1 was false AND cond2 was false → skip both
