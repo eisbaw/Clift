@@ -261,6 +261,41 @@ private theorem L1_modify_throw_no_ok {σ : Type} (f : σ → σ) (s : σ) (s' :
   rw [h]; intro h_mem
   exact absurd (Prod.mk.inj h_mem).1 (by intro h; cases h)
 
+private theorem L1_modify_no_error {σ : Type} (f : σ → σ) (s s' : σ) :
+    ¬(Except.error (), s') ∈ (L1.modify f s).results := by
+  intro h; exact absurd (Prod.mk.inj h).1 (by intro h; cases h)
+
+private theorem L1_skip_no_error {σ : Type} (s s' : σ) :
+    ¬(Except.error (), s') ∈ (L1.skip (σ := σ) s).results := by
+  simp only [L1.skip, NondetM.pure]
+  intro h; exact absurd (Prod.mk.inj h).1 (by intro h; cases h)
+
+private theorem L1_guard_no_error' {σ : Type} {p : σ → Prop} [DecidablePred p] (s s' : σ) :
+    ¬(Except.error (), s') ∈ (L1.guard p s).results := by
+  simp only [L1.guard]
+  split
+  · intro h; exact absurd (Prod.mk.inj h).1 (by intro h; cases h)
+  · intro h; exact h
+
+-- Seq membership decomposition (ok result): only the "ok;ok" path is possible
+private theorem L1_seq_ok_mem {σ : Type} {m₁ m₂ : L1Monad σ} {s s' : σ}
+    (h : (Except.ok (), s') ∈ (L1.seq m₁ m₂ s).results) :
+    ∃ s₁, (Except.ok (), s₁) ∈ (m₁ s).results ∧ (Except.ok (), s') ∈ (m₂ s₁).results := by
+  change (_ ∨ _) at h
+  rcases h with ⟨s₁, h₁, h₂⟩ | ⟨_, h_tag⟩
+  · exact ⟨s₁, h₁, h₂⟩
+  · exact absurd h_tag (by intro h; cases h)
+
+-- Seq membership decomposition (error result): either "ok;error" or "error from m1"
+private theorem L1_seq_error_mem {σ : Type} {m₁ m₂ : L1Monad σ} {s s' : σ}
+    (h : (Except.error (), s') ∈ (L1.seq m₁ m₂ s).results) :
+    (∃ s₁, (Except.ok (), s₁) ∈ (m₁ s).results ∧ (Except.error (), s') ∈ (m₂ s₁).results) ∨
+    (Except.error (), s') ∈ (m₁ s).results := by
+  change (_ ∨ _) at h
+  rcases h with ⟨s₁, h₁, h₂⟩ | ⟨h_err, _⟩
+  · exact Or.inl ⟨s₁, h₁, h₂⟩
+  · exact Or.inr h_err
+
 /-! ## Helper Hoare rules (not in L1HoareRules.lean) -/
 
 private theorem L1_hoare_throw (Q : Except Unit Unit → ProgramState → Prop) :
@@ -484,6 +519,60 @@ private theorem lk_set_ret0_funext :
 private theorem lk_set_ret1_funext :
     (fun s : ProgramState => { s with locals := { s.locals with ret__val := 1 } }) = lk_set_ret1 := by
   funext s; unfold lk_set_ret1; rfl
+
+-- Combined advance: idx := (idx+1) &&& cap_mask, probes := probes + 1
+-- This is the composition of the two modify operations on the continue path.
+private noncomputable def lk_advance (s : ProgramState) : ProgramState :=
+  ⟨s.globals, ⟨s.locals.cap_mask, s.locals.capacity, s.locals.h, s.locals.ht, s.locals.i,
+   (s.locals.idx + 1) &&& s.locals.cap_mask, s.locals.key, s.locals.keys, s.locals.out,
+   s.locals.probes + 1, s.locals.ret__val, s.locals.value, s.locals.values⟩⟩
+
+attribute [local irreducible] hVal in
+private theorem lk_advance_locals (s : ProgramState) :
+    (lk_advance s).locals = ⟨s.locals.cap_mask, s.locals.capacity, s.locals.h, s.locals.ht, s.locals.i,
+      (s.locals.idx + 1) &&& s.locals.cap_mask, s.locals.key, s.locals.keys, s.locals.out,
+      s.locals.probes + 1, s.locals.ret__val, s.locals.value, s.locals.values⟩ := by
+  show (⟨s.globals, ⟨s.locals.cap_mask, s.locals.capacity, s.locals.h, s.locals.ht, s.locals.i,
+    (s.locals.idx + 1) &&& s.locals.cap_mask, s.locals.key, s.locals.keys, s.locals.out,
+    s.locals.probes + 1, s.locals.ret__val, s.locals.value, s.locals.values⟩⟩ : ProgramState).locals = _
+  rfl
+
+attribute [local irreducible] hVal in
+@[simp] private theorem lk_advance_globals (s : ProgramState) :
+    (lk_advance s).globals = s.globals := by
+  show (⟨s.globals, _⟩ : ProgramState).globals = _; rfl
+
+attribute [local irreducible] hVal in
+@[simp] private theorem lk_advance_ht (s : ProgramState) :
+    (lk_advance s).locals.ht = s.locals.ht := by rw [lk_advance_locals]
+
+attribute [local irreducible] hVal in
+@[simp] private theorem lk_advance_keys (s : ProgramState) :
+    (lk_advance s).locals.keys = s.locals.keys := by rw [lk_advance_locals]
+
+attribute [local irreducible] hVal in
+@[simp] private theorem lk_advance_values (s : ProgramState) :
+    (lk_advance s).locals.values = s.locals.values := by rw [lk_advance_locals]
+
+attribute [local irreducible] hVal in
+@[simp] private theorem lk_advance_cap_mask (s : ProgramState) :
+    (lk_advance s).locals.cap_mask = s.locals.cap_mask := by rw [lk_advance_locals]
+
+attribute [local irreducible] hVal in
+@[simp] private theorem lk_advance_idx (s : ProgramState) :
+    (lk_advance s).locals.idx = (s.locals.idx + 1) &&& s.locals.cap_mask := by rw [lk_advance_locals]
+
+attribute [local irreducible] hVal in
+@[simp] private theorem lk_advance_out (s : ProgramState) :
+    (lk_advance s).locals.out = s.locals.out := by rw [lk_advance_locals]
+
+-- funext: the composition of two modifies equals lk_advance
+attribute [local irreducible] hVal heapPtrValid heapUpdate in
+private theorem lk_advance_funext (s : ProgramState) :
+    (fun s' : ProgramState => { s' with locals := { s'.locals with probes := s'.locals.probes + 1 } })
+      ((fun s' : ProgramState => { s' with locals := { s'.locals with idx := (s'.locals.idx + 1) &&& s'.locals.cap_mask } }) s) =
+    lk_advance s := by
+  unfold lk_advance; rfl
 
 -- Restore after ht_hash call: locals from saved except idx from current ret_val
 private noncomputable def lk_restore (saved : ProgramState) (s : ProgramState) : ProgramState :=
@@ -730,7 +819,7 @@ private theorem ht_guard_modify_cm
     exact ⟨hr, hs ▸ h_post s hpre⟩
 
 attribute [local irreducible] hVal heapPtrValid heapUpdate lk_restore
-  ht_hash_f1 ht_hash_f2 HashTable.l1_ht_hash_body in
+  ht_hash_f1 ht_hash_f2 HashTable.l1_ht_hash_body lk_advance lk_set_ret0 lk_set_ret1 in
 theorem ht_lookup_correct :
     ht_lookup_spec.satisfiedBy HashTable.l1_ht_lookup_body := by
   unfold FuncSpec.satisfiedBy ht_lookup_spec
@@ -914,16 +1003,92 @@ theorem ht_lookup_correct :
                       · exact hf2
             · -- h_body_inv: I ∧ c ∧ ok → I preserved (continue path: advance idx/probes)
               intro s s' ⟨⟨h_ht, h_arr, h_cap, h_cm, h_idx⟩, h_out⟩ _ h_mem
-              -- ok result means: cond1 was false AND cond2 was false → skip both
-              -- Then: idx := (idx+1) & cap_mask, probes := probes + 1
-              sorry
+              -- ok path: both conditions false (skip), then idx/probes modified
+              -- Decompose outer seq (cond1; rest) for ok result
+              have ⟨s1, hs1, h_rest⟩ := L1_seq_ok_mem h_mem
+              -- cond1: ok means condition was false (skip), since true branch is modify;throw
+              simp only [L1.condition] at hs1; split at hs1
+              · exact absurd hs1 (L1_modify_throw_no_ok _ s s1)
+              · -- cond1 false: skip → s1 = s
+                rw [(Prod.mk.inj hs1).2] at h_rest
+                -- Decompose inner seq (cond2; advance) for ok result
+                have ⟨s2, hs2, h_adv⟩ := L1_seq_ok_mem h_rest
+                simp only [L1.condition] at hs2; split at hs2
+                · -- cond2 true: seq (guards+heap_write) (modify_ret1;throw) → no ok result
+                  have ⟨_, _, h_mt⟩ := L1_seq_ok_mem hs2
+                  exact absurd h_mt (L1_modify_throw_no_ok _ _ s2)
+                · -- cond2 false: skip → s2 = s
+                  rw [(Prod.mk.inj hs2).2] at h_adv
+                  -- Decompose seq modify_idx modify_probes for ok result
+                  have ⟨s3, hs3, h_probes⟩ := L1_seq_ok_mem h_adv
+                  -- s3 = set_idx s, s' = set_probes s3 = lk_advance s
+                  have h_s'_adv : s' = lk_advance s := by
+                    rw [(Prod.mk.inj h_probes).2, (Prod.mk.inj hs3).2]
+                    exact lk_advance_funext s
+                  rw [h_s'_adv]
+                  refine ⟨⟨?_, ?_, ?_, ?_, ?_⟩, ?_⟩
+                  · rw [lk_advance_globals, lk_advance_ht]; exact h_ht
+                  · rw [lk_advance_globals, lk_advance_keys, lk_advance_values, lk_advance_ht]; exact h_arr
+                  · rw [lk_advance_globals, lk_advance_ht]; exact h_cap
+                  · rw [lk_advance_cap_mask, lk_advance_globals, lk_advance_ht]; exact h_cm
+                  · rw [lk_advance_idx, lk_advance_globals, lk_advance_ht]
+                    exact idx_advance_bounded s.locals.idx s.locals.cap_mask
+                      (hVal s.globals.rawHeap s.locals.ht).capacity h_cm h_cap
+                  · rw [lk_advance_globals, lk_advance_out]; exact h_out
             · -- h_exit: I ∧ ¬c → Q ok (R for seq)
               intro s ⟨h_inv, h_out⟩ _; exact ⟨h_inv, h_out⟩
             · -- h_abrupt: I ∧ c ∧ error → Q error (ht_ret_01)
               intro s s' ⟨⟨h_ht, h_arr, h_cap, h_cm, h_idx⟩, h_out⟩ _ h_mem
-              -- Error results only come from modify(ret:=0);throw or modify(ret:=1);throw.
-              -- Each sets ret_val to 0 or 1. Requires NondetM decomposition.
-              sorry
+              -- Error results come from modify(ret:=0);throw or modify(ret:=1);throw.
+              -- Decompose outer seq for error result
+              rcases L1_seq_error_mem h_mem with ⟨s1, hs1, h_rest⟩ | h_err1
+              · -- ok from cond1, error from rest
+                simp only [L1.condition] at hs1; split at hs1
+                · exact absurd hs1 (L1_modify_throw_no_ok _ s s1)
+                · -- cond1 false: skip → s1 = s
+                  rw [(Prod.mk.inj hs1).2] at h_rest
+                  -- Decompose inner seq for error result
+                  rcases L1_seq_error_mem h_rest with ⟨s2, hs2, h_adv_err⟩ | h_err2
+                  · -- ok from cond2, error from advance (modify_idx;modify_probes)
+                    simp only [L1.condition] at hs2; split at hs2
+                    · -- cond2 true: no ok from seq guards (modify_ret1;throw)
+                      have ⟨_, _, h_mt⟩ := L1_seq_ok_mem hs2
+                      exact absurd h_mt (L1_modify_throw_no_ok _ _ s2)
+                    · -- cond2 false: skip → s2 = s
+                      rw [(Prod.mk.inj hs2).2] at h_adv_err
+                      -- seq modify_idx modify_probes: no error results
+                      rcases L1_seq_error_mem h_adv_err with ⟨_, _, h_f⟩ | h_m_err
+                      · exact absurd h_f (L1_modify_no_error _ _ _)
+                      · exact absurd h_m_err (L1_modify_no_error _ _ _)
+                  · -- error from cond2 directly
+                    simp only [L1.condition] at h_err2; split at h_err2
+                    · -- cond2 true: error from seq (guard;guard;modify_heap) (modify_ret1;throw)
+                      rcases L1_seq_error_mem h_err2 with ⟨s_mid, _, h_mid_err⟩ | h_inner_err
+                      · -- ok from guards+modify_heap, error from modify_ret1;throw
+                        simp only [lk_set_ret1_funext] at h_mid_err
+                        have h_mt := (L1_modify_throw_only_error' lk_set_ret1 s_mid).1
+                        rw [h_mt] at h_mid_err
+                        rw [(Prod.mk.inj h_mid_err).2]
+                        exact Or.inr (lk_set_ret1_ret s_mid)
+                      · -- error from seq (guard out) (seq (guard elem) (modify heap)):
+                        -- No error results (guards and modify only produce ok)
+                        rcases L1_seq_error_mem h_inner_err with ⟨_, _, h_inner2⟩ | h_g_err
+                        · rcases L1_seq_error_mem h_inner2 with ⟨_, _, h_m_err⟩ | h_g2_err
+                          · exact absurd h_m_err (L1_modify_no_error _ _ _)
+                          · exact absurd h_g2_err (L1_guard_no_error' _ _)
+                        · exact absurd h_g_err (L1_guard_no_error' _ _)
+                    · -- cond2 false: skip → error from skip: impossible
+                      exact absurd h_err2 (L1_skip_no_error _ _)
+              · -- error from cond1 directly
+                simp only [L1.condition] at h_err1; split at h_err1
+                · -- cond1 true: modify_ret0;throw → error with ret_val = 0
+                  simp only [lk_set_ret0_funext] at h_err1
+                  have h_mt := (L1_modify_throw_only_error' lk_set_ret0 s).1
+                  rw [h_mt] at h_err1
+                  rw [(Prod.mk.inj h_err1).2]
+                  exact Or.inl (lk_set_ret0_ret s)
+                · -- cond1 false: skip → only ok, no error
+                  exact absurd h_err1 (L1_skip_no_error _ _)
           · -- seq modify(ret:=0) throw: from R, produce ht_ret_01
             apply L1_hoare_modify_throw_catch
             intro s _; exact Or.inl rfl
