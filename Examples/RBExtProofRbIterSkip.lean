@@ -41,16 +41,6 @@ private def skipInv (s : ProgramState) : Prop :=
   heapPtrValid s.globals.rawHeap s.locals.iter ∧
   LinkedListValid s.globals.rawHeap (hVal s.globals.rawHeap s.locals.iter).current
 
--- After the ADVANCE heapUpdate, express the LinkedListValid invariant via hVal_update_self
--- Key: heapUpdate heap iter {current := x.next, remaining := r} then hVal new_heap iter = that struct
--- So (hVal new_heap iter).current = x.next
-
--- Helper simp lemma for the advance step
-@[simp] private theorem C_rb_iter_current_mk (c : Ptr C_rb_node) (r : UInt32) :
-    (C_rb_iter.mk c r).current = c := rfl
-
-@[simp] private theorem C_rb_iter_remaining_mk (c : Ptr C_rb_node) (r : UInt32) :
-    (C_rb_iter.mk c r).remaining = r := rfl
 
 attribute [local irreducible] hVal heapUpdate heapPtrValid in
 theorem rb_iter_skip_validHoare :
@@ -85,12 +75,7 @@ theorem rb_iter_skip_validHoare :
             apply L1_hoare_condition
             · -- True: current == null → modify ret + throw → error
               apply L1_hoare_modify_throw_catch
-                (Q_ok := fun s =>
-                  heapPtrValid s.globals.rawHeap s.locals.iter ∧
-                  (hVal s.globals.rawHeap s.locals.iter).current ≠ Ptr.null ∧
-                  heapPtrValid s.globals.rawHeap (hVal s.globals.rawHeap s.locals.iter).current ∧
-                  LinkedListValid s.globals.rawHeap (hVal s.globals.rawHeap s.locals.iter).current)
-              -- modify only changes ret_val in locals
+              -- modify only changes ret_val in locals, heapPtrValid iter preserved
               intro s ⟨⟨⟨hiter, _⟩, _⟩, _⟩
               exact hiter
             · -- False: current ≠ null → skip
@@ -145,7 +130,7 @@ theorem rb_iter_skip_validHoare :
                   constructor
                   · exact hiter'
                   · rw [hVal_update_self hiter]
-                    simp only [C_rb_iter_current_mk]
+                    dsimp only
                     exact LinkedListValid_heapUpdate_iter hiter (hll.tail hne)
             · -- seq DECR_REM INC_SKIP
               apply L1_hoare_seq_ok
@@ -167,7 +152,7 @@ theorem rb_iter_skip_validHoare :
                     constructor
                     · exact hiter'
                     · rw [hVal_update_self hiter]
-                      simp only [C_rb_iter_current_mk]
+                      dsimp only
                       exact LinkedListValid_heapUpdate_iter hiter hll
                 · -- False: remaining = 0 → skip
                   intro s₀ ⟨⟨hiter, hll⟩, _⟩
@@ -185,29 +170,24 @@ theorem rb_iter_skip_validHoare :
                   show skipInv _; exact ⟨hiter, hll⟩
         · -- while exit: skipInv + cond false → iterValid
           intro s ⟨hiter, _⟩ _; exact hiter
-      · -- TEARDOWN: modify ret + throw — always produces error
+      · -- TEARDOWN: modify ret + throw — always produces error with heapPtrValid iter preserved
         intro s hiter
-        have h_mt := L1_modify_throw_result
-          (fun s : ProgramState => { globals := s.globals,
-            locals :=
-              have __src := s.locals;
-              { a := __src.a, actual := __src.actual, b := __src.b, ca := __src.ca, cap := __src.cap, cb := __src.cb,
-                count := __src.count, cur := __src.cur, current_count := __src.current_count, delta := __src.delta,
-                dst := __src.dst, filled := __src.filled, front := __src.front, idx := __src.idx, iter := __src.iter,
-                max_drain := __src.max_drain, max_val := __src.max_val, min_val := __src.min_val,
-                modified := __src.modified, n := __src.n, new_val := __src.new_val, node := __src.node, nxt := __src.nxt,
-                old_head := __src.old_head, old_val := __src.old_val, out_val := __src.out_val, pop_ok := __src.pop_ok,
-                pop_result := __src.pop_result, prev := __src.prev, push_ok := __src.push_ok,
-                push_result := __src.push_result, rb := __src.rb, removed := __src.removed, replaced := __src.replaced,
-                result := __src.result, ret__val := s.locals.skipped, scratch := __src.scratch, skipped := __src.skipped,
-                src := __src.src, stats := __src.stats, temp_node := __src.temp_node, threshold := __src.threshold,
-                tmp := __src.tmp, total := __src.total, transferred := __src.transferred, val := __src.val } }) s
         constructor
-        · exact h_mt.2
+        · -- ¬failed: modify+throw never fails
+          intro hf
+          change (_ ∨ _) at hf
+          rcases hf with hf1 | ⟨s', hs', hf2⟩
+          · exact hf1
+          · exact hf2
         · intro r s₁ hmem
-          rw [h_mt.1] at hmem
-          have ⟨hr, hs⟩ := Prod.mk.inj hmem; subst hr; subst hs
-          exact hiter
+          -- results of modify+throw = {(error, f s)}
+          change (_ ∨ _) at hmem
+          rcases hmem with ⟨s', hs', hthr⟩ | ⟨herr, _⟩
+          · have ⟨_, hs'_eq⟩ := Prod.mk.inj hs'; subst hs'_eq
+            -- hthr : (r, s₁) ∈ (throw s').results = {(error, s')}
+            have ⟨hr, hs₁⟩ := Prod.mk.inj hthr; subst hr; subst hs₁
+            exact hiter
+          · exact absurd (Prod.mk.inj herr).1 (by intro h; cases h)
   · -- Handler: skip
     intro s hiter
     constructor

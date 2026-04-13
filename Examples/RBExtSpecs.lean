@@ -456,11 +456,16 @@ def rb_push_if_not_full_spec : FuncSpec ProgramState where
     r = Except.ok ()
 
 /-- rb_pop_if_not_empty: checks count then calls rb_pop.
-    Task 0137: if not empty, delegates to rb_pop. If empty, state unchanged and ret=1. -/
+    Task 0137: if not empty, delegates to rb_pop. If empty, state unchanged and ret=1.
+    Precondition strengthened to include rb_pop callee requirements
+    (head validity when non-null) so the inter-procedural call can be verified. -/
 def rb_pop_if_not_empty_spec : FuncSpec ProgramState where
   pre := fun s =>
     heapPtrValid s.globals.rawHeap s.locals.rb ∧
-    heapPtrValid s.globals.rawHeap s.locals.out_val
+    heapPtrValid s.globals.rawHeap s.locals.out_val ∧
+    -- rb_pop callee requirements (needed when buffer is not empty)
+    ((hVal s.globals.rawHeap s.locals.rb).head ≠ Ptr.null →
+      heapPtrValid s.globals.rawHeap (hVal s.globals.rawHeap s.locals.rb).head)
   post := fun r s =>
     r = Except.ok () →
     (s.locals.ret__val = 0 ∨ s.locals.ret__val = 1) ∧

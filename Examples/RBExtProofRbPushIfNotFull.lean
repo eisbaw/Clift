@@ -33,7 +33,6 @@ private theorem rb_push_results_ok (s : ProgramState) :
   unfold l1_rb_push_body; exact L1_catch_skip_ok_only _ s
 
 -- Callee validHoare: rb_push with ok-only postcondition.
--- Uses rb_push_validHoare for non-failure, structural ok-only for postcondition.
 private theorem rb_push_ok_hoare :
     validHoare
       (fun s => heapPtrValid s.globals.rawHeap s.locals.rb ∧
@@ -53,41 +52,38 @@ private theorem rb_push_ok_hoare :
 theorem rb_push_if_not_full_validHoare :
     rb_push_if_not_full_spec.satisfiedBy RingBufferExt.l1_rb_push_if_not_full_body := by
   unfold FuncSpec.satisfiedBy rb_push_if_not_full_spec l1_rb_push_if_not_full_body
-  -- Structure: catch(body, skip). Body always throws. catch+skip → all results ok.
-  -- Postcondition is r = ok, which follows structurally from catch+skip.
-  -- Main obligation: prove non-failure (all guards in all paths succeed).
+  -- Structure: catch(body, skip). All paths in body throw. catch+skip → all ok.
+  -- Postcondition is just r = ok, which is structural from catch+skip.
+  -- Main content: prove non-failure (memory safety).
   apply L1_hoare_catch (R := fun _ => True)
   · -- CATCH BODY: seq(cond_is_full, seq(dynCom_call, seq(cond_result, modify_throw)))
-    -- All paths end in throw. R = True suffices since postcondition is just r = ok.
-    -- For catch body postcondition: ok results → post(ok, s) i.e. ok = ok (trivial)
-    --                                error results → R s i.e. True (trivial)
-    apply L1_hoare_seq
-      (R := fun s => heapPtrValid s.globals.rawHeap s.locals.rb ∧
-                      heapPtrValid s.globals.rawHeap s.locals.node ∧
-                      ¬((hVal s.globals.rawHeap s.locals.rb).count ≥
-                        (hVal s.globals.rawHeap s.locals.rb).capacity) ∧
-                      ((hVal s.globals.rawHeap s.locals.rb).tail ≠ Ptr.null →
-                        heapPtrValid s.globals.rawHeap (hVal s.globals.rawHeap s.locals.rb).tail) ∧
-                      ((hVal s.globals.rawHeap s.locals.rb).tail ≠ Ptr.null →
-                        ptrDisjoint s.locals.node (hVal s.globals.rawHeap s.locals.rb).tail))
+    -- Strategy: first handle the is_full condition via L1_hoare_seq,
+    -- then prove the rest (dynCom + trailing code) directly at the NondetM level.
+    apply L1_hoare_seq (R := fun s =>
+      heapPtrValid s.globals.rawHeap s.locals.rb ∧
+      heapPtrValid s.globals.rawHeap s.locals.node ∧
+      ¬((hVal s.globals.rawHeap s.locals.rb).count ≥
+        (hVal s.globals.rawHeap s.locals.rb).capacity) ∧
+      ((hVal s.globals.rawHeap s.locals.rb).tail ≠ Ptr.null →
+        heapPtrValid s.globals.rawHeap (hVal s.globals.rawHeap s.locals.rb).tail) ∧
+      ((hVal s.globals.rawHeap s.locals.rb).tail ≠ Ptr.null →
+        ptrDisjoint s.locals.node (hVal s.globals.rawHeap s.locals.rb).tail))
     · -- COND: count >= capacity → modify(ret=-1);throw | skip
       apply L1_hoare_condition
-      · -- TRUE branch (is full): modify(ret_val = 0xFFFFFFFF) + throw → error
-        -- catch body postcondition for error: R s = True
-        apply L1_hoare_modify_throw (R := fun _ => True)
-        intro _ _; trivial
-      · -- FALSE branch (not full): skip → ok with intermediate R
-        intro s ⟨⟨h_rb, h_node, _, h_tail, h_disj⟩, h_not_full⟩
-        constructor
-        · intro h; exact h
-        · intro r s' h_mem
-          have ⟨hr, hs⟩ := Prod.mk.inj h_mem; subst hr; subst hs
-          have h_lt : ¬((hVal s.globals.rawHeap s.locals.rb).count ≥
-                        (hVal s.globals.rawHeap s.locals.rb).capacity) := by
-            simp only [decide_eq_false_iff_not] at h_not_full; exact h_not_full
-          exact ⟨h_rb, h_node, h_lt, h_tail, h_disj⟩
+      · -- TRUE branch (is full): modify(ret_val = 0xFFFFFFFF) + throw
+        -- modify+throw produces error. match error => True.
+        intro s _
+        have h := L1_modify_throw_result
+          (fun s => { s with locals := { s.locals with ret__val := 4294967295 } }) s
+        exact ⟨h.2, fun r s' h_mem => by rw [h.1] at h_mem; have ⟨hr, _⟩ := Prod.mk.inj h_mem; subst hr; trivial⟩
+      · -- FALSE branch (not full): skip preserves state
+        intro s₀ ⟨⟨h_rb, h_node, h_tail, h_disj⟩, h_not_full⟩
+        refine ⟨not_false, fun r s₁ h_mem => ?_⟩
+        have ⟨hr, hs⟩ := Prod.mk.inj h_mem; subst hr; subst hs
+        simp only [decide_eq_false_iff_not] at h_not_full
+        exact ⟨h_rb, h_node, h_not_full, h_tail, h_disj⟩
     · -- REST: seq(dynCom_call, seq(cond_result, modify_throw))
-      -- All paths throw, so postcondition for error is R = True.
+      -- Prove directly at the NondetM level (following check_integrity pattern).
       apply L1_hoare_seq (R := fun _ => True)
       · -- DYNCOM + CALL rb_push
         apply L1_hoare_dynCom_call
@@ -103,51 +99,52 @@ theorem rb_push_if_not_full_validHoare :
           (Q_callee := fun r _ => r = Except.ok ())
         · -- lookup: l1Γ "rb_push" = some l1_rb_push_body
           simp [L1.L1ProcEnv.insert]
-        · -- setup preserves precondition (setup is identity)
+        · -- setup preserves precondition (setup is identity on relevant fields)
           intro s₀ ⟨h_rb, h_node, h_lt, h_tail, h_disj⟩
-          exact ⟨h_rb, h_node, h_lt, h_tail, h_disj⟩
+          -- Setup: { s.locals with rb := s.locals.rb, node := s.locals.node, val := s.locals.val }
+          -- This is identity, so the precondition is preserved.
+          -- We need count < capacity: ¬(count >= capacity) → count < capacity
+          have h_lt' : (hVal s₀.globals.rawHeap s₀.locals.rb).count <
+                        (hVal s₀.globals.rawHeap s₀.locals.rb).capacity :=
+            Nat.lt_of_not_le h_lt
+          exact ⟨h_rb, h_node, h_lt', h_tail, h_disj⟩
         · -- callee spec
           exact rb_push_ok_hoare
-        · -- restore ok: dynCom ok postcondition
-          -- Q for dynCom = match r with ok => intermediate R | error => catch_error Q
-          -- For ok: need intermediate R (True, since later steps handle it)
-          -- Actually, the Q of the dynCom must match what L1_hoare_seq expects:
-          --   match r with | ok => R s | error => catch_body_Q error s
-          -- R = True, so ok case → True. Error case → True (R for catch).
+        · -- restore ok: from callee ok, establish dynCom postcondition
+          -- Q for dynCom: match r with | ok => R | error => catch_Q
+          -- For ok case: R = True
           intro _ _ _ _; trivial
-        · -- error case: callee always returns ok, so this is vacuous
-          intro _ _ _ h_ok
-          exact absurd h_ok (by intro h; cases h)
-      · -- seq(cond_result, modify_throw): all paths throw, postcondition trivial
-        -- From True, prove catch body postcondition (ok → post(ok) / error → R=True)
+        · -- error case: callee always returns ok, vacuous
+          intro _ _ _ h_ok; exact absurd h_ok (by intro h; cases h)
+      · -- seq(cond_result, modify_throw): from True, prove catch body Q
+        -- All paths throw. Postcondition: match r | ok => post(ok) | error => True
+        -- Since all paths throw, ok case is vacuous, error case is True.
         intro s₀ _
-        -- The remaining code: seq(condition(result≠0, modify+throw, skip), seq(modify, throw))
-        -- All paths throw. We prove non-failure and postcondition = True.
         constructor
-        · -- non-failure: condition never fails, modify never fails, throw never fails
+        · -- non-failure
           intro hf
           change (_ ∨ _) at hf
           rcases hf with hf1 | ⟨s1, _, hf_rest⟩
-          · -- condition failure: impossible
-            simp only [L1.condition] at hf1
+          · simp only [L1.condition] at hf1
             split at hf1
-            · -- true branch: modify+throw doesn't fail
-              exact (L1_modify_throw_result _ _).2 hf1
-            · exact hf1  -- skip doesn't fail
-          · -- rest failure: modify+throw doesn't fail
-            exact (L1_modify_throw_result _ _).2 hf_rest
-        · -- postcondition
+            · exact (L1_modify_throw_result _ _).2 hf1
+            · exact hf1
+          · exact (L1_modify_throw_result _ _).2 hf_rest
+        · -- postcondition: all paths produce error (every path ends in throw)
           intro r s₁ h_mem
           change (_ ∨ _) at h_mem
-          rcases h_mem with ⟨s1, _, h_rest⟩ | ⟨h_err, _⟩
-          · -- ok from condition, then modify+throw → error → True
+          rcases h_mem with ⟨s1, h_cond, h_rest⟩ | ⟨h_err, h_eq⟩
+          · -- ok from condition (skip case), then seq(modify, throw)
+            -- seq(modify, throw) always produces error
             change (_ ∨ _) at h_rest
-            rcases h_rest with ⟨s2, _, h_throw⟩ | ⟨_, _⟩
-            · exact absurd (Prod.mk.inj h_throw).1 (by intro h; cases h)
-            · trivial  -- error result → R = True
-          · -- error from condition → R = True
-            trivial
-  · -- HANDLER (skip): from R=True, skip gives post (r = ok)
+            rcases h_rest with ⟨s2, _, h_throw⟩ | ⟨h_err_mod, h_eq_mod⟩
+            · -- modify ok → throw: produces error
+              have : r = Except.error () := (Prod.mk.inj h_throw).1
+              subst this; trivial
+            · -- modify error: impossible (modify only produces ok)
+              exact absurd (Prod.mk.inj h_err_mod).1 (by intro h; cases h)
+          · -- error from condition (modify+throw in true branch)
+            have : r = Except.error () := h_eq; subst this; trivial
+  · -- HANDLER (skip): from R=True, skip gives r = ok
     intro _ _
-    exact ⟨not_false, fun r s' h_mem => by
-      have ⟨hr, _⟩ := Prod.mk.inj h_mem; exact hr⟩
+    exact ⟨not_false, fun r s' h_mem => (Prod.mk.inj h_mem).1⟩

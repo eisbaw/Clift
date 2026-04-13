@@ -7,10 +7,55 @@ set_option maxHeartbeats 25600000
 set_option maxRecDepth 4096
 open RingBufferExt
 
+/-! # Heap frame lemmas for WellFormedList through heapUpdate -/
+
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem AllDisjointFrom_heapUpdate_frame'
+    {heap : HeapRawState} {q r : Ptr C_rb_node} {v : C_rb_node} {p : Ptr C_rb_node}
+    (hadj_q : AllDisjointFrom heap q p) (hadj_r : AllDisjointFrom heap r p)
+    (hr : heapPtrValid heap r)
+    : AllDisjointFrom (heapUpdate heap r v) q p := by
+  induction hadj_q with
+  | null => exact AllDisjointFrom.null
+  | cons p' hp' hv' hdisj_qp' _ ih =>
+    exact AllDisjointFrom.cons p' hp'
+      (heapUpdate_preserves_heapPtrValid heap r v p' hv') hdisj_qp'
+      (hVal_heapUpdate_disjoint heap r p' v (heapPtrValid_bound hr)
+        (heapPtrValid_bound hv') (hadj_r.headDisjoint hp') ▸ ih (hadj_r.adjtail hp'))
+
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem WellFormedList_heapUpdate_aux'
+    {heap : HeapRawState} {p : Ptr C_rb_node} {v : C_rb_node} {nxt : Ptr C_rb_node}
+    (hwf : WellFormedList heap nxt) (hv : heapPtrValid heap p)
+    (h_sep : AllDisjointFrom heap p nxt)
+    : WellFormedList (heapUpdate heap p v) nxt := by
+  induction hwf with
+  | null => exact WellFormedList.null
+  | @cons q hq hv_q _ hsep_q ih =>
+    have h_eq_q := hVal_heapUpdate_disjoint heap p q v (heapPtrValid_bound hv)
+      (heapPtrValid_bound hv_q) (h_sep.headDisjoint hq)
+    exact WellFormedList.cons q hq (heapUpdate_preserves_heapPtrValid heap p v q hv_q)
+      (h_eq_q ▸ ih (h_sep.adjtail hq))
+      (h_eq_q ▸ AllDisjointFrom_heapUpdate_frame' hsep_q (h_sep.adjtail hq) hv)
+
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem WellFormedList_heapUpdate_tail'
+    {heap : HeapRawState} {p : Ptr C_rb_node} {v : C_rb_node}
+    (h : WellFormedList heap p) (hp : p ≠ Ptr.null) (hv : heapPtrValid heap p)
+    : WellFormedList (heapUpdate heap p v) (hVal heap p).next :=
+  WellFormedList_heapUpdate_aux' (h.wf_tail hp) hv (h.headSep hp)
+
 /-! # Loop invariant -/
 
 private def rb_inc_all_inv (s : ProgramState) : Prop :=
   WellFormedList s.globals.rawHeap s.locals.cur
+
+/-- After heap write: tail is well-formed, cur is valid, and cur ≠ null.
+    This carries enough information to advance cur to next and restore rb_inc_all_inv. -/
+private def rb_inc_all_after_write (s : ProgramState) : Prop :=
+  WellFormedList s.globals.rawHeap (hVal s.globals.rawHeap s.locals.cur).next ∧
+  heapPtrValid s.globals.rawHeap s.locals.cur ∧
+  s.locals.cur ≠ Ptr.null
 
 /-! # Named functions for each basic operation -/
 
@@ -232,9 +277,10 @@ theorem rb_increment_all_validHoare :
         · -- while loop
           apply L1_hoare_while_from_body
           · -- loop body: seq (guard; guard; heap_write) (seq (modified++) (guard cur; cur:=next))
+            -- Split: first part = heap write, second part = modified++ then advance cur
             apply L1_hoare_seq
               (P := fun s => rb_inc_all_inv s ∧ decide (s.locals.cur ≠ Ptr.null) = true)
-              (R := fun s => rb_inc_all_inv s ∧ decide (s.locals.cur ≠ Ptr.null) = true)
+              (R := rb_inc_all_after_write)
             · -- guard cur; guard cur; heap_write (heap[cur].value += delta)
               intro s hpre
               obtain ⟨h_inv, h_cond⟩ := hpre
@@ -252,21 +298,29 @@ theorem rb_increment_all_validHoare :
                 rw [h_ggm.1] at h_mem
                 have ⟨hr, hs⟩ := Prod.mk.inj h_mem
                 subst hr; subst hs
-                constructor
-                · -- WellFormedList preserved through heapUpdate
-                  unfold rb_inc_all_inv
+                unfold rb_inc_all_after_write
+                refine ⟨?_, ?_, ?_⟩
+                · -- WellFormedList of tail in updated heap
                   rw [rb_inc_all_heap_write_globals_rawHeap, rb_inc_all_heap_write_locals_cur]
-                  exact WellFormedList_heapUpdate_tail h_inv h_ne h_valid
-                · -- cur ≠ null preserved (locals unchanged by heap write)
+                  -- Need: hVal (heapUpdate old_heap cur v) cur .next = (hVal old_heap cur).next
+                  -- Using hVal_heapUpdate_same: hVal (heapUpdate h p v) p = v
+                  -- v = { hVal old_heap cur with value := ... }, so v.next = (hVal old_heap cur).next
+                  have h_bound := heapPtrValid_bound h_valid
+                  rw [hVal_heapUpdate_same _ _ _ h_bound]
+                  exact WellFormedList_heapUpdate_tail' h_inv h_ne h_valid
+                · -- heapPtrValid cur in updated heap
+                  rw [rb_inc_all_heap_write_globals_rawHeap, rb_inc_all_heap_write_locals_cur]
+                  exact heapUpdate_preserves_heapPtrValid _ _ _ _ h_valid
+                · -- cur ≠ null
                   rw [rb_inc_all_heap_write_locals_cur]
-                  exact h_cond
+                  exact h_ne
             · -- seq (modified++) (guard cur; cur := cur.next)
               apply L1_hoare_seq
-                (P := fun s => rb_inc_all_inv s ∧ decide (s.locals.cur ≠ Ptr.null) = true)
-                (R := fun s => rb_inc_all_inv s ∧ decide (s.locals.cur ≠ Ptr.null) = true)
+                (P := rb_inc_all_after_write)
+                (R := rb_inc_all_after_write)
               · -- modified++
                 intro s hpre
-                obtain ⟨⟨h_inv, h_cond⟩⟩ := hpre
+                obtain ⟨h_wf_tail, h_valid, h_ne⟩ := hpre
                 constructor
                 · intro hf; exact hf
                 · intro r s' h_mem
@@ -274,21 +328,17 @@ theorem rb_increment_all_validHoare :
                   match r with
                   | Except.ok () =>
                     subst hs
-                    constructor
-                    · unfold rb_inc_all_inv at h_inv ⊢
-                      rw [rb_inc_all_inc_mod_globals, rb_inc_all_inc_mod_locals_cur]
-                      exact h_inv
-                    · exact h_cond
+                    unfold rb_inc_all_after_write
+                    refine ⟨?_, ?_, ?_⟩
+                    · rw [rb_inc_all_inc_mod_globals, rb_inc_all_inc_mod_locals_cur]; exact h_wf_tail
+                    · rw [rb_inc_all_inc_mod_globals, rb_inc_all_inc_mod_locals_cur]; exact h_valid
+                    · rw [show (rb_inc_all_inc_mod s).locals.cur = s.locals.cur from rb_inc_all_inc_mod_locals_cur s]
+                      exact h_ne
                   | Except.error () =>
                     exact absurd hr (by intro h; cases h)
               · -- guard cur valid; cur := cur.next
                 intro s hpre
-                obtain ⟨⟨h_inv, h_cond⟩⟩ := hpre
-                unfold rb_inc_all_inv at h_inv
-                have h_ne : s.locals.cur ≠ Ptr.null := by
-                  simp only [decide_eq_true_eq] at h_cond; exact h_cond
-                have h_valid := h_inv.headValid h_ne
-                have h_tail := h_inv.wf_tail h_ne
+                obtain ⟨h_wf_tail, h_valid, h_ne⟩ := hpre
                 have h_gm := L1_guard_modify_result
                   (fun s : ProgramState => heapPtrValid s.globals.rawHeap s.locals.cur)
                   rb_inc_all_set_cur_next s h_valid
@@ -300,7 +350,7 @@ theorem rb_increment_all_validHoare :
                   subst hr; subst hs
                   unfold rb_inc_all_inv
                   rw [rb_inc_all_set_cur_next_globals, rb_inc_all_set_cur_next_locals_cur]
-                  exact h_tail
+                  exact h_wf_tail
           · -- exit: while returns ok with invariant preserved
             intro s h_inv _
             exact h_inv
@@ -322,4 +372,4 @@ theorem rb_increment_all_validHoare :
       have ⟨hr, hs⟩ := Prod.mk.inj h_mem
       subst hr; subst hs
       intro _
-      exact ⟨rfl, rfl, rfl, rfl⟩
+      exact ⟨trivial, trivial, trivial, trivial⟩

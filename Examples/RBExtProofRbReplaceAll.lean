@@ -280,14 +280,16 @@ theorem rb_replace_all_validHoare :
               (R := rb_repl_after_cond)
             · -- cond (value == old_val): true → guard+heap_write then rep++; false → skip
               apply L1_hoare_condition
-              · -- TRUE branch: seq (guard cur; heap_write) (replaced++)
+              · -- TRUE branch: seq (seq (guard cur; heap_write) (replaced++))
+                -- L1 body: L1.seq (L1.seq (guard g) (modify heap_write)) (modify inc_rep)
+                -- Use L1_hoare_seq_ok for inner seq, then L1_hoare_seq for outer
                 apply L1_hoare_seq
-                  (P := fun s => rb_repl_inv s ∧ decide (s.locals.cur ≠ Ptr.null) = true ∧
+                  (P := fun s => (rb_repl_inv s ∧ decide (s.locals.cur ≠ Ptr.null) = true) ∧
                     decide ((hVal s.globals.rawHeap s.locals.cur).value = s.locals.old_val) = true)
                   (R := rb_repl_after_cond)
                 · -- guard cur valid; heap[cur].value := new_val
                   intro s hpre
-                  obtain ⟨h_inv, h_cond, _⟩ := hpre
+                  obtain ⟨⟨h_inv, h_cond⟩, _⟩ := hpre
                   unfold rb_repl_inv at h_inv
                   have h_ne : s.locals.cur ≠ Ptr.null := by
                     simp only [decide_eq_true_eq] at h_cond; exact h_cond
@@ -334,7 +336,7 @@ theorem rb_replace_all_validHoare :
                       exact absurd hr (by intro h; cases h)
               · -- FALSE branch: skip (no mutation)
                 intro s hpre
-                obtain ⟨⟨h_inv, h_cond⟩, _⟩ := hpre
+                obtain ⟨⟨h_inv, h_cond⟩, h_false_cond⟩ := hpre
                 unfold rb_repl_inv at h_inv
                 have h_ne : s.locals.cur ≠ Ptr.null := by
                   simp only [decide_eq_true_eq] at h_cond; exact h_cond
@@ -383,5 +385,4 @@ theorem rb_replace_all_validHoare :
     · intro r s' h_mem
       have ⟨hr, hs⟩ := Prod.mk.inj h_mem
       subst hr; subst hs
-      intro _
-      exact ⟨trivial, trivial, trivial, trivial⟩
+      intro _; trivial

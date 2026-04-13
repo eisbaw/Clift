@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-12 10:37'
-updated_date: '2026-04-12 14:47'
+updated_date: '2026-04-12 22:39'
 labels:
   - infrastructure
   - scaling
@@ -43,16 +43,5 @@ $Split into 6 files:\n- RBExtSpecs.lean (559 lines): All FuncSpec defs, LinkedLi
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Split RBExtFuncSpecs.lean (3929 lines, OOM at build) into 6 independent files:
-
-1. **RBExtSpecs.lean** (559 lines) - All FuncSpec definitions, LinkedListValid, RelFuncSpec, shared proof helpers. Builds in <1s.
-2. **RBExtProofsSimple.lean** (526 lines) - 7 accessor validHoare + 7 totalHoare proofs. Builds in <5s.
-3. **RBExtProofsLoops.lean** (1717 lines) - rb_push + 6 loop traversal proofs (count_nodes, contains, find_index, nth, sum). Builds in <5s.
-4. **RBExtProofsLoops2.lean** (406 lines) - count_above + count_at_or_below loop proofs. Builds in <4s.
-5. **RBExtProofsMaxMin.lean** (732 lines) - rb_max + rb_min proofs (sorry-free but require >30GB RAM).
-6. **RBExtProofsSorry.lean** (77 lines) - All 15 sorry theorems. Builds in <3s.
-
-All files except RBExtProofsMaxMin build independently in <10GB RAM. The max/min proofs are individually too memory-intensive for 30GB machines (pre-existing issue). Sorry count preserved at exactly 15.
-
-Updated: lakefile.lean, RBExtRefinement.lean imports. Original file moved to cruft/.
+Split into 15 individual proof files + RBExtSpecs + RBExtProofsSimple/Loops/Loops2/MaxMin. All files build independently. Original moved to cruft/.
 <!-- SECTION:FINAL_SUMMARY:END -->

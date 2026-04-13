@@ -98,20 +98,13 @@ private noncomputable def rb_equal_set_cb_next (s : ProgramState) : ProgramState
 
 -- Projection lemmas: globals preservation
 private theorem rb_equal_set_ca_globals (s : ProgramState) :
-    (rb_equal_set_ca s).globals = s.globals := by
-  unfold rb_equal_set_ca; rfl
-
+    (rb_equal_set_ca s).globals = s.globals := by unfold rb_equal_set_ca; rfl
 private theorem rb_equal_set_cb_globals (s : ProgramState) :
-    (rb_equal_set_cb s).globals = s.globals := by
-  unfold rb_equal_set_cb; rfl
-
+    (rb_equal_set_cb s).globals = s.globals := by unfold rb_equal_set_cb; rfl
 private theorem rb_equal_set_ca_next_globals (s : ProgramState) :
-    (rb_equal_set_ca_next s).globals = s.globals := by
-  unfold rb_equal_set_ca_next; rfl
-
+    (rb_equal_set_ca_next s).globals = s.globals := by unfold rb_equal_set_ca_next; rfl
 private theorem rb_equal_set_cb_next_globals (s : ProgramState) :
-    (rb_equal_set_cb_next s).globals = s.globals := by
-  unfold rb_equal_set_cb_next; rfl
+    (rb_equal_set_cb_next s).globals = s.globals := by unfold rb_equal_set_cb_next; rfl
 
 -- Projection lemmas: locals_eq
 attribute [local irreducible] hVal heapUpdate heapPtrValid in
@@ -126,13 +119,10 @@ private theorem rb_equal_set_ret0_locals_eq (s : ProgramState) :
       s.locals.rb, s.locals.removed, s.locals.replaced, s.locals.result, (0 : UInt32),
       s.locals.scratch, s.locals.skipped, s.locals.src, s.locals.stats,
       s.locals.temp_node, s.locals.threshold, s.locals.tmp, s.locals.total,
-      s.locals.transferred, s.locals.val⟩ := by
-  unfold rb_equal_set_ret0; rfl
+      s.locals.transferred, s.locals.val⟩ := by unfold rb_equal_set_ret0; rfl
 
-attribute [local irreducible] hVal heapUpdate heapPtrValid in
-private theorem rb_equal_set_ret0_locals_ret (s : ProgramState) :
-    (rb_equal_set_ret0 s).locals.ret__val = 0 := by
-  rw [rb_equal_set_ret0_locals_eq]
+@[simp] private theorem rb_equal_set_ret0_locals_ret (s : ProgramState) :
+    (rb_equal_set_ret0 s).locals.ret__val = 0 := by rw [rb_equal_set_ret0_locals_eq]
 
 attribute [local irreducible] hVal heapUpdate heapPtrValid in
 private theorem rb_equal_set_ret1_locals_eq (s : ProgramState) :
@@ -146,13 +136,10 @@ private theorem rb_equal_set_ret1_locals_eq (s : ProgramState) :
       s.locals.rb, s.locals.removed, s.locals.replaced, s.locals.result, (1 : UInt32),
       s.locals.scratch, s.locals.skipped, s.locals.src, s.locals.stats,
       s.locals.temp_node, s.locals.threshold, s.locals.tmp, s.locals.total,
-      s.locals.transferred, s.locals.val⟩ := by
-  unfold rb_equal_set_ret1; rfl
+      s.locals.transferred, s.locals.val⟩ := by unfold rb_equal_set_ret1; rfl
 
-attribute [local irreducible] hVal heapUpdate heapPtrValid in
-private theorem rb_equal_set_ret1_locals_ret (s : ProgramState) :
-    (rb_equal_set_ret1 s).locals.ret__val = 1 := by
-  rw [rb_equal_set_ret1_locals_eq]
+@[simp] private theorem rb_equal_set_ret1_locals_ret (s : ProgramState) :
+    (rb_equal_set_ret1 s).locals.ret__val = 1 := by rw [rb_equal_set_ret1_locals_eq]
 
 attribute [local irreducible] hVal heapUpdate heapPtrValid in
 private theorem rb_equal_set_ca_locals_eq (s : ProgramState) :
@@ -167,18 +154,15 @@ private theorem rb_equal_set_ca_locals_eq (s : ProgramState) :
       s.locals.removed, s.locals.replaced, s.locals.result, s.locals.ret__val,
       s.locals.scratch, s.locals.skipped, s.locals.src, s.locals.stats,
       s.locals.temp_node, s.locals.threshold, s.locals.tmp, s.locals.total,
-      s.locals.transferred, s.locals.val⟩ := by
-  unfold rb_equal_set_ca; rfl
+      s.locals.transferred, s.locals.val⟩ := by unfold rb_equal_set_ca; rfl
 
-attribute [local irreducible] hVal heapUpdate heapPtrValid in
-private theorem rb_equal_set_ca_locals_ca (s : ProgramState) :
+@[simp] private theorem rb_equal_set_ca_locals_ca (s : ProgramState) :
     (rb_equal_set_ca s).locals.ca = (hVal s.globals.rawHeap s.locals.a).head := by
   rw [rb_equal_set_ca_locals_eq]
-
-attribute [local irreducible] hVal heapUpdate heapPtrValid in
-private theorem rb_equal_set_ca_locals_cb (s : ProgramState) :
-    (rb_equal_set_ca s).locals.cb = s.locals.cb := by
-  rw [rb_equal_set_ca_locals_eq]
+@[simp] private theorem rb_equal_set_ca_locals_cb (s : ProgramState) :
+    (rb_equal_set_ca s).locals.cb = s.locals.cb := by rw [rb_equal_set_ca_locals_eq]
+@[simp] private theorem rb_equal_set_ca_locals_b (s : ProgramState) :
+    (rb_equal_set_ca s).locals.b = s.locals.b := by rw [rb_equal_set_ca_locals_eq]
 
 attribute [local irreducible] hVal heapUpdate heapPtrValid in
 private theorem rb_equal_set_cb_locals_eq (s : ProgramState) :
@@ -193,18 +177,13 @@ private theorem rb_equal_set_cb_locals_eq (s : ProgramState) :
       s.locals.removed, s.locals.replaced, s.locals.result, s.locals.ret__val,
       s.locals.scratch, s.locals.skipped, s.locals.src, s.locals.stats,
       s.locals.temp_node, s.locals.threshold, s.locals.tmp, s.locals.total,
-      s.locals.transferred, s.locals.val⟩ := by
-  unfold rb_equal_set_cb; rfl
+      s.locals.transferred, s.locals.val⟩ := by unfold rb_equal_set_cb; rfl
 
-attribute [local irreducible] hVal heapUpdate heapPtrValid in
-private theorem rb_equal_set_cb_locals_cb (s : ProgramState) :
+@[simp] private theorem rb_equal_set_cb_locals_cb (s : ProgramState) :
     (rb_equal_set_cb s).locals.cb = (hVal s.globals.rawHeap s.locals.b).head := by
   rw [rb_equal_set_cb_locals_eq]
-
-attribute [local irreducible] hVal heapUpdate heapPtrValid in
-private theorem rb_equal_set_cb_locals_ca (s : ProgramState) :
-    (rb_equal_set_cb s).locals.ca = s.locals.ca := by
-  rw [rb_equal_set_cb_locals_eq]
+@[simp] private theorem rb_equal_set_cb_locals_ca (s : ProgramState) :
+    (rb_equal_set_cb s).locals.ca = s.locals.ca := by rw [rb_equal_set_cb_locals_eq]
 
 attribute [local irreducible] hVal heapUpdate heapPtrValid in
 private theorem rb_equal_set_ca_next_locals_eq (s : ProgramState) :
@@ -219,18 +198,13 @@ private theorem rb_equal_set_ca_next_locals_eq (s : ProgramState) :
       s.locals.removed, s.locals.replaced, s.locals.result, s.locals.ret__val,
       s.locals.scratch, s.locals.skipped, s.locals.src, s.locals.stats,
       s.locals.temp_node, s.locals.threshold, s.locals.tmp, s.locals.total,
-      s.locals.transferred, s.locals.val⟩ := by
-  unfold rb_equal_set_ca_next; rfl
+      s.locals.transferred, s.locals.val⟩ := by unfold rb_equal_set_ca_next; rfl
 
-attribute [local irreducible] hVal heapUpdate heapPtrValid in
-private theorem rb_equal_set_ca_next_locals_ca (s : ProgramState) :
+@[simp] private theorem rb_equal_set_ca_next_locals_ca (s : ProgramState) :
     (rb_equal_set_ca_next s).locals.ca = (hVal s.globals.rawHeap s.locals.ca).next := by
   rw [rb_equal_set_ca_next_locals_eq]
-
-attribute [local irreducible] hVal heapUpdate heapPtrValid in
-private theorem rb_equal_set_ca_next_locals_cb (s : ProgramState) :
-    (rb_equal_set_ca_next s).locals.cb = s.locals.cb := by
-  rw [rb_equal_set_ca_next_locals_eq]
+@[simp] private theorem rb_equal_set_ca_next_locals_cb (s : ProgramState) :
+    (rb_equal_set_ca_next s).locals.cb = s.locals.cb := by rw [rb_equal_set_ca_next_locals_eq]
 
 attribute [local irreducible] hVal heapUpdate heapPtrValid in
 private theorem rb_equal_set_cb_next_locals_eq (s : ProgramState) :
@@ -245,31 +219,24 @@ private theorem rb_equal_set_cb_next_locals_eq (s : ProgramState) :
       s.locals.removed, s.locals.replaced, s.locals.result, s.locals.ret__val,
       s.locals.scratch, s.locals.skipped, s.locals.src, s.locals.stats,
       s.locals.temp_node, s.locals.threshold, s.locals.tmp, s.locals.total,
-      s.locals.transferred, s.locals.val⟩ := by
-  unfold rb_equal_set_cb_next; rfl
+      s.locals.transferred, s.locals.val⟩ := by unfold rb_equal_set_cb_next; rfl
 
-attribute [local irreducible] hVal heapUpdate heapPtrValid in
-private theorem rb_equal_set_cb_next_locals_cb (s : ProgramState) :
+@[simp] private theorem rb_equal_set_cb_next_locals_cb (s : ProgramState) :
     (rb_equal_set_cb_next s).locals.cb = (hVal s.globals.rawHeap s.locals.cb).next := by
   rw [rb_equal_set_cb_next_locals_eq]
-
-attribute [local irreducible] hVal heapUpdate heapPtrValid in
-private theorem rb_equal_set_cb_next_locals_ca (s : ProgramState) :
-    (rb_equal_set_cb_next s).locals.ca = s.locals.ca := by
-  rw [rb_equal_set_cb_next_locals_eq]
+@[simp] private theorem rb_equal_set_cb_next_locals_ca (s : ProgramState) :
+    (rb_equal_set_cb_next s).locals.ca = s.locals.ca := by rw [rb_equal_set_cb_next_locals_eq]
 
 -- funext lemmas
 attribute [local irreducible] hVal heapUpdate heapPtrValid in
 private theorem rb_equal_set_ret0_funext :
     (fun s : ProgramState => { s with locals := { s.locals with ret__val := (0 : UInt32) } }) =
-      rb_equal_set_ret0 := by
-  funext s; unfold rb_equal_set_ret0; rfl
+      rb_equal_set_ret0 := by funext s; unfold rb_equal_set_ret0; rfl
 
 attribute [local irreducible] hVal heapUpdate heapPtrValid in
 private theorem rb_equal_set_ret1_funext :
     (fun s : ProgramState => { s with locals := { s.locals with ret__val := (1 : UInt32) } }) =
-      rb_equal_set_ret1 := by
-  funext s; unfold rb_equal_set_ret1; rfl
+      rb_equal_set_ret1 := by funext s; unfold rb_equal_set_ret1; rfl
 
 attribute [local irreducible] hVal heapUpdate heapPtrValid in
 private theorem rb_equal_set_ca_funext :
@@ -296,7 +263,9 @@ private theorem rb_equal_set_cb_next_funext :
   funext s; unfold rb_equal_set_cb_next; rfl
 
 -- Main theorem
-attribute [local irreducible] hVal heapUpdate heapPtrValid in
+attribute [local irreducible] hVal heapUpdate heapPtrValid
+  rb_equal_set_ret0 rb_equal_set_ret1 rb_equal_set_ca rb_equal_set_cb
+  rb_equal_set_ca_next rb_equal_set_cb_next in
 theorem rb_equal_validHoare :
     rb_equal_spec.satisfiedBy RingBufferExt.l1_rb_equal_body := by
   unfold FuncSpec.satisfiedBy rb_equal_spec
@@ -305,8 +274,7 @@ theorem rb_equal_validHoare :
     rb_equal_set_ca_funext, rb_equal_set_cb_funext,
     rb_equal_set_ca_next_funext, rb_equal_set_cb_next_funext]
   apply L1_hoare_catch (R := rb_equal_ret_bool)
-  · -- body inside catch
-    -- Structure: seq(cond(count_ne, ret0+throw, skip), rest)
+  · -- body: seq(cond(count_ne, ret0+throw, skip), rest)
     apply L1_hoare_seq
       (R := fun s => heapPtrValid s.globals.rawHeap s.locals.a ∧
                       heapPtrValid s.globals.rawHeap s.locals.b ∧
@@ -314,7 +282,7 @@ theorem rb_equal_validHoare :
                       LinkedListValid s.globals.rawHeap (hVal s.globals.rawHeap s.locals.b).head)
     · -- cond: count mismatch → ret=0, throw; else skip
       apply L1_hoare_condition
-      · -- true branch: counts differ → modify ret=0, throw
+      · -- true: counts differ → ret=0, throw
         intro s hpre
         obtain ⟨⟨h_a, h_b, h_lla, h_llb⟩, _⟩ := hpre
         have h_mt := L1_modify_throw_result rb_equal_set_ret0 s
@@ -326,17 +294,16 @@ theorem rb_equal_validHoare :
           subst hr; subst hs
           unfold rb_equal_ret_bool
           left; rw [rb_equal_set_ret0_locals_ret]
-      · -- false branch: counts equal → skip
+      · -- false: counts equal → skip
         intro s hpre
         obtain ⟨⟨h_a, h_b, h_lla, h_llb⟩, _⟩ := hpre
         constructor
         · intro hf; exact hf
         · intro r s' h_mem
           have ⟨hr, hs⟩ := Prod.mk.inj h_mem
-          match r with
-          | Except.ok () => subst hs; exact ⟨h_a, h_b, h_lla, h_llb⟩
-          | Except.error () => exact absurd hr (by intro h; cases h)
-    · -- rest: guard+ca := a.head >> guard+cb := b.head >> while >> postloop
+          subst hr; subst hs
+          exact ⟨h_a, h_b, h_lla, h_llb⟩
+    · -- rest: guard+ca >> guard+cb >> while >> postloop
       apply L1_hoare_seq (R := fun s =>
         heapPtrValid s.globals.rawHeap s.locals.b ∧
         LinkedListValid s.globals.rawHeap s.locals.ca ∧
@@ -354,10 +321,10 @@ theorem rb_equal_validHoare :
           have ⟨hr, hs⟩ := Prod.mk.inj h_mem
           subst hr; subst hs
           refine ⟨?_, ?_, ?_⟩
-          · rw [rb_equal_set_ca_globals]; exact h_b
+          · rw [rb_equal_set_ca_globals, rb_equal_set_ca_locals_b]; exact h_b
           · rw [rb_equal_set_ca_locals_ca, rb_equal_set_ca_globals]; exact h_lla
-          · rw [rb_equal_set_ca_globals]; exact h_llb
-      · -- guard+cb := b.head >> while >> postloop
+          · rw [rb_equal_set_ca_globals, rb_equal_set_ca_locals_b]; exact h_llb
+      · -- guard+cb >> while >> postloop
         apply L1_hoare_seq (R := rb_equal_inv)
         · -- guard(heapPtrValid b) >> cb := b.head
           intro s hpre
@@ -378,17 +345,15 @@ theorem rb_equal_validHoare :
           apply L1_hoare_seq (R := rb_equal_inv)
           · -- while loop
             apply L1_hoare_while_from_body
-            · -- loop body
-              -- Structure: seq(cond(cb=null,...), seq(cond(value_ne,...), seq(guard+ca_next, guard+cb_next)))
-              -- Use R that tracks both cursors non-null after the two conds
+            · -- loop body: seq(cond(cb=null,...), seq(cond(value_ne,...), seq(guard+ca_next, guard+cb_next)))
               apply L1_hoare_seq
                 (P := fun s => rb_equal_inv s ∧ decide (s.locals.ca ≠ Ptr.null) = true)
                 (R := fun s => rb_equal_inv s ∧ s.locals.ca ≠ Ptr.null ∧ s.locals.cb ≠ Ptr.null)
               · -- cond(cb = null, ret0+throw, skip)
                 apply L1_hoare_condition
-                · -- true: cb is null → ret=0, throw (early exit)
+                · -- true: cb is null → ret=0, throw
                   intro s hpre
-                  obtain ⟨⟨h_inv, h_cond⟩, _⟩ := hpre
+                  obtain ⟨⟨h_inv, _⟩, _⟩ := hpre
                   have h_mt := L1_modify_throw_result rb_equal_set_ret0 s
                   constructor
                   · exact h_mt.2
@@ -398,22 +363,17 @@ theorem rb_equal_validHoare :
                     subst hr; subst hs
                     unfold rb_equal_ret_bool
                     left; rw [rb_equal_set_ret0_locals_ret]
-                · -- false: cb ≠ null → skip, track cb ≠ null
+                · -- false: cb ≠ null → skip
                   intro s hpre
                   obtain ⟨⟨h_inv, h_ca_cond⟩, h_cb_cond⟩ := hpre
                   constructor
                   · intro hf; exact hf
                   · intro r s' h_mem
                     have ⟨hr, hs⟩ := Prod.mk.inj h_mem
-                    match r with
-                    | Except.ok () =>
-                      subst hs
-                      refine ⟨h_inv, ?_, ?_⟩
-                      · simp only [decide_eq_true_eq] at h_ca_cond; exact h_ca_cond
-                      · -- decide (cb = null) = false means cb ≠ null
-                        simp only [decide_eq_true_eq] at h_cb_cond
-                        exact fun h => h_cb_cond h
-                    | Except.error () => exact absurd hr (by intro h; cases h)
+                    subst hr; subst hs
+                    refine ⟨h_inv, ?_, ?_⟩
+                    · simp only [decide_eq_true_eq] at h_ca_cond; exact h_ca_cond
+                    · rw [decide_eq_false_iff_not] at h_cb_cond; exact h_cb_cond
               · -- seq(cond(value_ne,...), seq(guard+ca_next, guard+cb_next))
                 apply L1_hoare_seq
                   (P := fun s => rb_equal_inv s ∧ s.locals.ca ≠ Ptr.null ∧ s.locals.cb ≠ Ptr.null)
@@ -422,7 +382,7 @@ theorem rb_equal_validHoare :
                   apply L1_hoare_condition
                   · -- true: values differ → ret=0, throw
                     intro s hpre
-                    obtain ⟨⟨h_inv, h_ca_ne, h_cb_ne⟩, _⟩ := hpre
+                    obtain ⟨⟨h_inv, _, _⟩, _⟩ := hpre
                     have h_mt := L1_modify_throw_result rb_equal_set_ret0 s
                     constructor
                     · exact h_mt.2
@@ -439,9 +399,8 @@ theorem rb_equal_validHoare :
                     · intro hf; exact hf
                     · intro r s' h_mem
                       have ⟨hr, hs⟩ := Prod.mk.inj h_mem
-                      match r with
-                      | Except.ok () => subst hs; exact ⟨h_inv, h_ca_ne, h_cb_ne⟩
-                      | Except.error () => exact absurd hr (by intro h; cases h)
+                      subst hr; subst hs
+                      exact ⟨h_inv, h_ca_ne, h_cb_ne⟩
                 · -- seq(guard+ca_next, guard+cb_next)
                   apply L1_hoare_seq
                     (P := fun s => rb_equal_inv s ∧ s.locals.ca ≠ Ptr.null ∧ s.locals.cb ≠ Ptr.null)
@@ -467,8 +426,7 @@ theorem rb_equal_validHoare :
                         exact h_ca_tail
                       · rw [rb_equal_set_ca_next_locals_cb, rb_equal_set_ca_next_globals]
                         exact h_cb_ll
-                      · -- cb unchanged by ca_next step
-                        rw [rb_equal_set_ca_next_locals_cb]; exact h_cb_ne
+                      · rw [rb_equal_set_ca_next_locals_cb]; exact h_cb_ne
                   · -- guard(heapPtrValid cb) >> cb := cb.next
                     intro s hpre
                     obtain ⟨h_ca_ll, h_cb_ll, h_cb_ne⟩ := hpre
@@ -486,9 +444,8 @@ theorem rb_equal_validHoare :
                       unfold rb_equal_inv
                       exact ⟨by rw [rb_equal_set_cb_next_locals_ca, rb_equal_set_cb_next_globals]; exact h_ca_ll,
                              by rw [rb_equal_set_cb_next_locals_cb, rb_equal_set_cb_next_globals]; exact h_cb_tail⟩
-            · -- while exit: invariant preserved
-              intro s h_inv _
-              exact h_inv
+            · -- while exit
+              intro s h_inv _; exact h_inv
           · -- postloop: seq(cond(cb≠null, ret0+throw, skip), seq(ret1, throw))
             apply L1_hoare_seq (R := rb_equal_inv)
             · -- cond(cb ≠ null, ret0+throw, skip)
@@ -511,9 +468,7 @@ theorem rb_equal_validHoare :
                 · intro hf; exact hf
                 · intro r s' h_mem
                   have ⟨hr, hs⟩ := Prod.mk.inj h_mem
-                  match r with
-                  | Except.ok () => subst hs; exact h_inv
-                  | Except.error () => exact absurd hr (by intro h; cases h)
+                  subst hr; subst hs; exact h_inv
             · -- ret=1, throw
               intro s _
               have h_mt := L1_modify_throw_result rb_equal_set_ret1 s
@@ -534,6 +489,4 @@ theorem rb_equal_validHoare :
       subst hr; subst hs
       intro _
       unfold rb_equal_ret_bool at h_ret
-      constructor
-      · exact h_ret
-      · trivial
+      exact h_ret

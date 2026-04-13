@@ -1,10 +1,11 @@
 ---
 id: TASK-0235
 title: Implement L1ProcEnv compositional call reasoning for inter-procedural proofs
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-04-12 17:01'
-updated_date: '2026-04-12 18:53'
+updated_date: '2026-04-12 23:59'
 labels:
   - infrastructure
   - inter-procedural
@@ -57,11 +58,17 @@ IMPLEMENTATION FILE: Clift/Lifting/L1HoareRules.lean (add L1_hoare_dynCom_call r
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 L1_hoare_dynCom_call theorem proven in L1HoareRules.lean
+- [x] #1 L1_hoare_dynCom_call theorem proven in L1HoareRules.lean
 - [ ] #2 At least one inter-procedural sorry eliminated using the new rule
 - [ ] #3 Pattern documented with example (e.g. rb_check_integrity calling rb_count_nodes)
-- [ ] #4 No kernel depth or OOM issues in the proof
+- [x] #4 No kernel depth or OOM issues in the proof
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+$1. Add L1_hoare_call, L1_hoare_dynCom_basic, L1_hoare_dynCom_call to L1HoareRules.lean\n2. Add L1_catch_skip_ok_only helper lemma\n3. Prove rb_check_integrity_validHoare using the new rules\n4. Build and verify
+<!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
 

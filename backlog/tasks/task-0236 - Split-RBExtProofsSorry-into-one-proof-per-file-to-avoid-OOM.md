@@ -1,9 +1,10 @@
 ---
 id: TASK-0236
 title: Split RBExtProofsSorry into one-proof-per-file to avoid OOM
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-12 18:58'
+updated_date: '2026-04-12 22:40'
 labels:
   - infrastructure
   - scaling
@@ -76,3 +77,9 @@ MEMORY BUDGET: Each file must build in <10GB. If a single proof exceeds 10GB, it
 - [ ] #4 lakefile.lean updated with all new modules
 - [ ] #5 Sorry count unchanged (proofs moved, not lost)
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+14 sorry split into one-proof-per-file. 10 of 14 subsequently proven (swap_front_back, increment_all, replace_all, fill, reverse, remove_first_match, equal, iter_skip, iter_next, clear). 4 remain blocked on dynCom (TASK-0235).
+<!-- SECTION:FINAL_SUMMARY:END -->
