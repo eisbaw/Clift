@@ -120,7 +120,12 @@ theorem rb_pop_validHoare : rb_pop_spec.satisfiedBy RingBufferExt.l1_rb_pop_body
     · -- guard(rb) + modify(front := rb.head) + rest
       -- The body here is L1.seq (L1.seq (L1.guard _) (L1.modify _)) rest
       -- Use guard_modify_fused for the first part
-      sorry
+      change validHoare _ (L1.seq (L1.seq (L1.guard _) (L1.modify _)) _) _
+      apply L1_hoare_seq_ok (R := fun s => heapPtrValid s.globals.rawHeap s.locals.rb ∧ heapPtrValid s.globals.rawHeap s.locals.out_val ∧ heapPtrValid s.globals.rawHeap s.locals.front ∧ s.locals.front = (hVal s.globals.rawHeap s.locals.rb).head)
+      · apply L1_hoare_guard_modify_fused
+        · intro s ⟨hrb, _, _, _⟩; exact hrb
+        · intro s ⟨hrb, hov, _, hhead⟩; dsimp only; exact ⟨rfl, hrb, hov, hhead, rfl⟩
+      · exact rb_pop_part2 _ _ (rb_pop_part1 _ _ rfl (fun s hret hov => ⟨hret, hov⟩))
   · intro s ⟨hret, hov⟩
     exact ⟨fun hf => hf, fun r s' hmem => let ⟨hr, hs⟩ := Prod.mk.inj hmem; hr ▸ hs ▸ fun _ => ⟨hret, hov⟩⟩
 end RbPopProof
