@@ -1,11 +1,11 @@
 ---
 id: TASK-0108
 title: 'Full L2 LocalVarExtract: rewrite computation, not wrapper'
-status: Done
+status: To Do
 assignee:
   - '@claude'
 created_date: '2026-04-10 12:58'
-updated_date: '2026-04-10 14:07'
+updated_date: '2026-04-14 22:12'
 labels:
   - scalability
   - lifting

@@ -1,11 +1,11 @@
 ---
 id: TASK-0098
 title: 'Verify 1000+ LOC module: write specs, prove properties, measure effort'
-status: Done
+status: To Do
 assignee:
   - '@claude'
 created_date: '2026-04-10 05:19'
-updated_date: '2026-04-10 07:32'
+updated_date: '2026-04-14 22:11'
 labels:
   - phase-d
   - milestone

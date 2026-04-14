@@ -1,11 +1,11 @@
 ---
 id: TASK-0074
 title: 'Concurrency: interrupt handler verification'
-status: Done
+status: To Do
 assignee:
   - '@claude'
 created_date: '2026-04-09 19:34'
-updated_date: '2026-04-09 22:55'
+updated_date: '2026-04-14 22:12'
 labels:
   - phase-5
   - csemantics

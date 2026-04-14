@@ -1,11 +1,11 @@
 ---
 id: TASK-0046
 title: 'CVcg tactic: verification condition generator'
-status: Done
+status: To Do
 assignee:
   - '@claude'
 created_date: '2026-04-08 21:39'
-updated_date: '2026-04-09 19:19'
+updated_date: '2026-04-14 22:12'
 labels:
   - phase-4
   - tactics

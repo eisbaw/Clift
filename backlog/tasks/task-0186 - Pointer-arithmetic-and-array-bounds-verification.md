@@ -1,10 +1,10 @@
 ---
 id: TASK-0186
 title: Pointer arithmetic and array bounds verification
-status: Done
+status: To Do
 assignee: []
 created_date: '2026-04-10 18:55'
-updated_date: '2026-04-10 23:02'
+updated_date: '2026-04-14 22:11'
 labels:
   - phase-l
   - soundness

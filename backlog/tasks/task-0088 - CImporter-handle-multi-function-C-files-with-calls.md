@@ -1,11 +1,11 @@
 ---
 id: TASK-0088
 title: 'CImporter: handle multi-function C files with calls'
-status: Done
+status: To Do
 assignee:
   - '@claude'
 created_date: '2026-04-10 05:17'
-updated_date: '2026-04-10 06:28'
+updated_date: '2026-04-14 22:12'
 labels:
   - phase-b
   - cimporter

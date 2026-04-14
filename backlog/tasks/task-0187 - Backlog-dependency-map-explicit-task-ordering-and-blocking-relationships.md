@@ -1,10 +1,10 @@
 ---
 id: TASK-0187
 title: 'Backlog dependency map: explicit task ordering and blocking relationships'
-status: Done
+status: To Do
 assignee: []
 created_date: '2026-04-10 18:55'
-updated_date: '2026-04-10 23:22'
+updated_date: '2026-04-14 22:11'
 labels:
   - meta
   - planning

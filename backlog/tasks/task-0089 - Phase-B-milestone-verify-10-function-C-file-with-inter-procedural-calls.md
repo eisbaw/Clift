@@ -1,11 +1,11 @@
 ---
 id: TASK-0089
 title: 'Phase B milestone: verify 10-function C file with inter-procedural calls'
-status: Done
+status: To Do
 assignee:
   - '@claude'
 created_date: '2026-04-10 05:17'
-updated_date: '2026-04-10 06:34'
+updated_date: '2026-04-14 22:11'
 labels:
   - phase-b
   - milestone

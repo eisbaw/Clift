@@ -1,11 +1,11 @@
 ---
 id: TASK-0070
 title: 'L2 LocalVarExtract: implement full extraction (not just stub)'
-status: Done
+status: To Do
 assignee:
   - '@claude'
 created_date: '2026-04-09 19:34'
-updated_date: '2026-04-09 22:54'
+updated_date: '2026-04-14 22:13'
 labels:
   - phase-5
   - lifting

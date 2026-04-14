@@ -4,7 +4,7 @@ title: Eliminate 5 sorry in DmaBufferProof.lean
 status: Done
 assignee: []
 created_date: '2026-04-10 20:49'
-updated_date: '2026-04-12 12:35'
+updated_date: '2026-04-14 22:13'
 labels:
   - sorry-elimination
 dependencies: []
@@ -19,9 +19,9 @@ priority: medium
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Modular arithmetic lemmas proven (2 sorry)
-- [ ] #2 validHoare proofs completed (3 sorry)
-- [ ] #3 All proofs kernel-checked
+- [x] #1 Modular arithmetic lemmas proven (2 sorry)
+- [x] #2 validHoare proofs completed (3 sorry)
+- [x] #3 All proofs kernel-checked
 <!-- AC:END -->
 
 ## Implementation Notes

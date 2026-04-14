@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude-code'
 created_date: '2026-04-10 18:54'
-updated_date: '2026-04-10 19:39'
+updated_date: '2026-04-14 22:15'
 labels:
   - phase-l
   - soundness
@@ -26,7 +26,7 @@ Any 'sorry' in the codebase is an unproven assumption that could hide unsoundnes
 - [x] #2 Zero sorry in MonadLib/
 - [x] #3 Zero sorry in CSemantics/
 - [x] #4 Zero sorry in Lifting/ (excluding examples)
-- [ ] #5 Sorry count tracked as CI metric
+- [x] #5 Sorry count tracked as CI metric
 <!-- AC:END -->
 
 ## Implementation Notes

@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-09 17:13'
-updated_date: '2026-04-09 22:36'
+updated_date: '2026-04-14 22:15'
 labels:
   - phase-3c
   - future
@@ -24,7 +24,7 @@ Our MemType only has roundtrip : fromMem (toMem v) = v (injection). For full mem
 - [x] #1 MemType extended with surjection property
 - [x] #2 Surjection proven for UInt8 and UInt16
 - [x] #3 Kernel depth limitation documented for UInt32/UInt64
-- [ ] #4 Ptr surjection limitation documented
+- [x] #4 Ptr surjection limitation documented
 <!-- AC:END -->
 
 ## Final Summary

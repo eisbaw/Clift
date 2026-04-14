@@ -1,10 +1,10 @@
 ---
 id: TASK-0147
 title: 'Verify a device driver: UART or SPI register manipulation'
-status: Done
+status: To Do
 assignee: []
 created_date: '2026-04-10 18:46'
-updated_date: '2026-04-10 20:13'
+updated_date: '2026-04-14 22:12'
 labels:
   - phase-n
   - industrial

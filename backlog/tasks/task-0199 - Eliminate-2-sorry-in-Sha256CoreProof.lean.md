@@ -4,7 +4,7 @@ title: Eliminate 2 sorry in Sha256CoreProof.lean
 status: Done
 assignee: []
 created_date: '2026-04-10 20:50'
-updated_date: '2026-04-12 00:52'
+updated_date: '2026-04-14 22:13'
 labels:
   - sorry-elimination
 dependencies: []
@@ -19,8 +19,8 @@ priority: medium
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 All 2 sorry eliminated
-- [ ] #2 All proofs kernel-checked
+- [x] #1 All 2 sorry eliminated
+- [x] #2 All proofs kernel-checked
 <!-- AC:END -->
 
 ## Implementation Notes

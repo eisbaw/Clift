@@ -1,11 +1,11 @@
 ---
 id: TASK-0078
 title: 'Performance: incremental re-verification when C changes'
-status: Done
+status: To Do
 assignee:
   - '@claude'
 created_date: '2026-04-09 19:34'
-updated_date: '2026-04-09 22:56'
+updated_date: '2026-04-14 22:11'
 labels:
   - phase-5
   - performance

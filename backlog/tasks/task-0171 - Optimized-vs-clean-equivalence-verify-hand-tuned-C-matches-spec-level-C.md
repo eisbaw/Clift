@@ -4,7 +4,7 @@ title: 'Optimized-vs-clean equivalence: verify hand-tuned C matches spec-level C
 status: Done
 assignee: []
 created_date: '2026-04-10 18:53'
-updated_date: '2026-04-10 23:22'
+updated_date: '2026-04-14 22:17'
 labels:
   - phase-l
   - seL4-parity
@@ -21,7 +21,7 @@ seL4's IPC fastpath verification proved a hand-optimized C implementation equiva
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Framework: state equivalence between optimized and clean implementations
-- [ ] #2 Example: at least one optimized function proven equivalent to clean version
-- [ ] #3 Pattern documented for users
+- [x] #1 Framework: state equivalence between optimized and clean implementations
+- [x] #2 Example: at least one optimized function proven equivalent to clean version
+- [x] #3 Pattern documented for users
 <!-- AC:END -->

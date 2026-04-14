@@ -1,10 +1,10 @@
 ---
 id: TASK-0148
 title: 'Verify a protocol parser: MQTT or CoAP message parsing'
-status: Done
+status: To Do
 assignee: []
 created_date: '2026-04-10 18:46'
-updated_date: '2026-04-10 20:13'
+updated_date: '2026-04-14 22:11'
 labels:
   - phase-n
   - industrial

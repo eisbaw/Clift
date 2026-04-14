@@ -3,11 +3,11 @@ id: TASK-0210
 title: >-
   Proof engine: generate [local irreducible] + projection simp lemmas
   automatically
-status: Done
+status: To Do
 assignee:
   - '@claude'
 created_date: '2026-04-11 06:29'
-updated_date: '2026-04-11 07:26'
+updated_date: '2026-04-14 22:13'
 labels:
   - proof-engine
   - automation

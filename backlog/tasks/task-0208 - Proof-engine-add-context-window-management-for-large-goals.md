@@ -1,11 +1,11 @@
 ---
 id: TASK-0208
 title: 'Proof engine: add context window management for large goals'
-status: Done
+status: To Do
 assignee:
   - '@claude'
 created_date: '2026-04-11 06:28'
-updated_date: '2026-04-11 08:45'
+updated_date: '2026-04-14 22:11'
 labels:
   - proof-engine
   - ai

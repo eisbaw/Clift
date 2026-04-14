@@ -1,11 +1,11 @@
 ---
 id: TASK-0032
 title: 'Phase 2 end-to-end: gcd lifts to Nat -> Nat -> Nat'
-status: Done
+status: To Do
 assignee:
   - '@mped'
 created_date: '2026-04-08 21:37'
-updated_date: '2026-04-09 05:25'
+updated_date: '2026-04-14 22:12'
 labels:
   - phase-2
   - test

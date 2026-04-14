@@ -1,11 +1,11 @@
 ---
 id: TASK-0116
 title: Full per-function Hoare triple verification for ring_buffer_ext (40 functions)
-status: Done
+status: To Do
 assignee:
   - '@claude'
 created_date: '2026-04-10 15:29'
-updated_date: '2026-04-10 17:27'
+updated_date: '2026-04-14 22:13'
 labels:
   - phase-f
   - verification

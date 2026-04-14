@@ -1,10 +1,10 @@
 ---
 id: TASK-0164
 title: 'Concurrency: interrupt preemption model and shared state verification'
-status: Done
+status: To Do
 assignee: []
 created_date: '2026-04-10 18:50'
-updated_date: '2026-04-10 23:22'
+updated_date: '2026-04-14 22:12'
 labels:
   - phase-n
   - concurrency

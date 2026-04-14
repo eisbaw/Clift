@@ -1,11 +1,11 @@
 ---
 id: TASK-0028
 title: 'TypeStrengthen (L3): MetaM to analyze and narrow monad'
-status: Done
+status: To Do
 assignee:
   - '@mped'
 created_date: '2026-04-08 21:36'
-updated_date: '2026-04-09 05:00'
+updated_date: '2026-04-14 22:11'
 labels:
   - phase-2
   - lifting

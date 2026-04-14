@@ -1,10 +1,10 @@
 ---
 id: TASK-0221
 title: Prove rb_push validHoare using guard_modify chain lemmas
-status: Done
+status: To Do
 assignee: []
 created_date: '2026-04-11 15:07'
-updated_date: '2026-04-12 05:28'
+updated_date: '2026-04-14 22:13'
 labels:
   - sorry-elimination
   - ring-buffer

@@ -1,11 +1,11 @@
 ---
 id: TASK-0139
 title: Prove absence of all undefined behavior in ring_buffer_ext
-status: Done
+status: To Do
 assignee:
   - '@claude-code'
 created_date: '2026-04-10 18:45'
-updated_date: '2026-04-10 19:38'
+updated_date: '2026-04-14 22:11'
 labels:
   - phase-l
   - verification

@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude-code'
 created_date: '2026-04-10 18:46'
-updated_date: '2026-04-10 19:38'
+updated_date: '2026-04-14 22:15'
 labels:
   - phase-m
   - testing
@@ -28,7 +28,7 @@ Our Exec has 22 rules. Simpl's Semantic.thy has more. Audit each of our Exec rul
 - [x] #2 Missing rules identified (if any)
 - [x] #3 Edge cases tested: fault in while body, throw in seq, call to missing proc
 - [x] #4 Differences from Simpl documented with rationale
-- [ ] #5 Fix any incorrect rules (if found)
+- [x] #5 Fix any incorrect rules (if found)
 <!-- AC:END -->
 
 ## Implementation Notes

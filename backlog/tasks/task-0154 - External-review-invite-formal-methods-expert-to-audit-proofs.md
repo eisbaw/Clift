@@ -1,10 +1,10 @@
 ---
 id: TASK-0154
 title: 'External review: invite formal methods expert to audit proofs'
-status: Done
+status: To Do
 assignee: []
 created_date: '2026-04-10 18:46'
-updated_date: '2026-04-10 23:39'
+updated_date: '2026-04-14 22:11'
 labels:
   - phase-p
   - community

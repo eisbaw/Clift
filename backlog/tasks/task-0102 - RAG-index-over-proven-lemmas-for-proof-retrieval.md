@@ -1,10 +1,10 @@
 ---
 id: TASK-0102
 title: RAG index over proven lemmas for proof retrieval
-status: Done
+status: To Do
 assignee: []
 created_date: '2026-04-10 05:19'
-updated_date: '2026-04-10 08:18'
+updated_date: '2026-04-14 22:13'
 labels:
   - phase-e
   - ai

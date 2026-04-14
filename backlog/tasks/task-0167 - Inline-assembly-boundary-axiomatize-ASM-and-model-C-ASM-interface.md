@@ -1,10 +1,10 @@
 ---
 id: TASK-0167
 title: 'Inline assembly boundary: axiomatize ASM and model C/ASM interface'
-status: Done
+status: To Do
 assignee: []
 created_date: '2026-04-10 18:50'
-updated_date: '2026-04-10 23:22'
+updated_date: '2026-04-14 22:16'
 labels:
   - phase-n
   - asm
@@ -27,3 +27,9 @@ seL4 has ~340 lines of handwritten ARM assembly axiomatized as specs. Real embed
 - [ ] #4 TCB documentation updated: ASM specs are trusted
 - [ ] #5 Example: disable_irq/enable_irq as axiomatized ASM
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-04-14: AsmBoundary.lean has AsmSpec type (AC#1) and disable_irq/enable_irq examples (AC#5), but AC#2-3 (CImporter integration) not implemented.
+<!-- SECTION:NOTES:END -->

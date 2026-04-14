@@ -1,11 +1,11 @@
 ---
 id: TASK-0071
 title: 'CVcg tactic: MetaM-level implementation for flat proof terms'
-status: Done
+status: To Do
 assignee:
   - '@claude'
 created_date: '2026-04-09 19:34'
-updated_date: '2026-04-10 04:43'
+updated_date: '2026-04-14 22:12'
 labels:
   - phase-5
   - tactics

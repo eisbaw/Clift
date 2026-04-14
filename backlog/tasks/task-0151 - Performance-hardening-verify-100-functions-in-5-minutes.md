@@ -1,10 +1,10 @@
 ---
 id: TASK-0151
 title: 'Performance hardening: verify 100+ functions in <5 minutes'
-status: Done
+status: To Do
 assignee: []
 created_date: '2026-04-10 18:46'
-updated_date: '2026-04-10 20:13'
+updated_date: '2026-04-14 22:11'
 labels:
   - phase-o
   - performance

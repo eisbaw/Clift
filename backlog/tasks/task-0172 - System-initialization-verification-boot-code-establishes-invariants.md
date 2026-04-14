@@ -1,10 +1,10 @@
 ---
 id: TASK-0172
 title: 'System initialization verification: boot code establishes invariants'
-status: Done
+status: To Do
 assignee: []
 created_date: '2026-04-10 18:53'
-updated_date: '2026-04-10 23:22'
+updated_date: '2026-04-14 22:12'
 labels:
   - phase-l
   - seL4-parity

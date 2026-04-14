@@ -1,11 +1,11 @@
 ---
 id: TASK-0076
 title: 'Lean 4 { s with ... } kernel depth issue: upstream report or workaround'
-status: Done
+status: To Do
 assignee:
   - '@mped'
 created_date: '2026-04-09 19:34'
-updated_date: '2026-04-10 04:43'
+updated_date: '2026-04-14 22:12'
 labels:
   - phase-5
   - lean4-bug

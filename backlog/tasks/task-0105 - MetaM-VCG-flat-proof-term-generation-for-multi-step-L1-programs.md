@@ -1,11 +1,11 @@
 ---
 id: TASK-0105
 title: 'MetaM VCG: flat proof term generation for multi-step L1 programs'
-status: Done
+status: To Do
 assignee:
   - '@claude'
 created_date: '2026-04-10 12:58'
-updated_date: '2026-04-10 14:32'
+updated_date: '2026-04-14 22:12'
 labels:
   - critical-path
   - metam

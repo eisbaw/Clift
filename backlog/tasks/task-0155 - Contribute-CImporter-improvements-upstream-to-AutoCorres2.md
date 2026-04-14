@@ -1,10 +1,10 @@
 ---
 id: TASK-0155
 title: Contribute CImporter improvements upstream to AutoCorres2
-status: Done
+status: To Do
 assignee: []
 created_date: '2026-04-10 18:47'
-updated_date: '2026-04-10 23:39'
+updated_date: '2026-04-14 22:11'
 labels:
   - phase-p
   - community

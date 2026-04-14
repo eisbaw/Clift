@@ -1,11 +1,11 @@
 ---
 id: TASK-0023
 title: 'SimplConv (L1): MetaM to convert CSimpl -> L1 monadic form'
-status: Done
+status: To Do
 assignee:
   - '@mped'
 created_date: '2026-04-08 21:36'
-updated_date: '2026-04-08 23:55'
+updated_date: '2026-04-14 22:11'
 labels:
   - phase-1
   - lifting

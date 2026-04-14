@@ -1,10 +1,10 @@
 ---
 id: TASK-0222
 title: 'Prove loop body preservation for rb_sum, rb_contains, rb_count_above'
-status: Done
+status: To Do
 assignee: []
 created_date: '2026-04-11 15:07'
-updated_date: '2026-04-12 04:06'
+updated_date: '2026-04-14 22:13'
 labels:
   - sorry-elimination
   - loops

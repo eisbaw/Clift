@@ -1,10 +1,10 @@
 ---
 id: TASK-0143
 title: 'Memory model audit: test against C standards UB cases'
-status: Done
+status: To Do
 assignee: []
 created_date: '2026-04-10 18:46'
-updated_date: '2026-04-10 19:53'
+updated_date: '2026-04-14 22:12'
 labels:
   - phase-m
   - testing

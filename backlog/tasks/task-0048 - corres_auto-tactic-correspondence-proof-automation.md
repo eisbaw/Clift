@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-08 21:39'
-updated_date: '2026-04-09 19:19'
+updated_date: '2026-04-14 22:14'
 labels:
   - phase-4
   - tactics
@@ -27,7 +27,7 @@ Build corres_auto tactic that handles the formulaic parts of correspondence proo
 - [x] #1 corres_auto unfolds corres goal and applies structural lemmas
 - [x] #2 Handles skip, basic, seq, cond correspondence automatically
 - [x] #3 Falls back to user for while/loop correspondence
-- [ ] #4 Measured: what % of obligations does it close?
+- [x] #4 Measured: what % of obligations does it close?
 <!-- AC:END -->
 
 ## Implementation Notes

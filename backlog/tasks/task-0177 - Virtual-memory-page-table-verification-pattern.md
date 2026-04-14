@@ -1,10 +1,10 @@
 ---
 id: TASK-0177
 title: Virtual memory / page table verification pattern
-status: Done
+status: To Do
 assignee: []
 created_date: '2026-04-10 18:53'
-updated_date: '2026-04-10 23:39'
+updated_date: '2026-04-14 22:12'
 labels:
   - phase-n
   - seL4-parity

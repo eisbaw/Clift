@@ -1,11 +1,11 @@
 ---
 id: TASK-0113
 title: 'Attempt seL4-scale: verify 1000+ LOC embedded C with full pipeline'
-status: Done
+status: To Do
 assignee:
   - '@claude'
 created_date: '2026-04-10 12:58'
-updated_date: '2026-04-10 14:23'
+updated_date: '2026-04-14 22:12'
 labels:
   - milestone
   - scalability

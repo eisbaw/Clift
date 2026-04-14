@@ -1,10 +1,10 @@
 ---
 id: TASK-0161
 title: 'Example: verify a priority queue (binary heap)'
-status: Done
+status: To Do
 assignee: []
 created_date: '2026-04-10 18:47'
-updated_date: '2026-04-10 23:02'
+updated_date: '2026-04-14 22:12'
 labels:
   - phase-n
   - examples
