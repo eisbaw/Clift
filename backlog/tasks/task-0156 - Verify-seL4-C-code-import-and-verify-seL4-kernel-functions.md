@@ -1,10 +1,10 @@
 ---
 id: TASK-0156
 title: 'Verify seL4 C code: import and verify seL4 kernel functions'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-10 18:47'
-updated_date: '2026-04-14 22:12'
+updated_date: '2026-04-10 23:02'
 labels:
   - phase-n
   - industrial

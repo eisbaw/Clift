@@ -1,11 +1,11 @@
 ---
 id: TASK-0025
 title: 'Phase 1 end-to-end: gcd.c through full pipeline with user proof'
-status: To Do
+status: Done
 assignee:
   - '@mped'
 created_date: '2026-04-08 21:36'
-updated_date: '2026-04-14 22:11'
+updated_date: '2026-04-09 19:40'
 labels:
   - phase-1
   - test

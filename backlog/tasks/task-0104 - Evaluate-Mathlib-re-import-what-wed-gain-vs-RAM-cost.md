@@ -1,10 +1,10 @@
 ---
 id: TASK-0104
 title: 'Evaluate Mathlib re-import: what we''d gain vs RAM cost'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-10 12:58'
-updated_date: '2026-04-14 22:12'
+updated_date: '2026-04-10 13:05'
 labels:
   - infrastructure
   - scalability

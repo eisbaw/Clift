@@ -1,10 +1,10 @@
 ---
 id: TASK-0176
 title: 'Capability system verification: unforgeability, delegation, revocation'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-10 18:53'
-updated_date: '2026-04-14 22:17'
+updated_date: '2026-04-10 23:39'
 labels:
   - phase-n
   - seL4-parity
@@ -27,9 +27,3 @@ seL4's access control is capability-based with specific properties: capabilities
 - [ ] #4 Revocation: invalidates descendants proven
 - [ ] #5 Example: capability-protected resource
 <!-- AC:END -->
-
-## Implementation Notes
-
-<!-- SECTION:NOTES:BEGIN -->
-2026-04-14: Capabilities.lean has type definitions and properties but 0 theorems. ACs require proven theorems.
-<!-- SECTION:NOTES:END -->

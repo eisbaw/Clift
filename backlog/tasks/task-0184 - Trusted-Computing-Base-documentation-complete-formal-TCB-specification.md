@@ -4,7 +4,7 @@ title: 'Trusted Computing Base documentation: complete formal TCB specification'
 status: Done
 assignee: []
 created_date: '2026-04-10 18:54'
-updated_date: '2026-04-14 22:17'
+updated_date: '2026-04-10 19:53'
 labels:
   - phase-l
   - industrial
@@ -21,9 +21,9 @@ seL4 explicitly documents every assumption in the TCB: hardware correctness, ass
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [x] #1 TCB components listed with justification
-- [x] #2 All assumptions listed explicitly
-- [x] #3 Excluded C features documented
-- [x] #4 Proven-vs-assumed boundary clear
-- [x] #5 Threat model documented
+- [ ] #1 TCB components listed with justification
+- [ ] #2 All assumptions listed explicitly
+- [ ] #3 Excluded C features documented
+- [ ] #4 Proven-vs-assumed boundary clear
+- [ ] #5 Threat model documented
 <!-- AC:END -->

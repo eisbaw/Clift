@@ -1,11 +1,11 @@
 ---
 id: TASK-0029
 title: 'WordAbstract (L5): define word-to-integer abstraction'
-status: To Do
+status: Done
 assignee:
   - '@mped'
 created_date: '2026-04-08 21:36'
-updated_date: '2026-04-14 22:11'
+updated_date: '2026-04-09 05:03'
 labels:
   - phase-2
   - lifting

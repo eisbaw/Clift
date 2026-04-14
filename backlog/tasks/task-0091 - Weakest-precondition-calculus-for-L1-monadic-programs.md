@@ -1,11 +1,11 @@
 ---
 id: TASK-0091
 title: Weakest precondition calculus for L1 monadic programs
-status: To Do
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-10 05:18'
-updated_date: '2026-04-14 22:12'
+updated_date: '2026-04-10 06:51'
 labels:
   - phase-c
   - automation

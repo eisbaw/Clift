@@ -1,11 +1,11 @@
 ---
 id: TASK-0094
 title: 'Phase C milestone: pointer-heavy C with <5:1 proof ratio'
-status: To Do
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-10 05:18'
-updated_date: '2026-04-14 22:11'
+updated_date: '2026-04-10 07:07'
 labels:
   - phase-c
   - milestone

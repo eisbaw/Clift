@@ -1,11 +1,11 @@
 ---
 id: TASK-0096
 title: Global invariant framework
-status: To Do
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-10 05:19'
-updated_date: '2026-04-14 22:12'
+updated_date: '2026-04-10 07:32'
 labels:
   - phase-d
   - verification-infrastructure

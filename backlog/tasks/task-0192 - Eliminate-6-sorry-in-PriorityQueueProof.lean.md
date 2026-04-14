@@ -4,7 +4,7 @@ title: Eliminate 6 sorry in PriorityQueueProof.lean
 status: To Do
 assignee: []
 created_date: '2026-04-10 20:49'
-updated_date: '2026-04-14 22:14'
+updated_date: '2026-04-11 22:34'
 labels:
   - sorry-elimination
 dependencies: []
@@ -27,8 +27,6 @@ priority: medium
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-04-12: Reopened. Still has 2 sorry. PriorityQueueProof.lean:260, :265 (both require call resolution for pq_bubble_up/down).
-
-2026-04-14: Verified still has 5 sorry in PriorityQueueProof.lean (lines 363, 395, 449, 455, 466). Status To Do is correct.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

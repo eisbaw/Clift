@@ -1,10 +1,10 @@
 ---
 id: TASK-0183
 title: 'CImporter validation against C11 standard: comprehensive semantics coverage'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-10 18:54'
-updated_date: '2026-04-14 22:12'
+updated_date: '2026-04-10 19:53'
 labels:
   - phase-m
   - soundness

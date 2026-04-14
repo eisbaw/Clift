@@ -1,11 +1,11 @@
 ---
 id: TASK-0204
 title: Wire clift-prove-by-claudecode to live Claude API
-status: To Do
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-11 06:28'
-updated_date: '2026-04-14 22:13'
+updated_date: '2026-04-11 07:26'
 labels:
   - critical-path
   - ai

@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@mped'
 created_date: '2026-04-10 20:49'
-updated_date: '2026-04-14 22:13'
+updated_date: '2026-04-11 07:15'
 labels:
   - sorry-elimination
   - sel4
@@ -21,8 +21,8 @@ priority: high
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [x] #1 All 7 validHoare proofs completed
-- [x] #2 All proofs kernel-checked
+- [ ] #1 All 7 validHoare proofs completed
+- [ ] #2 All proofs kernel-checked
 <!-- AC:END -->
 
 ## Implementation Notes

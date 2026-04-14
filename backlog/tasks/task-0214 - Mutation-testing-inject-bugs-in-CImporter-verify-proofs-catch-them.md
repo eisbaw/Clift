@@ -1,11 +1,11 @@
 ---
 id: TASK-0214
 title: 'Mutation testing: inject bugs in CImporter, verify proofs catch them'
-status: To Do
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-11 06:29'
-updated_date: '2026-04-14 22:11'
+updated_date: '2026-04-11 07:26'
 labels:
   - maturity
   - testing

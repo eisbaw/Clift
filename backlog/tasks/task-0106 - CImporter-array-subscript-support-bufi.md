@@ -1,11 +1,11 @@
 ---
 id: TASK-0106
 title: 'CImporter: array subscript support (buf[i])'
-status: To Do
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-10 12:58'
-updated_date: '2026-04-14 22:12'
+updated_date: '2026-04-10 14:33'
 labels:
   - critical-path
   - cimporter

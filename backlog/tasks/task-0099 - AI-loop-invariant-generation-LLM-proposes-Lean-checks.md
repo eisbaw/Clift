@@ -1,11 +1,11 @@
 ---
 id: TASK-0099
 title: 'AI loop invariant generation: LLM proposes, Lean checks'
-status: To Do
+status: Done
 assignee:
   - '@claude-code'
 created_date: '2026-04-10 05:19'
-updated_date: '2026-04-14 22:13'
+updated_date: '2026-04-10 08:18'
 labels:
   - phase-e
   - ai

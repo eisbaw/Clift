@@ -4,7 +4,7 @@ title: Complete l1_swap_validHoare proof (remove sorry)
 status: Done
 assignee: []
 created_date: '2026-04-09 06:43'
-updated_date: '2026-04-14 22:14'
+updated_date: '2026-04-09 19:40'
 labels:
   - phase-3a
   - proof
@@ -19,8 +19,8 @@ The swap correctness proof in Examples/SwapProof.lean has one sorry in l1_swap_v
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [x] #1 l1_swap_validHoare proved without sorry
-- [x] #2 swap_correct depends only on propext and Quot.sound
+- [ ] #1 l1_swap_validHoare proved without sorry
+- [ ] #2 swap_correct depends only on propext and Quot.sound
 <!-- AC:END -->
 
 ## Implementation Notes

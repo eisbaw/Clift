@@ -1,11 +1,11 @@
 ---
 id: TASK-0118
 title: Abstract spec + refinement proof for ring_buffer_ext
-status: To Do
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-10 15:29'
-updated_date: '2026-04-14 22:13'
+updated_date: '2026-04-10 17:29'
 labels:
   - phase-f
   - verification

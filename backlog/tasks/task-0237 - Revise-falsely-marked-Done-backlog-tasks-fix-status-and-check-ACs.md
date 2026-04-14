@@ -1,11 +1,10 @@
 ---
 id: TASK-0237
 title: 'Revise falsely-marked-Done backlog tasks: fix status and check ACs'
-status: Done
-assignee:
-  - '@claude'
+status: To Do
+assignee: []
 created_date: '2026-04-12 21:47'
-updated_date: '2026-04-14 22:19'
+updated_date: '2026-04-12 21:48'
 labels:
   - housekeeping
 dependencies: []
@@ -20,10 +19,10 @@ Bulk status update around 2026-04-10 incorrectly marked ~120 tasks as Done witho
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [x] #1 Fix 27 ACTUALLY DONE tasks: leave as Done but check their unchecked ACs to match reality
-- [x] #2 Fix 29 NOT DONE tasks: reset status to To Do
-- [x] #3 Fix ~65 PARTIALLY DONE tasks: reset status to In Progress or To Do (decide policy)
-- [x] #4 Verify all changes are consistent after bulk update
+- [ ] #1 Fix 27 ACTUALLY DONE tasks: leave as Done but check their unchecked ACs to match reality
+- [ ] #2 Fix 29 NOT DONE tasks: reset status to To Do
+- [ ] #3 Fix ~65 PARTIALLY DONE tasks: reset status to In Progress or To Do (decide policy)
+- [ ] #4 Verify all changes are consistent after bulk update
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -190,20 +189,3 @@ Real code artifacts exist but 1-5 ACs represent genuinely missing functionality.
 - TASK-0221: Prove rb_push validHoare (1/4 AC) — proven but via different technique
 - TASK-0222: Loop body preservation (3/4 AC) — rb_sum has trivial postcondition
 <!-- SECTION:NOTES:END -->
-
-## Final Summary
-
-<!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Audited all Done tasks against actual codebase evidence. Results:
-
-- 29 NOT DONE tasks reset to To Do (no real implementation, only design docs)
-- 67 PARTIALLY DONE tasks reset to To Do (real artifacts exist but ACs not fully met)
-- 2 additional tasks moved to To Do during verification (TASK-0167 missing CImporter integration, TASK-0176 has 0 theorems, TASK-0189 still has 12 sorry)
-- 11 sorry-elimination tasks verified as correctly Done (0 sorry in their files)
-- 2 tasks correctly NOT Done confirmed (TASK-0192 has 5 sorry, TASK-0189 has 12 sorry)
-- TASK-0193 and TASK-0238 promoted from To Do to Done (HashTableProof now 0 sorry)
-- Checked ACs for actually-done tasks: TASK-0191 through 0203 (sorry elimination), TASK-0048, 0062, 0068, 0142, 0171, 0182, 0184, 0188
-- Fixed 4 stale final summaries (TASK-0195, 0198, 0202, 0203) that said "partially eliminated" when files now have 0 sorry
-
-Net effect: Done count went from ~220 to 125. To Do count went from ~40 to 139.
-<!-- SECTION:FINAL_SUMMARY:END -->

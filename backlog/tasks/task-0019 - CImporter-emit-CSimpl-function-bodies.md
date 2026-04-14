@@ -1,11 +1,11 @@
 ---
 id: TASK-0019
 title: 'CImporter: emit CSimpl function bodies'
-status: To Do
+status: Done
 assignee:
   - '@mped'
 created_date: '2026-04-08 21:35'
-updated_date: '2026-04-14 22:11'
+updated_date: '2026-04-08 23:19'
 labels:
   - phase-1
   - cimporter

@@ -1,10 +1,10 @@
 ---
 id: TASK-0173
 title: WCET / timing analysis integration for safety-critical deployment
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-10 18:53'
-updated_date: '2026-04-14 22:11'
+updated_date: '2026-04-10 23:39'
 labels:
   - phase-n
   - seL4-parity

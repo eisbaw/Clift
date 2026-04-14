@@ -1,11 +1,11 @@
 ---
 id: TASK-0107
 title: 'L1corres mutual recursion: fixed-point over call graph'
-status: To Do
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-10 12:58'
-updated_date: '2026-04-14 22:12'
+updated_date: '2026-04-10 14:33'
 labels:
   - critical-path
   - lifting

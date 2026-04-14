@@ -1,11 +1,11 @@
 ---
 id: TASK-0218
 title: 'Benchmark against AutoCorres2: same C file, compare proof effort'
-status: To Do
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-11 06:29'
-updated_date: '2026-04-14 22:11'
+updated_date: '2026-04-11 07:26'
 labels:
   - maturity
   - benchmark

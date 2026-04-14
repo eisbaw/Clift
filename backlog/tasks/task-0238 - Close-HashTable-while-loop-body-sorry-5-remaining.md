@@ -1,10 +1,9 @@
 ---
 id: TASK-0238
 title: Close HashTable while loop body sorry (5 remaining)
-status: Done
+status: To Do
 assignee: []
 created_date: '2026-04-13 09:53'
-updated_date: '2026-04-14 22:14'
 labels:
   - sorry-elimination
   - hash-table
@@ -33,15 +32,9 @@ TEMPLATE: lookup h_body_nf (just proven, line 879-924) shows the NondetM decompo
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [x] #1 ht_lookup h_body_inv proven
-- [x] #2 ht_lookup h_abrupt proven
-- [x] #3 ht_insert h_body_nf proven
-- [x] #4 ht_insert h_body_inv proven
-- [x] #5 ht_insert h_abrupt proven
+- [ ] #1 ht_lookup h_body_inv proven
+- [ ] #2 ht_lookup h_abrupt proven
+- [ ] #3 ht_insert h_body_nf proven
+- [ ] #4 ht_insert h_body_inv proven
+- [ ] #5 ht_insert h_abrupt proven
 <!-- AC:END -->
-
-## Implementation Notes
-
-<!-- SECTION:NOTES:BEGIN -->
-2026-04-14: All 5 while loop body sorry eliminated. HashTableProof.lean has 0 sorry. Marking Done.
-<!-- SECTION:NOTES:END -->

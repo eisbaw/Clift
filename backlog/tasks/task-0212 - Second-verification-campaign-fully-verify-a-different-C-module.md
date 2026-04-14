@@ -1,11 +1,11 @@
 ---
 id: TASK-0212
 title: 'Second verification campaign: fully verify a different C module'
-status: To Do
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-11 06:29'
-updated_date: '2026-04-14 22:11'
+updated_date: '2026-04-11 08:45'
 labels:
   - verification
   - depth

@@ -1,10 +1,10 @@
 ---
 id: TASK-0162
 title: 'Example: verify a circular DMA buffer (hardware interface)'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-10 18:47'
-updated_date: '2026-04-14 22:12'
+updated_date: '2026-04-10 23:02'
 labels:
   - phase-n
   - examples

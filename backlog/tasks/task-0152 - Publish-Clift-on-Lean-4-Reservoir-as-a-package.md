@@ -1,10 +1,10 @@
 ---
 id: TASK-0152
 title: Publish Clift on Lean 4 Reservoir as a package
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-10 18:46'
-updated_date: '2026-04-14 22:11'
+updated_date: '2026-04-10 23:39'
 labels:
   - phase-p
   - ecosystem

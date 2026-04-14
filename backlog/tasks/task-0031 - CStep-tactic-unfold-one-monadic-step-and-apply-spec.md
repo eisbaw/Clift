@@ -1,11 +1,11 @@
 ---
 id: TASK-0031
 title: 'CStep tactic: unfold one monadic step and apply spec'
-status: To Do
+status: Done
 assignee:
   - '@mped'
 created_date: '2026-04-08 21:37'
-updated_date: '2026-04-14 22:12'
+updated_date: '2026-04-09 05:06'
 labels:
   - phase-2
   - tactics

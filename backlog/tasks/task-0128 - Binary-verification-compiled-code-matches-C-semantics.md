@@ -1,11 +1,11 @@
 ---
 id: TASK-0128
 title: 'Binary verification: compiled code matches C semantics'
-status: To Do
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-10 15:30'
-updated_date: '2026-04-14 22:13'
+updated_date: '2026-04-10 18:10'
 labels:
   - phase-i
   - binary

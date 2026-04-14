@@ -1,10 +1,10 @@
 ---
 id: TASK-0185
 title: 'Availability proof: resource exhaustion and denial-of-service prevention'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-10 18:54'
-updated_date: '2026-04-14 22:11'
+updated_date: '2026-04-10 23:39'
 labels:
   - phase-n
   - seL4-parity

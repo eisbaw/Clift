@@ -1,11 +1,11 @@
 ---
 id: TASK-0024
 title: 'LocalVarExtract (L2): define L2 type and lift locals'
-status: To Do
+status: Done
 assignee:
   - '@mped'
 created_date: '2026-04-08 21:36'
-updated_date: '2026-04-14 22:11'
+updated_date: '2026-04-08 23:55'
 labels:
   - phase-1
   - lifting

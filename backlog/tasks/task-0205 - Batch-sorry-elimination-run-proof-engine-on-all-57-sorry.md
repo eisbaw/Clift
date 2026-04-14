@@ -1,11 +1,11 @@
 ---
 id: TASK-0205
 title: 'Batch sorry elimination: run proof engine on all 57 sorry'
-status: To Do
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-11 06:28'
-updated_date: '2026-04-14 22:11'
+updated_date: '2026-04-11 22:33'
 labels:
   - critical-path
   - ai

@@ -4,7 +4,7 @@ title: Eliminate 3 sorry in RtosQueueProof.lean
 status: Done
 assignee: []
 created_date: '2026-04-10 20:49'
-updated_date: '2026-04-14 22:13'
+updated_date: '2026-04-12 00:52'
 labels:
   - sorry-elimination
 dependencies: []
@@ -19,8 +19,8 @@ priority: medium
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [x] #1 All 3 sorry eliminated
-- [x] #2 All proofs kernel-checked
+- [ ] #1 All 3 sorry eliminated
+- [ ] #2 All proofs kernel-checked
 <!-- AC:END -->
 
 ## Implementation Notes

@@ -1,11 +1,11 @@
 ---
 id: TASK-0114
 title: Re-evaluate Mathlib import after MetaM VCG and Claude benchmark
-status: To Do
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-10 13:07'
-updated_date: '2026-04-14 22:12'
+updated_date: '2026-04-10 14:23'
 labels:
   - infrastructure
   - deferred-decision

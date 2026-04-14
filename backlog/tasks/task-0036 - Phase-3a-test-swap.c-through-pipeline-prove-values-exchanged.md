@@ -1,11 +1,11 @@
 ---
 id: TASK-0036
 title: 'Phase 3a test: swap.c through pipeline, prove values exchanged'
-status: To Do
+status: Done
 assignee:
   - '@mped'
 created_date: '2026-04-08 21:38'
-updated_date: '2026-04-14 22:12'
+updated_date: '2026-04-09 06:43'
 labels:
   - phase-3a
   - test

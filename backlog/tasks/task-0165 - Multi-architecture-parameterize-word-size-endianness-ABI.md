@@ -1,10 +1,10 @@
 ---
 id: TASK-0165
 title: 'Multi-architecture: parameterize word size, endianness, ABI'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-10 18:50'
-updated_date: '2026-04-14 22:12'
+updated_date: '2026-04-10 23:22'
 labels:
   - phase-n
   - architecture

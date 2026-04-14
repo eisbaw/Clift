@@ -1,11 +1,11 @@
 ---
 id: TASK-0086
 title: 'Function specification framework: pre/postconditions per function'
-status: To Do
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-10 05:17'
-updated_date: '2026-04-14 22:13'
+updated_date: '2026-04-10 06:23'
 labels:
   - phase-b
   - verification-infrastructure

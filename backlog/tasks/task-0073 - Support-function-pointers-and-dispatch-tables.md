@@ -1,11 +1,11 @@
 ---
 id: TASK-0073
 title: Support function pointers and dispatch tables
-status: To Do
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-09 19:34'
-updated_date: '2026-04-14 22:10'
+updated_date: '2026-04-09 22:55'
 labels:
   - phase-5
   - lifting

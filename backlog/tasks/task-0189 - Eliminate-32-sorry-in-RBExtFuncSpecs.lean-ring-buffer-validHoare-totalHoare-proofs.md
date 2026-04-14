@@ -3,11 +3,11 @@ id: TASK-0189
 title: >-
   Eliminate 32 sorry in RBExtFuncSpecs.lean (ring buffer validHoare/totalHoare
   proofs)
-status: To Do
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-10 20:49'
-updated_date: '2026-04-14 22:11'
+updated_date: '2026-04-11 21:27'
 labels:
   - sorry-elimination
   - ring-buffer
@@ -48,8 +48,6 @@ Tools identified for next session:
 - LeanDojo: extracts proof states from sorry locations for external proof engines
 
 AutoCorres2 strategy translations documented by research agent (8 concrete recommendations).
-
-2026-04-14: Reset from Done to To Do. RBExtFuncSpecs.lean was split into per-function files (TASK-0233/0236). Still 12 sorry across split files (5 in RbDrainTo, 2 in ProofsLoops, 2 in ProofsLoops2, 3 in Refinement).
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

@@ -1,11 +1,11 @@
 ---
 id: TASK-0217
 title: 'Proof repair automation: when C changes, auto-fix broken proofs'
-status: To Do
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-11 06:29'
-updated_date: '2026-04-14 22:11'
+updated_date: '2026-04-11 08:46'
 labels:
   - maturity
   - ai

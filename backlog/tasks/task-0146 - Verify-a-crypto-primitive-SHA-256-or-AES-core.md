@@ -1,10 +1,10 @@
 ---
 id: TASK-0146
 title: 'Verify a crypto primitive: SHA-256 or AES core'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-10 18:46'
-updated_date: '2026-04-14 22:12'
+updated_date: '2026-04-10 20:13'
 labels:
   - phase-n
   - industrial

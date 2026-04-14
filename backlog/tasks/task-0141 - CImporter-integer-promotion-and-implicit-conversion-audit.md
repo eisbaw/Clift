@@ -1,10 +1,10 @@
 ---
 id: TASK-0141
 title: 'CImporter: integer promotion and implicit conversion audit'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-10 18:46'
-updated_date: '2026-04-14 22:12'
+updated_date: '2026-04-10 19:53'
 labels:
   - phase-m
   - testing

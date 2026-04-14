@@ -1,11 +1,11 @@
 ---
 id: TASK-0042
 title: 'HeapLift (L4): MetaM for heap abstraction + corres proof'
-status: To Do
+status: Done
 assignee:
   - '@mped'
 created_date: '2026-04-08 21:38'
-updated_date: '2026-04-14 22:12'
+updated_date: '2026-04-09 18:05'
 labels:
   - phase-3c
   - lifting

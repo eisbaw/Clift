@@ -1,11 +1,11 @@
 ---
 id: TASK-0137
 title: 'Full functional correctness: every operation does EXACTLY what spec says'
-status: To Do
+status: Done
 assignee:
   - '@claude-code'
 created_date: '2026-04-10 18:45'
-updated_date: '2026-04-14 22:13'
+updated_date: '2026-04-10 19:38'
 labels:
   - phase-l
   - verification

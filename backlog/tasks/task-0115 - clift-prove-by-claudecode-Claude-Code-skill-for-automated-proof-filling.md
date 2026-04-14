@@ -1,11 +1,11 @@
 ---
 id: TASK-0115
 title: 'clift-prove-by-claudecode: Claude Code skill for automated proof filling'
-status: To Do
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-10 15:29'
-updated_date: '2026-04-14 22:12'
+updated_date: '2026-04-10 17:26'
 labels:
   - phase-f
   - ai

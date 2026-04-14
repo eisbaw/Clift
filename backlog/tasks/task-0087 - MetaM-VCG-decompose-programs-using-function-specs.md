@@ -1,11 +1,11 @@
 ---
 id: TASK-0087
 title: 'MetaM VCG: decompose programs using function specs'
-status: To Do
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-10 05:17'
-updated_date: '2026-04-14 22:12'
+updated_date: '2026-04-10 06:24'
 labels:
   - phase-b
   - metam

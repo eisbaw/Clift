@@ -1,11 +1,11 @@
 ---
 id: TASK-0044
 title: 'Phase 3 end-to-end: list_length.c with frame reasoning'
-status: To Do
+status: Done
 assignee:
   - '@mped'
 created_date: '2026-04-08 21:38'
-updated_date: '2026-04-14 22:12'
+updated_date: '2026-04-09 18:20'
 labels:
   - phase-3
   - test
