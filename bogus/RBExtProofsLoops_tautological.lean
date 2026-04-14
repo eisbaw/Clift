@@ -1442,11 +1442,278 @@ theorem rb_nth_validHoare :
       intro _
       exact h_catch
 
--- rb_sum: loop traversal (TAUTOLOGICAL POSTCONDITION — TASK-0231)
--- Previous proof used validHoare_weaken_trivial_post. Moved to bogus/.
+-- rb_sum: same pattern as count_nodes but kernel depth is an issue with 4-step while body.
+private def rb_sum_inv (s : ProgramState) : Prop :=
+  LinkedListValid s.globals.rawHeap s.locals.cur
+
+private noncomputable def rb_sum_set_total0 (s : ProgramState) : ProgramState :=
+  ⟨s.globals, ⟨s.locals.a, s.locals.actual, s.locals.b, s.locals.ca, s.locals.cap,
+    s.locals.cb, s.locals.count, s.locals.cur, s.locals.current_count, s.locals.delta,
+    s.locals.dst, s.locals.filled, s.locals.front, s.locals.idx, s.locals.iter,
+    s.locals.max_drain, s.locals.max_val, s.locals.min_val, s.locals.modified,
+    s.locals.n, s.locals.new_val, s.locals.node, s.locals.nxt, s.locals.old_head,
+    s.locals.old_val, s.locals.out_val, s.locals.pop_ok, s.locals.pop_result,
+    s.locals.prev, s.locals.push_ok, s.locals.push_result, s.locals.rb,
+    s.locals.removed, s.locals.replaced, s.locals.result, s.locals.ret__val,
+    s.locals.scratch, s.locals.skipped, s.locals.src, s.locals.stats,
+    s.locals.temp_node, s.locals.threshold, s.locals.tmp, (0 : UInt32),
+    s.locals.transferred, s.locals.val⟩⟩
+
+private noncomputable def rb_sum_set_cur (s : ProgramState) : ProgramState :=
+  ⟨s.globals, ⟨s.locals.a, s.locals.actual, s.locals.b, s.locals.ca, s.locals.cap,
+    s.locals.cb, s.locals.count, (hVal s.globals.rawHeap s.locals.rb).head,
+    s.locals.current_count, s.locals.delta, s.locals.dst, s.locals.filled,
+    s.locals.front, s.locals.idx, s.locals.iter, s.locals.max_drain,
+    s.locals.max_val, s.locals.min_val, s.locals.modified, s.locals.n,
+    s.locals.new_val, s.locals.node, s.locals.nxt, s.locals.old_head,
+    s.locals.old_val, s.locals.out_val, s.locals.pop_ok, s.locals.pop_result,
+    s.locals.prev, s.locals.push_ok, s.locals.push_result, s.locals.rb,
+    s.locals.removed, s.locals.replaced, s.locals.result, s.locals.ret__val,
+    s.locals.scratch, s.locals.skipped, s.locals.src, s.locals.stats,
+    s.locals.temp_node, s.locals.threshold, s.locals.tmp, s.locals.total,
+    s.locals.transferred, s.locals.val⟩⟩
+
+private noncomputable def rb_sum_add_total (s : ProgramState) : ProgramState :=
+  ⟨s.globals, ⟨s.locals.a, s.locals.actual, s.locals.b, s.locals.ca, s.locals.cap,
+    s.locals.cb, s.locals.count, s.locals.cur, s.locals.current_count, s.locals.delta,
+    s.locals.dst, s.locals.filled, s.locals.front, s.locals.idx, s.locals.iter,
+    s.locals.max_drain, s.locals.max_val, s.locals.min_val, s.locals.modified,
+    s.locals.n, s.locals.new_val, s.locals.node, s.locals.nxt, s.locals.old_head,
+    s.locals.old_val, s.locals.out_val, s.locals.pop_ok, s.locals.pop_result,
+    s.locals.prev, s.locals.push_ok, s.locals.push_result, s.locals.rb,
+    s.locals.removed, s.locals.replaced, s.locals.result, s.locals.ret__val,
+    s.locals.scratch, s.locals.skipped, s.locals.src, s.locals.stats,
+    s.locals.temp_node, s.locals.threshold, s.locals.tmp, s.locals.total + (hVal s.globals.rawHeap s.locals.cur).value,
+    s.locals.transferred, s.locals.val⟩⟩
+
+private noncomputable def rb_sum_set_cur_next (s : ProgramState) : ProgramState :=
+  ⟨s.globals, ⟨s.locals.a, s.locals.actual, s.locals.b, s.locals.ca, s.locals.cap,
+    s.locals.cb, s.locals.count, (hVal s.globals.rawHeap s.locals.cur).next,
+    s.locals.current_count, s.locals.delta, s.locals.dst, s.locals.filled,
+    s.locals.front, s.locals.idx, s.locals.iter, s.locals.max_drain,
+    s.locals.max_val, s.locals.min_val, s.locals.modified, s.locals.n,
+    s.locals.new_val, s.locals.node, s.locals.nxt, s.locals.old_head,
+    s.locals.old_val, s.locals.out_val, s.locals.pop_ok, s.locals.pop_result,
+    s.locals.prev, s.locals.push_ok, s.locals.push_result, s.locals.rb,
+    s.locals.removed, s.locals.replaced, s.locals.result, s.locals.ret__val,
+    s.locals.scratch, s.locals.skipped, s.locals.src, s.locals.stats,
+    s.locals.temp_node, s.locals.threshold, s.locals.tmp, s.locals.total,
+    s.locals.transferred, s.locals.val⟩⟩
+
+private noncomputable def rb_sum_set_ret_total (s : ProgramState) : ProgramState :=
+  ⟨s.globals, ⟨s.locals.a, s.locals.actual, s.locals.b, s.locals.ca, s.locals.cap,
+    s.locals.cb, s.locals.count, s.locals.cur, s.locals.current_count, s.locals.delta,
+    s.locals.dst, s.locals.filled, s.locals.front, s.locals.idx, s.locals.iter,
+    s.locals.max_drain, s.locals.max_val, s.locals.min_val, s.locals.modified,
+    s.locals.n, s.locals.new_val, s.locals.node, s.locals.nxt, s.locals.old_head,
+    s.locals.old_val, s.locals.out_val, s.locals.pop_ok, s.locals.pop_result,
+    s.locals.prev, s.locals.push_ok, s.locals.push_result, s.locals.rb,
+    s.locals.removed, s.locals.replaced, s.locals.result, s.locals.total,
+    s.locals.scratch, s.locals.skipped, s.locals.src, s.locals.stats,
+    s.locals.temp_node, s.locals.threshold, s.locals.tmp, s.locals.total,
+    s.locals.transferred, s.locals.val⟩⟩
+
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rb_sum_set_total0_funext :
+    (fun s : ProgramState => { s with locals := { s.locals with total := (0 : UInt32) } }) = rb_sum_set_total0 := by
+  funext s; unfold rb_sum_set_total0; rfl
+
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rb_sum_set_cur_funext :
+    (fun s : ProgramState => { s with locals := { s.locals with cur := (hVal s.globals.rawHeap s.locals.rb).head } }) = rb_sum_set_cur := by
+  funext s; unfold rb_sum_set_cur; rfl
+
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rb_sum_add_total_funext :
+    (fun s : ProgramState => { s with locals := { s.locals with total := s.locals.total + (hVal s.globals.rawHeap s.locals.cur).value } }) = rb_sum_add_total := by
+  funext s; unfold rb_sum_add_total; rfl
+
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rb_sum_set_cur_next_funext :
+    (fun s : ProgramState => { s with locals := { s.locals with cur := (hVal s.globals.rawHeap s.locals.cur).next } }) = rb_sum_set_cur_next := by
+  funext s; unfold rb_sum_set_cur_next; rfl
+
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rb_sum_set_ret_total_funext :
+    (fun s : ProgramState => { s with locals := { s.locals with ret__val := s.locals.total } }) = rb_sum_set_ret_total := by
+  funext s; unfold rb_sum_set_ret_total; rfl
+
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rb_sum_set_cur_globals (s : ProgramState) :
+    (rb_sum_set_cur s).globals = s.globals := by unfold rb_sum_set_cur; rfl
+
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rb_sum_set_cur_locals_eq (s : ProgramState) :
+    (rb_sum_set_cur s).locals = ⟨s.locals.a, s.locals.actual, s.locals.b, s.locals.ca,
+      s.locals.cap, s.locals.cb, s.locals.count, (hVal s.globals.rawHeap s.locals.rb).head,
+      s.locals.current_count, s.locals.delta, s.locals.dst, s.locals.filled,
+      s.locals.front, s.locals.idx, s.locals.iter, s.locals.max_drain,
+      s.locals.max_val, s.locals.min_val, s.locals.modified, s.locals.n,
+      s.locals.new_val, s.locals.node, s.locals.nxt, s.locals.old_head,
+      s.locals.old_val, s.locals.out_val, s.locals.pop_ok, s.locals.pop_result,
+      s.locals.prev, s.locals.push_ok, s.locals.push_result, s.locals.rb,
+      s.locals.removed, s.locals.replaced, s.locals.result, s.locals.ret__val,
+      s.locals.scratch, s.locals.skipped, s.locals.src, s.locals.stats,
+      s.locals.temp_node, s.locals.threshold, s.locals.tmp, s.locals.total,
+      s.locals.transferred, s.locals.val⟩ := by unfold rb_sum_set_cur; rfl
+
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rb_sum_set_cur_locals_cur (s : ProgramState) :
+    (rb_sum_set_cur s).locals.cur = (hVal s.globals.rawHeap s.locals.rb).head := by
+  rw [rb_sum_set_cur_locals_eq]
+
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rb_sum_add_total_globals (s : ProgramState) :
+    (rb_sum_add_total s).globals = s.globals := by unfold rb_sum_add_total; rfl
+
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rb_sum_add_total_locals_eq (s : ProgramState) :
+    (rb_sum_add_total s).locals = ⟨s.locals.a, s.locals.actual, s.locals.b, s.locals.ca,
+      s.locals.cap, s.locals.cb, s.locals.count, s.locals.cur,
+      s.locals.current_count, s.locals.delta, s.locals.dst, s.locals.filled,
+      s.locals.front, s.locals.idx, s.locals.iter, s.locals.max_drain,
+      s.locals.max_val, s.locals.min_val, s.locals.modified, s.locals.n,
+      s.locals.new_val, s.locals.node, s.locals.nxt, s.locals.old_head,
+      s.locals.old_val, s.locals.out_val, s.locals.pop_ok, s.locals.pop_result,
+      s.locals.prev, s.locals.push_ok, s.locals.push_result, s.locals.rb,
+      s.locals.removed, s.locals.replaced, s.locals.result, s.locals.ret__val,
+      s.locals.scratch, s.locals.skipped, s.locals.src, s.locals.stats,
+      s.locals.temp_node, s.locals.threshold, s.locals.tmp, s.locals.total + (hVal s.globals.rawHeap s.locals.cur).value,
+      s.locals.transferred, s.locals.val⟩ := by unfold rb_sum_add_total; rfl
+
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rb_sum_add_total_locals_cur (s : ProgramState) :
+    (rb_sum_add_total s).locals.cur = s.locals.cur := by
+  rw [rb_sum_add_total_locals_eq]
+
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rb_sum_set_cur_next_globals (s : ProgramState) :
+    (rb_sum_set_cur_next s).globals = s.globals := by unfold rb_sum_set_cur_next; rfl
+
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rb_sum_set_cur_next_locals_eq (s : ProgramState) :
+    (rb_sum_set_cur_next s).locals = ⟨s.locals.a, s.locals.actual, s.locals.b, s.locals.ca,
+      s.locals.cap, s.locals.cb, s.locals.count, (hVal s.globals.rawHeap s.locals.cur).next,
+      s.locals.current_count, s.locals.delta, s.locals.dst, s.locals.filled,
+      s.locals.front, s.locals.idx, s.locals.iter, s.locals.max_drain,
+      s.locals.max_val, s.locals.min_val, s.locals.modified, s.locals.n,
+      s.locals.new_val, s.locals.node, s.locals.nxt, s.locals.old_head,
+      s.locals.old_val, s.locals.out_val, s.locals.pop_ok, s.locals.pop_result,
+      s.locals.prev, s.locals.push_ok, s.locals.push_result, s.locals.rb,
+      s.locals.removed, s.locals.replaced, s.locals.result, s.locals.ret__val,
+      s.locals.scratch, s.locals.skipped, s.locals.src, s.locals.stats,
+      s.locals.temp_node, s.locals.threshold, s.locals.tmp, s.locals.total,
+      s.locals.transferred, s.locals.val⟩ := by unfold rb_sum_set_cur_next; rfl
+
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem rb_sum_set_cur_next_locals_cur (s : ProgramState) :
+    (rb_sum_set_cur_next s).locals.cur = (hVal s.globals.rawHeap s.locals.cur).next := by
+  rw [rb_sum_set_cur_next_locals_eq]
+
 set_option maxRecDepth 8192 in
 set_option maxHeartbeats 25600000 in
 attribute [local irreducible] hVal heapUpdate heapPtrValid in
 theorem rb_sum_validHoare :
     rb_sum_spec.satisfiedBy RingBufferExt.l1_rb_sum_body := by
-  sorry -- Tautological postcondition (count=count). Needs TASK-0231.
+  sorry -- Previous proof used validHoare_weaken_trivial_post (tautological postcondition: count=count)
+         -- The loop traversal IS correct but the spec needs strengthening (TASK-0231)
+         -- Original proof preserved in bogus/RBExtProofsLoops_tautological.lean
+  /-  Original tautological proof (proves no-crash but NOT functional correctness):
+  unfold RingBufferExt.l1_rb_sum_body
+  simp only [rb_sum_set_total0_funext, rb_sum_set_cur_funext,
+    rb_sum_add_total_funext, rb_sum_set_cur_next_funext,
+    rb_sum_set_ret_total_funext]
+  apply L1_hoare_catch (R := fun _ => True)
+  · apply L1_hoare_seq (R := fun s =>
+      heapPtrValid s.globals.rawHeap s.locals.rb ∧
+      LinkedListValid s.globals.rawHeap (hVal s.globals.rawHeap s.locals.rb).head)
+    · -- modify total=0
+      intro s₀ hpre
+      constructor
+      · intro h; exact h
+      · intro r s₁ h_mem
+        have ⟨hr, hs⟩ := Prod.mk.inj h_mem; subst hr; subst hs
+        exact hpre
+    · apply L1_hoare_seq (R := rb_sum_inv)
+      · -- setup: guard rb valid, then cur := rb.head
+        intro s hpre
+        obtain ⟨h_rb, h_ll⟩ := hpre
+        have h_gm := L1_guard_modify_result
+          (fun s : ProgramState => heapPtrValid s.globals.rawHeap s.locals.rb)
+          rb_sum_set_cur s h_rb
+        constructor
+        · exact h_gm.2
+        · intro r s' h_mem
+          rw [h_gm.1] at h_mem
+          have ⟨hr, hs⟩ := Prod.mk.inj h_mem
+          subst hr; subst hs
+          unfold rb_sum_inv
+          rw [rb_sum_set_cur_globals, rb_sum_set_cur_locals_cur]
+          exact h_ll
+      · -- rest: while + teardown
+        apply L1_hoare_seq (R := fun _ => True)
+        · -- while loop
+          apply L1_hoare_while_from_body
+          · -- loop body
+            apply L1_hoare_seq
+              (P := fun s => rb_sum_inv s ∧ decide (s.locals.cur ≠ Ptr.null) = true)
+              (R := fun s => rb_sum_inv s ∧ decide (s.locals.cur ≠ Ptr.null) = true)
+            · -- guard cur valid, then total := total + cur->val
+              intro s hpre
+              obtain ⟨h_inv, h_cond⟩ := hpre
+              unfold rb_sum_inv at h_inv
+              have h_ne : s.locals.cur ≠ Ptr.null := by
+                simp only [decide_eq_true_eq] at h_cond
+                exact h_cond
+              have h_valid := h_inv.heapValid h_ne
+              have h_gm := L1_guard_modify_result
+                (fun s : ProgramState => heapPtrValid s.globals.rawHeap s.locals.cur)
+                rb_sum_add_total s h_valid
+              constructor
+              · exact h_gm.2
+              · intro r s' h_mem
+                rw [h_gm.1] at h_mem
+                have ⟨hr, hs⟩ := Prod.mk.inj h_mem
+                subst hr; subst hs
+                unfold rb_sum_inv
+                rw [rb_sum_add_total_globals, rb_sum_add_total_locals_cur]
+                exact ⟨h_inv, h_cond⟩
+            · -- guard cur valid, then cur := cur->next
+              intro s hpre
+              obtain ⟨h_inv, h_cond⟩ := hpre
+              unfold rb_sum_inv at h_inv
+              have h_ne : s.locals.cur ≠ Ptr.null := by
+                simp only [decide_eq_true_eq] at h_cond
+                exact h_cond
+              have h_valid := h_inv.heapValid h_ne
+              have h_tail := h_inv.tail h_ne
+              have h_gm := L1_guard_modify_result
+                (fun s : ProgramState => heapPtrValid s.globals.rawHeap s.locals.cur)
+                rb_sum_set_cur_next s h_valid
+              constructor
+              · exact h_gm.2
+              · intro r s' h_mem
+                rw [h_gm.1] at h_mem
+                have ⟨hr, hs⟩ := Prod.mk.inj h_mem
+                subst hr; subst hs
+                unfold rb_sum_inv
+                rw [rb_sum_set_cur_next_globals, rb_sum_set_cur_next_locals_cur]
+                exact h_tail
+          · -- exit condition: while returns ok with invariant
+            intro s h_inv _
+            trivial
+        · -- teardown: ret := total; throw
+          intro s h_inv
+          have h_mt := L1_modify_throw_result rb_sum_set_ret_total s
+          constructor
+          · exact h_mt.2
+          · intro r s' h_mem
+            rw [h_mt.1] at h_mem
+            have ⟨hr, hs⟩ := Prod.mk.inj h_mem
+            subst hr; subst hs
+            trivial
+  · -- handler: skip
+    intro _ _
+    exact ⟨not_false, fun _ _ _ => trivial⟩
+
+-- rb_increment_all: loop with heap mutation per iteration

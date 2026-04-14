@@ -593,17 +593,10 @@ def rb_pop_relspec : RelFuncSpec ProgramState where
     (rb₀.count > 1 → rb₁.tail = rb₀.tail)
 
 
--- Shared helper: weaken trivial postcondition
-theorem validHoare_weaken_trivial_post
-    {P : ProgramState → Prop}
-    {Q : Except Unit Unit → ProgramState → Prop}
-    {m : L1Monad ProgramState}
-    (hQ : ∀ r s, Q r s)
-    (h : validHoare P m (fun _ _ => True)) :
-    validHoare P m Q := by
-  intro s₀ hpre
-  have ⟨h_nf, _⟩ := h s₀ hpre
-  exact ⟨h_nf, fun r s₁ _ => hQ r s₁⟩
+-- REMOVED: validHoare_weaken_trivial_post
+-- This lemma enabled "proofs" against tautological postconditions (count=count).
+-- It proves no-crash but NOT functional correctness. Moved to bogus/.
+-- If you need it, the postcondition in the FuncSpec is too weak — fix the spec instead.
 
 -- Shared helper: simplified while rule
 theorem L1_hoare_while_from_body {σ : Type} {c : σ → Bool} {body : L1Monad σ}
