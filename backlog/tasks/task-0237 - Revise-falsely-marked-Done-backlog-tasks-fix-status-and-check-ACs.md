@@ -4,7 +4,7 @@ title: 'Revise falsely-marked-Done backlog tasks: fix status and check ACs'
 status: To Do
 assignee: []
 created_date: '2026-04-12 21:47'
-updated_date: '2026-04-12 21:48'
+updated_date: '2026-04-14 22:21'
 labels:
   - housekeeping
 dependencies: []
@@ -188,4 +188,6 @@ Real code artifacts exist but 1-5 ACs represent genuinely missing functionality.
 - TASK-0210: Generate irreducible+projection lemmas (3/5 AC) — not integrated
 - TASK-0221: Prove rb_push validHoare (1/4 AC) — proven but via different technique
 - TASK-0222: Loop body preservation (3/4 AC) — rb_sum has trivial postcondition
+
+First attempt reverted — agent was too aggressive, moved ~96 tasks back to To Do without verifying code existence. Many tasks (e.g. FuncSpec framework, WP calculus, CVcg tactic) have working code but unchecked ACs in backlog. Need manual review comparing each task's ACs against actual codebase, not just checking backlog checkbox state.
 <!-- SECTION:NOTES:END -->
