@@ -1,33 +1,42 @@
 -- Proof for rb_drain_to_validHoare
 -- Inter-procedural: calls rb_pop + rb_push via dynCom in a while loop.
 --
--- STATUS: Structural skeleton with sorry spots for callee non-failure and loop body.
+-- STATUS: Partially proven. Early-exit paths (head=null for pop, full for push) closed.
 --
--- The original rb_drain_to_spec.pre (4× heapPtrValid) is PROVABLY TOO WEAK:
---   rb_pop's guards need heapPtrValid(src.head) when head ≠ null.
+-- The original rb_drain_to_spec.pre (4x heapPtrValid) is PROVABLY TOO WEAK:
+--   rb_pop's guards need heapPtrValid(src.head) when head != null.
 --   A counterexample exists: heapPtrValid src but src.head points to invalid memory.
 --   The computation fails at L1.guard in rb_pop.
 --
 -- We define rb_drain_to_spec_ext with the minimal strengthening:
 --   + ptrDisjoint src dst (push doesn't affect src's heap repr)
---   + temp_node ≠ null (push needs a valid node)
---   + (src.head ≠ null → heapPtrValid src.head)  (rb_pop guard)
---   + (dst.tail ≠ null → heapPtrValid dst.tail)   (rb_push guard)
+--   + temp_node != null (push needs a valid node)
+--   + (src.head != null -> heapPtrValid src.head)  (rb_pop guard)
+--   + (dst.tail != null -> heapPtrValid dst.tail)   (rb_push guard)
+--
+-- PROVEN:
+--   - rb_pop_for_drain: postcondition (all results are ok, via L1_catch_skip_ok_only)
+--   - rb_pop_for_drain head=null: non-failure via L1_catch_seq_error_first_nf
+--   - rb_push_for_drain: postcondition (all results are ok, via L1_catch_skip_ok_only)
+--   - rb_push_for_drain full: non-failure via L1_catch_seq_error_first_nf
+--   - h_init, h_exit: trivial from invariant
+--   - MODIFY(transferred:=0), POST-LOOP, HANDLER: fully proven
 --
 -- REMAINING SORRY (5 spots):
---   1. rb_pop_for_drain: non-failure when head-validity precondition holds
---   2. rb_push_for_drain: non-failure (no ptrDisjoint needed for guards)
+--   1. rb_pop_for_drain head!=null: guard chain non-failure (~100 lines, needs
+--      compiled RBPopProof.olean or inline guard-chain decomposition)
+--   2. rb_push_for_drain not-full: guard chain non-failure (~100 lines, needs
+--      inline guard-chain decomposition; can't use rb_push_validHoare due to
+--      missing ptrDisjoint in precondition)
 --   3. h_body_nf: while body non-failure (dynCom call composition)
 --   4. h_body_inv: invariant preservation through full iteration
---      (hardest: needs head-validity after rb_pop advances src.head)
---   5. h_abrupt: error exits preserve heapPtrValid (frame argument)
+--      (hardest: needs head-validity after rb_pop advances src.head;
+--      requires LinkedListValid or WellFormedList in precondition)
+--   5. h_abrupt: error exits preserve heapPtrValid (frame argument;
+--      error results only come from modify+throw break paths,
+--      but proving this requires tracing through dynCom structure)
 --
--- All 5 are THEORETICALLY PROVABLE — the difficulty is mechanical (large proof terms).
--- The blocking issue for h_body_inv is maintaining (src.head ≠ null → heapPtrValid head)
--- after rb_pop advances head to old_head.next. This requires either:
---   a. LinkedListValid + WellFormedList in precondition (heavy)
---   b. A custom fuel-bounded chain validity predicate
--- Both approaches add ~200 lines of helper lemma reasoning.
+-- All 5 are THEORETICALLY PROVABLE. The difficulty is mechanical (large proof terms).
 import Examples.RBExtSpecs
 import Examples.RBExtProofsLoops
 set_option maxHeartbeats 102400000
@@ -75,6 +84,22 @@ def rb_drain_to_spec_ext : FuncSpec ProgramState where
     heapPtrValid s.globals.rawHeap s.locals.src ∧
     heapPtrValid s.globals.rawHeap s.locals.dst
 
+/-! ## General L1 helpers -/
+
+/-- If the first half of a seq only produces error results and doesn't fail,
+    then catch(seq(first, rest), skip) doesn't fail. The rest is never reached. -/
+private theorem L1_catch_seq_error_first_nf {σ : Type} {m₁ m₂ : L1Monad σ} {s : σ}
+    (h_nf : ¬(m₁ s).failed)
+    (h_err : ∀ r s', (r, s') ∈ (m₁ s).results → r = Except.error ()) :
+    ¬(L1.catch (L1.seq m₁ m₂) L1.skip s).failed := by
+  intro hf
+  simp only [L1.catch, L1.seq, L1.skip, NondetM.pure] at hf
+  rcases hf with hf_seq | ⟨_, _, hf_skip⟩
+  · rcases hf_seq with hf1 | ⟨s', h_ok, _⟩
+    · exact h_nf hf1
+    · exact absurd (h_err _ _ h_ok) (by intro h; cases h)
+  · exact hf_skip
+
 /-! ## Callee ok-only (catch+skip structure) -/
 
 private theorem rb_pop_results_ok (s : ProgramState) :
@@ -91,9 +116,7 @@ private theorem rb_push_results_ok (s : ProgramState) :
     ret_val after each call and exits on failure). The non-failure proof
     requires chasing through the guard chain in each callee body. -/
 
--- rb_pop non-failure + ok-only.
--- Guards: heapPtrValid rb (×5), heapPtrValid out_val (×1), heapPtrValid front (×3).
--- When head=null: early exit (no guards). When head≠null: front=head, all guards pass.
+set_option maxHeartbeats 51200000 in
 private theorem rb_pop_for_drain :
     validHoare
       (fun s => heapPtrValid s.globals.rawHeap s.locals.rb ∧
@@ -102,14 +125,32 @@ private theorem rb_pop_for_drain :
                   heapPtrValid s.globals.rawHeap (hVal s.globals.rawHeap s.locals.rb).head))
       l1_rb_pop_body
       (fun r _ => r = Except.ok ()) := by
-  intro s ⟨h_rb, h_ov, h_head⟩
-  refine ⟨?_, fun r s' h => rb_pop_results_ok s r s' h⟩
-  -- Non-failure: chase through guards. Each heapUpdate preserves heapPtrValid.
-  sorry
+  intro s₀ ⟨h_rb, h_ov, h_head_valid⟩
+  refine ⟨?_, fun r s' h => rb_pop_results_ok s₀ r s' h⟩
+  by_cases h_head : (hVal s₀.globals.rawHeap s₀.locals.rb).head = Ptr.null
+  · -- HEAD = NULL: early return via modify+throw, caught by catch+skip.
+    -- The condition is true, so cond takes modify+throw branch.
+    -- modify+throw has no ok results and doesn't fail.
+    -- Therefore seq(cond, rest) doesn't fail, and catch+skip doesn't fail.
+    unfold l1_rb_pop_body
+    apply L1_catch_seq_error_first_nf
+    · -- condition(true) = modify+throw, which doesn't fail
+      show ¬(L1.condition _ _ _ s₀).failed
+      simp only [L1.condition, show (decide ((hVal s₀.globals.rawHeap s₀.locals.rb).head = Ptr.null)) = true from decide_eq_true h_head, ↓reduceIte]
+      exact (L1_modify_throw_result _ s₀).2
+    · -- condition(true) = modify+throw, all results are error
+      intro r s' h_mem
+      show r = Except.error ()
+      simp only [L1.condition, show (decide ((hVal s₀.globals.rawHeap s₀.locals.rb).head = Ptr.null)) = true from decide_eq_true h_head, ↓reduceIte] at h_mem
+      rw [(L1_modify_throw_result _ s₀).1] at h_mem
+      exact (Prod.mk.inj h_mem).1
+  · -- HEAD ≠ NULL: guard chain non-failure (all heapPtrValid guards pass)
+    sorry
 
 -- rb_push non-failure + ok-only.
 -- Guards: heapPtrValid node (×2), heapPtrValid rb.tail (conditional, ×1), heapPtrValid rb (×5).
 -- No ptrDisjoint needed for non-failure (only for functional postcondition).
+set_option maxHeartbeats 51200000 in
 private theorem rb_push_for_drain :
     validHoare
       (fun s => heapPtrValid s.globals.rawHeap s.locals.rb ∧
@@ -118,9 +159,23 @@ private theorem rb_push_for_drain :
                   heapPtrValid s.globals.rawHeap (hVal s.globals.rawHeap s.locals.rb).tail))
       l1_rb_push_body
       (fun r _ => r = Except.ok ()) := by
-  intro s ⟨h_rb, h_node, h_tail⟩
-  refine ⟨?_, fun r s' h => rb_push_results_ok s r s' h⟩
-  sorry
+  intro s₀ ⟨h_rb, h_node, h_tail_valid⟩
+  refine ⟨?_, fun r s' h => rb_push_results_ok s₀ r s' h⟩
+  by_cases h_full : (hVal s₀.globals.rawHeap s₀.locals.rb).count ≥
+                    (hVal s₀.globals.rawHeap s₀.locals.rb).capacity
+  · -- FULL: early return via modify+throw, caught by catch+skip.
+    unfold l1_rb_push_body
+    apply L1_catch_seq_error_first_nf
+    · show ¬(L1.condition _ _ _ s₀).failed
+      simp only [L1.condition, show (decide ((hVal s₀.globals.rawHeap s₀.locals.rb).count ≥ (hVal s₀.globals.rawHeap s₀.locals.rb).capacity)) = true from decide_eq_true h_full, ↓reduceIte]
+      exact (L1_modify_throw_result _ s₀).2
+    · intro r s' h_mem
+      show r = Except.error ()
+      simp only [L1.condition, show (decide ((hVal s₀.globals.rawHeap s₀.locals.rb).count ≥ (hVal s₀.globals.rawHeap s₀.locals.rb).capacity)) = true from decide_eq_true h_full, ↓reduceIte] at h_mem
+      rw [(L1_modify_throw_result _ s₀).1] at h_mem
+      exact (Prod.mk.inj h_mem).1
+  · -- NOT FULL: guard chain non-failure (all heapPtrValid guards pass)
+    sorry
 
 /-! ## Main theorem
 
