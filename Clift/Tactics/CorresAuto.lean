@@ -116,7 +116,7 @@ private def findCalleeCorres (goal : MVarId) (calleeName : String) : MetaM (Opti
         return some (mkConst name)
     return none
 
-/-- Try to close a non-L1corres goal using rfl, simp, or native_decide.
+/-- Try to close a non-L1corres goal using rfl, simp, or decide.
     Returns true if the goal was closed. -/
 private def tryCloseGoal (g : MVarId) : TacticM Bool := do
   -- Try rfl first
@@ -134,10 +134,10 @@ private def tryCloseGoal (g : MVarId) : TacticM Bool := do
            L1.L1ProcEnv.insert, L1.L1ProcEnv.empty]))
     return true
   catch _ => pure ()
-  -- Try native_decide
+  -- Try decide (kernel-checked, unlike native_decide which uses trusted compiled code)
   try
     let _ ← Tactic.run g do
-      evalTactic (← `(tactic| native_decide))
+      evalTactic (← `(tactic| decide))
     return true
   catch _ => pure ()
   return false

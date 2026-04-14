@@ -341,7 +341,7 @@ private theorem extract_min_call_resolves :
 
 private theorem uint32_pqueue_typeTag_ne :
     (inferInstance : CType UInt32).typeTag ≠ (inferInstance : CType PriorityQueue.C_pqueue).typeTag := by
-  native_decide
+  decide
 
 -- pq_swap: catch(guard+modify chain, skip)
 -- Non-failure when data[i] and data[j] are heap-valid.

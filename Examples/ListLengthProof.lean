@@ -142,7 +142,7 @@ theorem listLengthInv_advance (xs : List Nat) (h₀ : HeapRawState) (s : Program
     have h_no_wrap : s.locals.count.toNat + 1 < 4294967296 := by omega
     have h_add : (s.locals.count + 1).toNat = s.locals.count.toNat + 1 := by
       have h_mod := UInt32.toNat_add s.locals.count 1
-      have h_one : (1 : UInt32).toNat = 1 := by native_decide
+      have h_one : (1 : UInt32).toNat = 1 := by decide
       rw [h_mod, h_one, Nat.mod_eq_of_lt h_no_wrap]
     rw [h_add]; omega
   · -- vs.length ≤ xs.length
