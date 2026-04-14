@@ -602,3 +602,34 @@ are fully proved as theorems. No axioms remain. The proofs rely on:
 
 For Phase 1, we manually construct L1 versions and compose the lemmas.
 The MetaM automation (Phase 2) will generate these compositions automatically. -/
+
+/-! # Bridge: L1corres + validHoare -> cHoare
+
+This theorem connects the L1 monadic world to the CSimpl Exec world.
+If the L1 monad overapproximates the CSimpl Exec semantics (L1corres),
+and the L1 monad satisfies a Hoare triple, then the CSimpl program
+satisfies a corresponding Hoare triple. -/
+
+theorem L1corres_cHoare_bridge {σ : Type} {Γ : ProcEnv σ}
+    {m : L1Monad σ} {c : CSimpl σ}
+    (h_corres : L1corres Γ m c)
+    {P : σ → Prop}
+    {Q_ok : σ → Prop}
+    {Q_err : σ → Prop}
+    (h_hoare : validHoare P m (fun r s =>
+      match r with
+      | Except.ok () => Q_ok s
+      | Except.error () => Q_err s)) :
+    cHoare Γ P c Q_ok Q_err := by
+  intro s h_P o h_exec
+  have ⟨h_nf, h_post⟩ := h_hoare s h_P
+  obtain ⟨h_ok, h_err, h_no_fault⟩ := h_corres s h_nf
+  match o with
+  | .normal s' =>
+    have h_mem := h_ok s' h_exec
+    exact h_post (Except.ok ()) s' h_mem
+  | .abrupt s' =>
+    have h_mem := h_err s' h_exec
+    exact h_post (Except.error ()) s' h_mem
+  | .fault =>
+    exact absurd h_exec h_no_fault

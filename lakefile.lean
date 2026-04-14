@@ -45,9 +45,6 @@ lean_lib Generated where
 @[default_target]
 lean_lib Examples where
   roots := #[`Examples.MaxProof, `Examples.MetaMTest, `Examples.Benchmark,
-             `Examples.GcdProof, `Examples.GcdCorrect, `Examples.GcdTypeStrengthen,
-             `Examples.GcdWordAbstract, `Examples.GcdPhase2,
-             `Examples.GcdL2,
              `Examples.GcdEndToEnd,
              `Examples.SwapProof, `Examples.SwapHeapLift,
              `Examples.SwapL2,

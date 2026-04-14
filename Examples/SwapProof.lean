@@ -5,17 +5,20 @@
 --           -> L1 lifting -> L1corres_cHoare_bridge
 
 import Generated.Swap
-import Clift.Lifting.SimplConv
+import Clift.Lifting.Pipeline
 import Clift.Lifting.L1HoareRules
 import Clift.MonadLib.HoareRules
-import Examples.GcdCorrect  -- for L1corres_cHoare_bridge
 
 set_option maxHeartbeats 12800000
 set_option maxRecDepth 16384
 
+/-! # Auto-generate L1 body + L1corres via clift -/
+
+clift Swap
+
 open Swap
 
-/-! # L1 monadic version of swap_body
+/-! # Step function decomposition for validHoare proofs
 
     Uses explicit constructors (CState.mk, Globals.mk, Locals.mk) instead of
     { s with ... } to avoid deep kernel term nesting from structure update
@@ -46,21 +49,15 @@ private noncomputable def swap_l1_step2 : L1Monad ProgramState :=
 private noncomputable def swap_l1_step3 : L1Monad ProgramState :=
   L1.seq (L1.guard (fun s => heapPtrValid s.globals.rawHeap s.locals.b)) (L1.modify swap_f3)
 
-noncomputable def l1_swap_body : L1Monad ProgramState :=
+/-- The swap body decomposed into named steps.
+    Proven equal to the clift-generated Swap.l1_swap_body. -/
+private noncomputable abbrev swap_body_decomposed : L1Monad ProgramState :=
   L1.catch (L1.seq swap_l1_step1 (L1.seq swap_l1_step2 swap_l1_step3)) L1.skip
 
-/-! # L1corres proof (sorry-free) -/
-
-theorem l1_swap_body_corres :
-    L1corres Swap.procEnv l1_swap_body Swap.swap_body := by
-  unfold l1_swap_body swap_l1_step1 swap_l1_step2 swap_l1_step3 Swap.swap_body
-  apply L1corres_catch
-  · apply L1corres_seq
-    · apply L1corres_guard; exact L1corres_basic _ _
-    · apply L1corres_seq
-      · apply L1corres_guard; apply L1corres_guard; exact L1corres_basic _ _
-      · apply L1corres_guard; exact L1corres_basic _ _
-  · exact L1corres_skip _
+private theorem swap_body_decomposed_eq :
+    swap_body_decomposed = Swap.l1_swap_body := by
+  unfold swap_body_decomposed swap_l1_step1 swap_l1_step2 swap_l1_step3 Swap.l1_swap_body
+  rfl
 
 /-! # validHoare for swap
 
@@ -75,7 +72,7 @@ theorem l1_swap_body_corres :
       s3 = {s2 with *b := t}     (guard ptrValid_b, modify *b := t)
     Final: catch produces s3, postcondition holds by heap update lemmas.
 
-    The key insight: l1_swap_body is defined using L1 combinators (guard, modify,
+    The key insight: swap_body_decomposed is defined using L1 combinators (guard, modify,
     seq, catch). We unfold it directly and work with the L1 combinator definitions,
     avoiding any intermediate abbrevs that would create kernel checking depth. -/
 
@@ -178,12 +175,12 @@ private theorem swap_f2_f1_heapPtrValid_b (s : ProgramState)
              swap_f1_locals_b]
   exact heapUpdate_preserves_heapPtrValid s.globals.rawHeap s.locals.a _ s.locals.b h_vb
 
-private theorem l1_swap_body_results (s : ProgramState)
+private theorem swap_body_decomposed_results (s : ProgramState)
     (h_va : heapPtrValid s.globals.rawHeap s.locals.a)
     (h_vb : heapPtrValid s.globals.rawHeap s.locals.b) :
-    ¬(l1_swap_body s).failed ∧
+    ¬(swap_body_decomposed s).failed ∧
     ∀ (r : Except Unit Unit) (s' : ProgramState),
-      (r, s') ∈ (l1_swap_body s).results →
+      (r, s') ∈ (swap_body_decomposed s).results →
       r = Except.ok () ∧
       s'.globals.rawHeap = heapUpdate
         (heapUpdate s.globals.rawHeap s.locals.a (hVal s.globals.rawHeap s.locals.b))
@@ -235,8 +232,8 @@ private theorem l1_swap_body_results (s : ProgramState)
     fun hf => h_seq23_nf (h_inner.2.mp hf)
   -- Outer catch: catch inner skip
   have h_catch := L1_catch_singleton_ok h_inner_res h_inner_nf
-  -- Now unfold l1_swap_body and conclude
-  unfold l1_swap_body
+  -- Now unfold swap_body_decomposed and conclude
+  unfold swap_body_decomposed
   constructor
   · exact h_catch.2
   · intro r s' h_mem
@@ -255,7 +252,7 @@ private theorem l1_swap_body_results (s : ProgramState)
     · -- s'.locals.b
       simp only [swap_f3_locals_b, swap_f2_locals_b, swap_f1_locals_b]
 
-/-- l1_swap_body does not fail and produces the expected postcondition. -/
+/-- Swap does not fail and produces the expected postcondition. -/
 theorem l1_swap_validHoare (va vb : UInt32) :
     validHoare
       (fun s : ProgramState =>
@@ -264,15 +261,16 @@ theorem l1_swap_validHoare (va vb : UInt32) :
         ptrDisjoint s.locals.a s.locals.b ∧
         hVal s.globals.rawHeap s.locals.a = va ∧
         hVal s.globals.rawHeap s.locals.b = vb)
-      l1_swap_body
+      Swap.l1_swap_body
       (fun r s =>
         match r with
         | Except.ok () =>
           hVal s.globals.rawHeap s.locals.a = vb ∧
           hVal s.globals.rawHeap s.locals.b = va
         | Except.error () => True) := by
+  rw [← swap_body_decomposed_eq]
   intro s ⟨h_va, h_vb, h_disj, h_val_a, h_val_b⟩
-  have ⟨h_nf, h_post⟩ := l1_swap_body_results s h_va h_vb
+  have ⟨h_nf, h_post⟩ := swap_body_decomposed_results s h_va h_vb
   constructor
   · exact h_nf
   · intro r s' h_mem
@@ -326,8 +324,8 @@ theorem swap_correct (va vb : UInt32) :
         hVal s.globals.rawHeap s.locals.a = vb ∧
         hVal s.globals.rawHeap s.locals.b = va)
       (fun _ => True) :=
-  L1corres_cHoare_bridge l1_swap_body_corres (l1_swap_validHoare va vb)
+  L1corres_cHoare_bridge Swap.l1_swap_body_corres (l1_swap_validHoare va vb)
 
-#print axioms l1_swap_body_corres
+#print axioms Swap.l1_swap_body_corres
 #print axioms swap_values_exchanged
 #print axioms swap_correct

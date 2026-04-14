@@ -11,7 +11,7 @@
 import Clift.AI.InvariantGen
 import Generated.Gcd
 import Generated.ListLength
-import Examples.GcdProof
+
 import Examples.ListLengthProof
 
 set_option maxHeartbeats 6400000

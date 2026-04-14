@@ -90,75 +90,12 @@ def lookup_fault_depth_mismatch_spec : FuncSpec ProgramState where
 
 /-! # Step 4: validHoare theorems -/
 
-/-! ## seL4 cap proof helpers
-
-    Strategy: Define our own L1 bodies explicitly, prove they equal the
-    generated ones, then prove validHoare for our explicit forms.
-    This avoids fighting with the macro-generated opaque definitions. -/
-
--- cap_get_capType: L1 body is catch (seq (modify f) throw) skip
-private noncomputable def l1_capType : L1Monad ProgramState :=
-  L1.catch (L1.seq (L1.modify
-    (fun s => { s with locals := { s.locals with ret__val := ((s.locals.w0 >>> 24) &&& 31) } }))
-    L1.throw) L1.skip
-
-private theorem l1_capType_eq : l1_capType = Sel4Cap.l1_cap_get_capType_body := by
-  unfold l1_capType Sel4Cap.l1_cap_get_capType_body; rfl
-
--- cap_get_capPtr: L1 body is catch (seq (modify f) throw) skip
-private noncomputable def l1_capPtr : L1Monad ProgramState :=
-  L1.catch (L1.seq (L1.modify
-    (fun s => { s with locals := { s.locals with ret__val := (s.locals.w0 &&& 16777215) } }))
-    L1.throw) L1.skip
-
-private theorem l1_capPtr_eq : l1_capPtr = Sel4Cap.l1_cap_get_capPtr_body := by
-  unfold l1_capPtr Sel4Cap.l1_cap_get_capPtr_body; rfl
-
--- isArchObjectType: catch (seq (cond (...) (cond (...) (modify+throw) skip) skip) (modify+throw)) skip
-private noncomputable def l1_isArch : L1Monad ProgramState :=
-  L1.catch
-    (L1.seq
-      (L1.condition (fun (st : ProgramState) => decide (st.locals.type >= 16))
-        (L1.condition (fun (st : ProgramState) => decide (st.locals.type <= 31))
-          (L1.seq (L1.modify (fun s => { s with locals := { s.locals with ret__val := 1 } })) L1.throw)
-          L1.skip)
-        L1.skip)
-      (L1.seq (L1.modify (fun s => { s with locals := { s.locals with ret__val := 0 } })) L1.throw))
-    L1.skip
-
-private theorem l1_isArch_eq : l1_isArch = Sel4Cap.l1_isArchObjectType_body := by
-  unfold l1_isArch Sel4Cap.l1_isArchObjectType_body; rfl
-
--- cap_is_null: catch (seq (modify capType:=...) (seq (modify ret:=...) throw)) skip
-private noncomputable def l1_isNull : L1Monad ProgramState :=
-  L1.catch
-    (L1.seq
-      (L1.modify (fun s => { s with locals := { s.locals with capType := ((s.locals.w0 >>> 24) &&& 31) } }))
-      (L1.seq (L1.modify (fun s => { s with locals := { s.locals with ret__val := (if s.locals.capType == 0 then 1 else 0) } })) L1.throw))
-    L1.skip
-
-private theorem l1_isNull_eq : l1_isNull = Sel4Cap.l1_cap_is_null_body := by
-  unfold l1_isNull Sel4Cap.l1_cap_is_null_body; rfl
-
--- lookup_fault_depth_mismatch: catch (seq (cond (...) (modify+throw) skip) (modify+throw)) skip
-private noncomputable def l1_depthMismatch : L1Monad ProgramState :=
-  L1.catch
-    (L1.seq
-      (L1.condition (fun s => decide (s.locals.bitsFound >= s.locals.bitsNeeded))
-        (L1.seq (L1.modify (fun s => { s with locals := { s.locals with ret__val := 0 } })) L1.throw)
-        L1.skip)
-      (L1.seq (L1.modify (fun s => { s with locals := { s.locals with ret__val := (s.locals.bitsNeeded - s.locals.bitsFound) } })) L1.throw))
-    L1.skip
-
-private theorem l1_depthMismatch_eq : l1_depthMismatch = Sel4Cap.l1_lookup_fault_depth_mismatch_body := by
-  unfold l1_depthMismatch Sel4Cap.l1_lookup_fault_depth_mismatch_body; rfl
-
-/-! ## validHoare proofs using explicit bodies -/
+/-! ## validHoare proofs using clift-generated bodies -/
 
 theorem cap_get_capType_correct :
     cap_get_capType_spec.satisfiedBy Sel4Cap.l1_cap_get_capType_body := by
   unfold FuncSpec.satisfiedBy cap_get_capType_spec
-  rw [← l1_capType_eq]; unfold l1_capType
+  unfold Sel4Cap.l1_cap_get_capType_body
   intro s _
   have ⟨h_res, h_nf⟩ := L1_modify_throw_catch_skip_result
     (fun s : ProgramState => { s with locals := { s.locals with ret__val := ((s.locals.w0 >>> 24) &&& 31) } }) s
@@ -169,7 +106,7 @@ theorem cap_get_capType_correct :
 theorem cap_get_capPtr_correct :
     cap_get_capPtr_spec.satisfiedBy Sel4Cap.l1_cap_get_capPtr_body := by
   unfold FuncSpec.satisfiedBy cap_get_capPtr_spec
-  rw [← l1_capPtr_eq]; unfold l1_capPtr
+  unfold Sel4Cap.l1_cap_get_capPtr_body
   intro s _
   have ⟨h_res, h_nf⟩ := L1_modify_throw_catch_skip_result
     (fun s : ProgramState => { s with locals := { s.locals with ret__val := (s.locals.w0 &&& 16777215) } }) s
@@ -215,7 +152,7 @@ private theorem L1_elim_cond_false {S : Type}
 theorem isArchObjectType_correct :
     isArchObjectType_spec.satisfiedBy Sel4Cap.l1_isArchObjectType_body := by
   unfold FuncSpec.satisfiedBy isArchObjectType_spec
-  rw [← l1_isArch_eq]; unfold l1_isArch
+  unfold Sel4Cap.l1_isArchObjectType_body
   intro s _
   -- The body is: catch (seq (condition b1 (condition b2 (modify+throw) skip) skip) (modify+throw)) skip
   -- Case split on the outer condition: type >= 16?
@@ -279,7 +216,7 @@ theorem isArchObjectType_correct :
 theorem cap_is_null_correct :
     cap_is_null_spec.satisfiedBy Sel4Cap.l1_cap_is_null_body := by
   unfold FuncSpec.satisfiedBy cap_is_null_spec
-  rw [← l1_isNull_eq]; unfold l1_isNull
+  unfold Sel4Cap.l1_cap_is_null_body
   intro s _
   let f1 : ProgramState → ProgramState :=
     fun s => { s with locals := { s.locals with capType := ((s.locals.w0 >>> 24) &&& 31) } }
@@ -306,7 +243,7 @@ theorem lookup_fault_depth_mismatch_correct :
     lookup_fault_depth_mismatch_spec.satisfiedBy
       Sel4Cap.l1_lookup_fault_depth_mismatch_body := by
   unfold FuncSpec.satisfiedBy lookup_fault_depth_mismatch_spec
-  rw [← l1_depthMismatch_eq]; unfold l1_depthMismatch
+  unfold Sel4Cap.l1_lookup_fault_depth_mismatch_body
   intro s _
   -- Case split on bitsFound >= bitsNeeded
   by_cases h1 : decide (s.locals.bitsFound >= s.locals.bitsNeeded) = true

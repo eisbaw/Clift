@@ -594,13 +594,14 @@ private theorem dw_heap_count_ptrValid_buf (s : ProgramState)
   simp only [dw_heap_count_rawHeap, dw_heap_count_locals]
   exact heapUpdate_preserves_heapPtrValid _ _ _ _ h
 
-/-! ### Manual L1 bodies using anonymous-constructor step functions
+/-! ### Decomposed L1 bodies using anonymous-constructor step functions
 
   The clift-generated L1 bodies use `{ s with ... }` which causes kernel deep recursion
-  on the 10-field Locals struct. We define equivalent L1 bodies using named step functions
-  with anonymous constructors, prove they're equal, then prove validHoare on the manual bodies. -/
+  on the 10-field Locals struct. We define equivalent decomposed bodies using named step
+  functions with anonymous constructors, prove they're definitionally equal to the
+  clift-generated ones, then prove validHoare on the decomposed forms. -/
 
-private noncomputable def l1_dma_write_manual : L1Monad ProgramState :=
+private noncomputable def dma_write_body_decomposed : L1Monad ProgramState :=
   let p := fun s : ProgramState => heapPtrValid s.globals.rawHeap s.locals.buf
   let pd := fun s : ProgramState => heapPtrValid s.globals.rawHeap
     (Ptr.elemOffset s.locals.data (hVal s.globals.rawHeap s.locals.buf).write_idx.toNat)
@@ -619,7 +620,7 @@ private noncomputable def l1_dma_write_manual : L1Monad ProgramState :=
             (L1.seq (L1.modify dma_set_ret0) L1.throw))))))
     L1.skip
 
-private noncomputable def l1_dma_read_manual : L1Monad ProgramState :=
+private noncomputable def dma_read_body_decomposed : L1Monad ProgramState :=
   let p := fun s : ProgramState => heapPtrValid s.globals.rawHeap s.locals.buf
   let po := fun s : ProgramState => heapPtrValid s.globals.rawHeap s.locals.out
   let prd := fun s : ProgramState => heapPtrValid s.globals.rawHeap
@@ -643,14 +644,14 @@ private noncomputable def l1_dma_read_manual : L1Monad ProgramState :=
 theorem dma_write_correct :
     dma_write_spec.satisfiedBy DmaBuffer.l1_dma_write_body := by
   -- The manual body is definitionally equal to the generated one
-  suffices h : dma_write_spec.satisfiedBy l1_dma_write_manual from h
+  suffices h : dma_write_spec.satisfiedBy dma_write_body_decomposed from h
   unfold FuncSpec.satisfiedBy dma_write_spec validHoare
   intro s ⟨hbuf, hdata, hlt⟩
   have hcond : decide ((hVal s.globals.rawHeap s.locals.buf).count >=
       (hVal s.globals.rawHeap s.locals.buf).capacity) = false := by
     rw [decide_eq_false_iff_not]; intro h
     exact absurd (UInt32.le_iff_toNat_le.mp h) (Nat.not_le.mpr (UInt32.lt_iff_toNat_lt.mp hlt))
-  unfold l1_dma_write_manual
+  unfold dma_write_body_decomposed
   rw [L1_elim_cond_false
     (fun st : ProgramState => decide ((hVal st.globals.rawHeap st.locals.buf).count >=
       (hVal st.globals.rawHeap st.locals.buf).capacity)) hcond]
@@ -758,14 +759,14 @@ private theorem dr_heap_count_ptrValid_buf (s : ProgramState)
 
 theorem dma_read_correct :
     dma_read_spec.satisfiedBy DmaBuffer.l1_dma_read_body := by
-  suffices h : dma_read_spec.satisfiedBy l1_dma_read_manual from h
+  suffices h : dma_read_spec.satisfiedBy dma_read_body_decomposed from h
   unfold FuncSpec.satisfiedBy dma_read_spec validHoare
   intro s ⟨hbuf, hout, hdata, hcount⟩
   have hcond : decide ((hVal s.globals.rawHeap s.locals.buf).count = 0) = false := by
     rw [decide_eq_false_iff_not]
     intro heq; rw [heq] at hcount
     exact absurd hcount (by decide)
-  unfold l1_dma_read_manual
+  unfold dma_read_body_decomposed
   rw [L1_elim_cond_false
     (fun st : ProgramState => decide ((hVal st.globals.rawHeap st.locals.buf).count = 0)) hcond]
   -- After cond false: catch (seq skip rest) skip

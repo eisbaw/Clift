@@ -12,7 +12,7 @@ import Generated.Gcd
 import Clift.Lifting.Pipeline
 import Clift.Lifting.WordAbstract
 import Clift.Tactics
-import Examples.GcdCorrect
+
 
 set_option maxHeartbeats 6400000
 set_option maxRecDepth 4096

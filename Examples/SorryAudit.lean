@@ -122,7 +122,7 @@ Same tautological postcondition issue as above. Split into separate file.
 
 ### Other Examples/ — ZERO sorry
 
-  GcdProof, GcdCorrect, SwapProof, SwapL2, Rotate3Proof, MaxProof,
+  GcdEndToEnd, SwapProof, SwapL2, Rotate3Proof, MaxProof,
   MultiCallProof, ListLengthProof, RingBufferProof, SoundnessCheck,
   TerminationProofs, AIInvariantTest, PhaseEMilestone, PipelineTest,
   L1AutoTest, L1VcgTest, RBExtProofsSimple, RBExtProofsLoops (proven theorems),

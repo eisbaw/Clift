@@ -8,7 +8,7 @@
 -- This is defense-in-depth. Even if lake build says success, we verify
 -- the kernel actually checked everything and no sorry leaked through.
 
-import Examples.GcdCorrect
+import Examples.GcdEndToEnd
 import Examples.SwapProof
 import Examples.SoundnessCheck
 import Examples.TerminationProofs
@@ -130,11 +130,11 @@ import Examples.MultiCallProof
 
 /-! ## Category 8: Concrete proofs (GCD, swap, etc.) -/
 
--- GCD (defined at top level, not namespaced)
-#print axioms l1_gcd_body_corres
+-- GCD (auto-generated via clift in GcdEndToEnd.lean)
+#print axioms Gcd.l1_gcd_body_corres
 
--- Swap (defined at top level in SwapProof.lean)
-#print axioms l1_swap_body_corres
+-- Swap (auto-generated via clift in SwapProof.lean)
+#print axioms Swap.l1_swap_body_corres
 
 -- MultiCall
 #print axioms MultiCall.l1_add_body_corres

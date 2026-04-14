@@ -12,7 +12,7 @@
 import Clift.CSemantics
 import Clift.MonadLib
 import Clift.Lifting.SimplConv
-import Examples.GcdCorrect  -- for L1corres_cHoare_bridge
+
 
 set_option maxHeartbeats 800000
 
