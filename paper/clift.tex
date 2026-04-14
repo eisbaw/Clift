@@ -654,6 +654,61 @@ module) and MetaM automation maturity.
 15 years of community refinement. Clift demonstrates feasibility, not
 production readiness.
 
+\subsection{Architecture Pivot: mvcgen and SpecM}
+
+Feedback from Sebastian Graf (Lean FRO) suggests a significant
+architectural simplification.  Two changes are proposed, both
+validated by his LeanCorres proof of
+concept~\cite{leancorres2026}:
+
+\paragraph{Replace custom Hoare logic with \texttt{Std.Do.Triple} and
+\texttt{mvcgen}.}
+Clift currently defines its own \texttt{validHoare} triple and
+maintains $\sim$960 lines of Hoare rules (\texttt{L1HoareRules}) plus
+$\sim$675 lines of VCG tactics.  Lean's standard library now includes
+\texttt{Std.Do.Triple}, a weakest-precondition Hoare logic for
+monadic programs, together with \texttt{mvcgen}, a tactic that
+automates verification-condition generation.  Adopting these would
+eliminate the painful \texttt{simp only [L1.seq]} chains that
+currently dominate Clift proofs, and may alleviate the kernel
+reduction depth issues described above, since \texttt{mvcgen} operates
+at the tactic level rather than through definitional unfolding.
+
+\paragraph{Skip CSimpl, emit monadic code directly from CImporter.}
+Industry users of AutoCorres2 have reported that CSimpl---the deeply
+embedded intermediate representation---is a ``legacy artifact'' that
+adds complexity without proportional benefit.  LeanCorres demonstrates
+the alternative: a denotational semantics maps C~AST statements
+directly into a \texttt{SpecM} monad (a faithful port of AutoCorres2's
+\texttt{Spec\_Monad} with demonic nondeterminism and CCPO-based least
+fixpoints for loops).  This would eliminate Clift's CSimpl
+($\sim$64~LOC), Exec ($\sim$239~LOC), SimplConv ($\sim$604~LOC), and
+all \texttt{L1corres} refinement proofs---roughly 2,500 lines of code
+and proof.
+
+\paragraph{Tradeoffs.}
+The simplification comes at a cost: absorbing \texttt{L1corres}
+proofs into the CImporter expands the Trusted Computing Base.
+Currently, only the CImporter is trusted; the five-stage refinement
+chain is machine-checked.  Under the proposed architecture, the
+CImporter would also be responsible for the correctness of the
+monadic translation---a responsibility currently discharged by
+\texttt{L1corres} theorems.  Notably, LeanCorres's four remaining
+\texttt{sorry} are concentrated precisely at this CLight-to-SpecM
+bridge, suggesting that proving the denotational semantics correct is
+not free, merely deferred.
+
+\paragraph{Feasibility evidence.}
+LeanCorres ($\sim$2,000~LOC, 8~commits) demonstrates that the
+approach works end to end: its \texttt{SpecM} monad supports
+\texttt{whileLoop} via CCPO least fixpoints with
+\texttt{WhileInvariant} (including well-founded termination via
+\texttt{Acc}), and its sorry-free Schorr--Waite proof ($\sim$800
+lines) shows that \texttt{mvcgen} handles complex pointer algorithms.
+Nondeterminism and while loops---two constructs central to C
+verification---are fully supported, so neither is a blocker for
+adoption.
+
 % ─── 7. conclusion ─────────────────────────────────────────────────
 \section{Conclusion}
 
