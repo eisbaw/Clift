@@ -287,12 +287,12 @@ lint-semantic MODULE="all":
     fi
     for M in "${TARGETS[@]}"; do
       echo -n "  Lint${M}... "
-      if lake build "Tools.Lint.Lean.Lint${M}" 2>&1 | tail -1 | grep -q "successfully"; then
+      if lake build -j1 "Tools.Lint.Lean.Lint${M}" 2>&1 | tail -1 | grep -q "successfully"; then
         echo "OK"
         PASS=$((PASS + 1))
       else
         echo "FAIL"
-        lake build "Tools.Lint.Lean.Lint${M}" 2>&1 | grep -E "LINT|WARN|FAIL|error" | head -5
+        lake build -j1 "Tools.Lint.Lean.Lint${M}" 2>&1 | grep -E "LINT|WARN|FAIL|error" | head -5
         FAIL=$((FAIL + 1))
       fi
     done
