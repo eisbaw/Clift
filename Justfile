@@ -271,6 +271,43 @@ lint:
 audit:
     python3 tools/lint/audit.py
 
+# Semantic lint: per-module MetaM checks (tautological post, vacuous pre, axiom audit)
+# Each module runs independently (~5GB, ~30s) for isolation and progress visibility
+lint-semantic MODULE="all":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    MODULES=(GcdEndToEnd HashTable Swap DmaBuffer PacketParser MemAlloc RtosQueue \
+             Sha256 UartDriver Sel4Cap StateMachine PriorityQueue \
+             RBSimple RBLoops RBLoops2 RBRefinement)
+    PASS=0; FAIL=0
+    if [ "{{MODULE}}" = "all" ]; then
+      TARGETS=("${MODULES[@]}")
+    else
+      TARGETS=("{{MODULE}}")
+    fi
+    for M in "${TARGETS[@]}"; do
+      echo -n "  Lint${M}... "
+      if lake build "Tools.Lint.Lean.Lint${M}" 2>&1 | tail -1 | grep -q "successfully"; then
+        echo "OK"
+        PASS=$((PASS + 1))
+      else
+        echo "FAIL"
+        lake build "Tools.Lint.Lean.Lint${M}" 2>&1 | grep -E "LINT|WARN|FAIL|error" | head -5
+        FAIL=$((FAIL + 1))
+      fi
+    done
+    echo "=== Semantic lint: $PASS/$((PASS+FAIL)) passed ==="
+    [ "$FAIL" -eq 0 ]
+
+# Full audit: Python checks + semantic lint
+audit-full:
+    just audit
+    just lint-semantic
+
+# Test the audit tools themselves
+test-audit:
+    python3 -m pytest tools/lint/tests/ -v
+
 # Clean Lake build artifacts
 clean:
     lake clean

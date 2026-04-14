@@ -104,3 +104,25 @@ lean_lib Examples where
              `Examples.DmaBufferProof,
              `Examples.SpecCompletenessReview,
              `Examples.ArrayBoundsProof]
+
+-- Per-module semantic lint targets (not default -- run explicitly)
+lean_lib «Tools.Lint.Lean» where
+  srcDir := "."
+  roots := #[
+    `Tools.Lint.Lean.LintGcdEndToEnd,
+    `Tools.Lint.Lean.LintHashTable,
+    `Tools.Lint.Lean.LintSwap,
+    `Tools.Lint.Lean.LintDmaBuffer,
+    `Tools.Lint.Lean.LintPacketParser,
+    `Tools.Lint.Lean.LintMemAlloc,
+    `Tools.Lint.Lean.LintRtosQueue,
+    `Tools.Lint.Lean.LintSha256,
+    `Tools.Lint.Lean.LintUartDriver,
+    `Tools.Lint.Lean.LintSel4Cap,
+    `Tools.Lint.Lean.LintStateMachine,
+    `Tools.Lint.Lean.LintPriorityQueue,
+    `Tools.Lint.Lean.LintRBSimple,
+    `Tools.Lint.Lean.LintRBLoops,
+    `Tools.Lint.Lean.LintRBLoops2,
+    `Tools.Lint.Lean.LintRBRefinement
+  ]
