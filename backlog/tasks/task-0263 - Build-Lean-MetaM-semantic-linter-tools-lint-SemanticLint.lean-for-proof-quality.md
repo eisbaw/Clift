@@ -3,9 +3,11 @@ id: TASK-0263
 title: >-
   Build Lean MetaM semantic linter (tools/lint/SemanticLint.lean) for proof
   quality
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-04-14 18:49'
+updated_date: '2026-04-14 18:55'
 labels:
   - tooling
   - audit
@@ -83,3 +85,21 @@ REFERENCE:
 - [ ] #5 Integrated into CI pipeline
 - [ ] #6 Reviews and subsumes TASK-0232, semantic parts of TASK-0258, detection part of TASK-0261
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Create Clift/Lint/ directory and SemanticLint.lean
+2. Implement 5 checks as MetaM functions (simplest first):
+   a. axiom_audit: walk ConstantInfo for sorryAx/trustCompiler in transitive deps
+   b. spec_strength: inspect FuncSpec post bodies for ret__val references and x=x tautologies
+   c. satisfiedBy_target: check that satisfiedBy proofs reference Generated.* L1 bodies
+   d. tautological_postcondition: try isDefEq with True after forall-intro
+   e. vacuous_precondition: try to prove negation of pre existence
+3. Register a #clift_lint command that runs all checks on the environment
+4. Create Clift/Lint.lean umbrella import
+5. Update lakefile.lean (Clift lib already uses srcDir "." so it should auto-include)
+6. Update Clift.lean to import Clift.Lint
+7. Build and test with lake build Clift.Lint.SemanticLint
+8. Git commit
+<!-- SECTION:PLAN:END -->
