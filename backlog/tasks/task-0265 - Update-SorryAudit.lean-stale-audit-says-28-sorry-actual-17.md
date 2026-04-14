@@ -1,7 +1,7 @@
 ---
 id: TASK-0265
 title: 'Update SorryAudit.lean: stale audit (says 28 sorry, actual 17)'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-14 20:53'
