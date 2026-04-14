@@ -334,7 +334,38 @@ audit:
       echo "  OK: No circular result-set definitions found"
     fi
 
-    # 5. Sorry in core library (must always be 0)
+    # 5. Custom axioms (must be 0 — only standard Lean axioms allowed)
+    echo ""
+    echo "--- Custom axioms ---"
+    AXIOMS=$(grep -rn "^axiom \|^constant " --include="*.lean" Clift/ Examples/ \
+      | grep -v cruft | grep -v "^.*:.*--" | wc -l || true)
+    if [ "$AXIOMS" -gt 0 ]; then
+      echo "  FAIL: $AXIOMS custom axiom/constant declarations"
+      grep -rn "^axiom \|^constant " --include="*.lean" Clift/ Examples/ \
+        | grep -v cruft | grep -v "^.*:.*--"
+      ISSUES=$((ISSUES + AXIOMS))
+    else
+      echo "  OK: No custom axioms (only propext, Quot.sound, Classical.choice)"
+    fi
+
+    # 6. sorryAx in compiled proof files (check .olean axiom traces)
+    echo ""
+    echo "--- sorryAx in compiled theorems ---"
+    SORRY_AX=$(find .lake/build/lib/lean/Examples -name "*.olean" 2>/dev/null | head -1)
+    if [ -n "$SORRY_AX" ]; then
+      # Build the axiom audit file which #print axioms on key theorems
+      if $HOME/.elan/toolchains/leanprover--lean4---v4.30.0-rc1/bin/lake build Examples.AxiomAudit 2>&1 | grep -q "sorryAx"; then
+        echo "  FAIL: sorryAx found in compiled theorems"
+        $HOME/.elan/toolchains/leanprover--lean4---v4.30.0-rc1/bin/lake build Examples.AxiomAudit 2>&1 | grep "sorryAx"
+        ISSUES=$((ISSUES + 1))
+      else
+        echo "  OK: No sorryAx in any compiled theorem"
+      fi
+    else
+      echo "  SKIP: No .olean files found (run lake build first)"
+    fi
+
+    # 7. Sorry in core library (must always be 0)
     echo ""
     echo "--- Sorry in core library ---"
     LIB_SORRY=$(grep -rn "^\s*sorry" Clift/ --include="*.lean" | grep -c "sorry" || true)
@@ -346,7 +377,7 @@ audit:
       echo "  OK: Core library sorry-free"
     fi
 
-    # 6. Sorry in example proofs
+    # 8. Sorry in example proofs
     echo ""
     echo "--- Sorry in proof files ---"
     SORRY=$(grep -rn '; sorry\|by sorry\|^\s\+sorry' Examples/ --include="*.lean" \
