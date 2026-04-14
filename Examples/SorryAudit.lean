@@ -8,92 +8,99 @@
 
 import Clift.CSemantics
 
-/-! # Sorry Audit — 2026-04-08
+/-! # Sorry Audit — 2026-04-14
 
 ## Executive summary
 
-  Total sorry in codebase: 28
-  - Core library (Clift/):     0  (ZERO sorry in MonadLib, CSemantics, Lifting, Tactics)
-  - Generated code:            0  (ZERO sorry in Generated/)
-  - Examples/RBExtFuncSpecs:   25 (validHoare proofs for ring buffer functions)
-  - Examples/RBExtRefinement:  3  (refinement proofs, blocked on the 25 above)
-  - Other Examples:            0  (ZERO sorry in GCD, Swap, SoundnessCheck, etc.)
+  Total sorry in codebase: 17
+  - Core library (Clift/):           0  (ZERO sorry in MonadLib, CSemantics, Lifting, Tactics)
+  - Generated code:                  0  (ZERO sorry in Generated/)
+  - Examples/PriorityQueueProof:     5  (pq_swap body, bubble_up, insert guards, extract_min)
+  - Examples/RBExtProofRbDrainTo:    5  (drain_to loop: non-failure, invariant, abrupt + callee chains)
+  - Examples/RBExtProofsLoops:       2  (count_nodes, sum — tautological postconditions)
+  - Examples/RBExtProofsLoops2:      2  (count_above, count_at_or_below — tautological postconditions)
+  - Examples/RBExtRefinement:        3  (refinement: all-ops, inv_preserved, fifo transfer)
+  - Other Examples:                  0  (ZERO sorry in GCD, Swap, SoundnessCheck, etc.)
 
-  The 28 sorry are ALL in the Examples/ directory, not in the core library.
+  The 17 sorry are ALL in the Examples/ directory, not in the core library.
   The core library (MonadLib, CSemantics, Lifting, Tactics) is sorry-free.
 
 ## Severity classification
 
   - **Core sorry** (would invalidate the framework): 0
-  - **Proof sorry** (proofs not yet completed): 25 (RBExtFuncSpecs validHoare)
-  - **Blocked sorry** (transitively blocked): 3 (RBExtRefinement, blocked on above 25)
+  - **Proof sorry — tautological postcondition** (need spec strengthening): 4
+    (count_nodes, sum, count_above, count_at_or_below — blocked on TASK-0231)
+  - **Proof sorry — inter-procedural** (need dynCom/call composition): 8
+    (pq_swap body, bubble_up, insert x2, extract_min, drain_to x3)
+  - **Blocked sorry** (transitively blocked on validHoare proofs): 3
+    (RBExtRefinement: all-ops, inv_preserved, fifo)
   - **Stub sorry** (placeholder for future work): 0
 
 ## Detailed inventory
 
-### File: Examples/RBExtFuncSpecs.lean (25 sorry)
+### File: Examples/PriorityQueueProof.lean (5 sorry)
 
-All 25 are validHoare proofs for ring buffer functions. The FuncSpecs
-themselves (preconditions/postconditions) are fully defined with no sorry.
-The sorry is in the PROOF that the L1 body satisfies the spec.
+Priority queue proofs involving array-based heap operations with dynCom calls.
 
-| # | Line | Theorem                              | Category   | Effort | Blocked by        |
-|---|------|--------------------------------------|------------|--------|-------------------|
-| 1 | 219  | rb_push_validHoare                   | multi-heap | 2 days | projection lemmas |
-| 2 | 225  | rb_pop_validHoare                    | multi-heap | 2 days | projection lemmas |
-| 3 | 231  | rb_count_nodes_validHoare            | loop       | 1 day  | loop invariant    |
-| 4 | 236  | rb_contains_validHoare               | loop       | 1 day  | loop invariant    |
-| 5 | 241  | rb_find_index_validHoare             | loop       | 1 day  | loop invariant    |
-| 6 | 246  | rb_nth_validHoare                    | loop       | 1 day  | loop invariant    |
-| 7 | 251  | rb_sum_validHoare                    | loop       | 1 day  | loop invariant    |
-| 8 | 256  | rb_increment_all_validHoare          | loop       | 1 day  | loop invariant    |
-| 9 | 261  | rb_count_above_validHoare            | loop       | 0.5d   | loop invariant    |
-|10 | 266  | rb_count_at_or_below_validHoare      | loop       | 0.5d   | loop invariant    |
-|11 | 271  | rb_swap_front_back_validHoare        | multi-heap | 1.5d   | projection lemmas |
-|12 | 276  | rb_max_validHoare                    | loop       | 1 day  | loop invariant    |
-|13 | 281  | rb_replace_all_validHoare            | loop       | 1 day  | loop invariant    |
-|14 | 286  | rb_fill_validHoare                   | loop       | 1 day  | loop invariant    |
-|15 | 291  | rb_reverse_validHoare                | loop       | 3 days | pointer reversal  |
-|16 | 296  | rb_remove_first_match_validHoare     | heap+loop  | 2 days | inv + projection  |
-|17 | 301  | rb_equal_validHoare                  | loop       | 1.5d   | dual-ptr inv      |
-|18 | 306  | rb_check_integrity_validHoare        | call       | 0.5d   | callee spec       |
-|19 | 311  | rb_iter_next_validHoare              | multi-heap | 1 day  | projection lemmas |
-|20 | 316  | rb_iter_skip_validHoare              | loop       | 1 day  | loop invariant    |
-|21 | 321  | rb_push_if_not_full_validHoare       | call       | 0.5d   | push spec         |
-|22 | 326  | rb_pop_if_not_empty_validHoare       | call       | 0.5d   | pop spec          |
-|23 | 331  | rb_drain_to_validHoare               | call+loop  | 3 days | push+pop specs    |
-|24 | 336  | rb_clear_validHoare                  | heap+loop  | 2 days | inv + projection  |
-|25 | 341  | rb_min_validHoare                    | loop       | 1 day  | loop invariant    |
+| # | Line | Theorem / context                    | Category       | Effort | Blocked by                   |
+|---|------|--------------------------------------|----------------|--------|------------------------------|
+| 1 | 363  | pq_swap body (catch body)            | guard+heap     | 1 day  | heapUpdate chain reasoning   |
+| 2 | 395  | pq_bubble_up_ok_hoare                | while+dynCom   | 3 days | loop inv + dynCom(pq_swap)   |
+| 3 | 449  | pq_insert (guard+modify data write)  | guard+heap     | 0.5d   | dataArrayValid preservation  |
+| 4 | 455  | pq_insert (dynCom+size++ chain)      | dynCom+chain   | 1 day  | bubble_up callee spec        |
+| 5 | 466  | pq_extract_min_correct               | call+loop      | 3 days | bubble_down callee spec      |
 
-  Estimated total effort: ~30 person-days
-  Critical path: push/pop specs (4 days) → call specs (1.5 days) → drain_to (3 days)
+  Estimated effort: ~8.5 person-days
+  Critical path: pq_swap (1d) -> bubble_up (3d) -> insert/extract_min (4d)
 
-### File: Examples/RBExtFuncSpecs.lean (7 additional totalHoare sorry)
+### File: Examples/RBExtProofRbDrainTo.lean (5 sorry)
 
-These are the totalHoare statements from task 0139. Each requires its
-corresponding validHoare proof + the existing Terminates proof.
+Ring buffer drain-to: loop calling rb_pop on src and rb_push on dst via dynCom.
 
-| # | Line | Theorem                              | Blocked by                        |
-|---|------|--------------------------------------|-----------------------------------|
-|26 | ~370 | rb_capacity_totalHoare               | rb_capacity validHoare            |
-|27 | ~375 | rb_size_totalHoare                   | rb_size validHoare                |
-|28 | ~380 | rb_remaining_totalHoare              | rb_remaining validHoare           |
-|29 | ~385 | rb_is_empty_totalHoare               | rb_is_empty validHoare            |
-|30 | ~390 | rb_is_full_totalHoare                | rb_is_full validHoare             |
-|31 | ~395 | rb_stats_total_ops_totalHoare        | rb_stats_total_ops validHoare     |
-|32 | ~400 | rb_iter_has_next_totalHoare          | rb_iter_has_next validHoare       |
+| # | Line | Theorem / context                    | Category       | Effort | Blocked by                   |
+|---|------|--------------------------------------|----------------|--------|------------------------------|
+| 6 | 148  | rb_pop_for_drain (not-empty branch)  | guard chain    | 1 day  | heapPtrValid chain           |
+| 7 | 178  | rb_push_for_drain (not-full branch)  | guard chain    | 1 day  | heapPtrValid chain           |
+| 8 | 239  | drain_to while h_body_nf             | dynCom+loop    | 2 days | callee non-failure           |
+| 9 | 246  | drain_to while h_body_inv            | dynCom+loop    | 3 days | LinkedListValid in invariant |
+|10 | 254  | drain_to while h_abrupt              | dynCom+loop    | 1 day  | heapUpdate preservation      |
 
-  Effort: ~1 day total (once validHoare proofs done: combine with Terminates)
+  Estimated effort: ~8 person-days
+  Critical path: pop/push callees (2d) -> loop body (5d)
+  Blocker: invariant needs LinkedListValid for head-validity after iteration.
+
+### File: Examples/RBExtProofsLoops.lean (2 sorry)
+
+Loop proofs with tautological postconditions (count=count). Previous proofs
+used validHoare_weaken_trivial_post and were moved to bogus/.
+
+| # | Line | Theorem                              | Category       | Effort | Blocked by                   |
+|---|------|--------------------------------------|----------------|--------|------------------------------|
+|11 | 383  | rb_count_nodes_validHoare            | tautological   | 1 day  | TASK-0231 spec strengthening |
+|12 |1452  | rb_sum_validHoare                    | tautological   | 1 day  | TASK-0231 spec strengthening |
+
+  Estimated effort: ~2 person-days (after specs are strengthened)
+
+### File: Examples/RBExtProofsLoops2.lean (2 sorry)
+
+Same tautological postcondition issue as above. Split into separate file.
+
+| # | Line | Theorem                              | Category       | Effort | Blocked by                   |
+|---|------|--------------------------------------|----------------|--------|------------------------------|
+|13 | 10   | rb_count_above_validHoare            | tautological   | 0.5d   | TASK-0231 spec strengthening |
+|14 | 14   | rb_count_at_or_below_validHoare      | tautological   | 0.5d   | TASK-0231 spec strengthening |
+
+  Estimated effort: ~1 person-day (after specs are strengthened)
 
 ### File: Examples/RBExtRefinement.lean (3 sorry)
 
-| # | Line | Theorem                              | Blocked by                   |
-|---|------|--------------------------------------|------------------------------|
-|33 | 487  | ring_buffer_ext_refines_queue_spec   | all 25 validHoare proofs     |
-|34 | 500  | rbExtSystemRefinement.inv_preserved  | theorem 33                   |
-|35 | 530  | fifo_holds_at_c_level               | theorem 33                   |
+| # | Line | Theorem                              | Category       | Effort | Blocked by                   |
+|---|------|--------------------------------------|----------------|--------|------------------------------|
+|15 | 507  | ring_buffer_ext_refines_queue_spec   | refinement     | 3 days | all validHoare proofs        |
+|16 | 520  | rbExtSystemRefinement.inv_preserved  | refinement     | 1 day  | theorem 15                   |
+|17 | 550  | fifo_holds_at_c_level               | refinement     | 1 day  | theorem 15                   |
 
-  Effort: ~3 days (once all 25 validHoare proofs done)
+  Estimated effort: ~5 person-days (once all validHoare proofs done)
 
 ### Core library: Clift/ — ZERO sorry
 
@@ -118,35 +125,39 @@ corresponding validHoare proof + the existing Terminates proof.
   GcdProof, GcdCorrect, SwapProof, SwapL2, Rotate3Proof, MaxProof,
   MultiCallProof, ListLengthProof, RingBufferProof, SoundnessCheck,
   TerminationProofs, AIInvariantTest, PhaseEMilestone, PipelineTest,
-  L1AutoTest, L1VcgTest: ALL sorry-free.
+  L1AutoTest, L1VcgTest, RBExtProofsSimple, RBExtProofsLoops (proven theorems),
+  PacketParserProof, DmaBufferProof, Sel4CapProof: ALL sorry-free.
 
 ## Sorry elimination roadmap
 
   Priority order (maximizes sorry reduction per effort):
 
-  1. **Simple accessors** (rb_size, rb_capacity, rb_remaining, rb_is_empty, rb_is_full,
-     rb_stats_total_ops, rb_iter_has_next): ~3 days for 7 sorry + unlocks 7 totalHoare
-     = 14 sorry eliminated.
+  1. **Tautological specs** (TASK-0231): Strengthen postconditions for
+     count_nodes, sum, count_above, count_at_or_below. Once specs are
+     meaningful, reproving is ~3 person-days for 4 sorry eliminated.
 
-  2. **Multi-heap** (rb_push, rb_pop, rb_swap_front_back, rb_iter_next): ~6.5 days
-     for 4 sorry + unlocks 3 call sorry (check_integrity, push_if_not_full,
-     pop_if_not_empty) = 7 sorry eliminated.
+  2. **Guard chains** (drain_to callees): rb_pop_for_drain and rb_push_for_drain
+     are Pattern C (multi-step guard+modify). ~2 days for 2 sorry eliminated.
 
-  3. **Loop functions** (13 remaining): ~14 days. Establish loop invariant pattern
-     on rb_count_nodes first, then apply to others.
+  3. **PQ accessors** (pq_swap body, insert guard+modify): Pattern C guard
+     chains with heap reasoning. ~1.5 days for 2 sorry eliminated.
 
-  4. **Hard cases** (rb_reverse, rb_drain_to, rb_remove_first_match, rb_clear):
-     ~10 days. Pointer reversal and combined call+loop proofs.
+  4. **Inter-procedural** (bubble_up, insert dynCom chain, extract_min,
+     drain_to loop): These need dynCom/call composition (Pattern E).
+     Currently BLOCKED on L1_hoare_dynCom_call rule (TASK-0235).
+     ~12 days for 6 sorry once the rule exists.
 
-  5. **Refinement** (3 sorry in RBExtRefinement): ~3 days after all validHoare done.
+  5. **Refinement** (3 sorry in RBExtRefinement): ~5 days after all
+     validHoare proofs done. Transitively blocked on everything above.
 
-  Total estimated: ~36.5 person-days to reach zero sorry.
+  Total estimated: ~23.5 person-days to reach zero sorry.
+  Hard blocker: TASK-0235 (dynCom call rule) blocks 6 sorry.
 
 ## CI metric
 
-  Current sorry count: 35 (28 original + 7 new totalHoare)
+  Current sorry count: 17
   Target: 0
-  Tracking: `just sorry-count` reports actual sorry lines
+  Tracking: `just sorry-count` and `python3 tools/lint/audit.py --skip-lake`
 -/
 
 -- This file is documentation-only. No Lean declarations needed.
