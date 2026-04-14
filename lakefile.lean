@@ -48,6 +48,7 @@ lean_lib Examples where
              `Examples.GcdProof, `Examples.GcdCorrect, `Examples.GcdTypeStrengthen,
              `Examples.GcdWordAbstract, `Examples.GcdPhase2,
              `Examples.GcdL2,
+             `Examples.GcdEndToEnd,
              `Examples.SwapProof, `Examples.SwapHeapLift,
              `Examples.SwapL2,
              `Examples.Rotate3Proof,
