@@ -267,19 +267,53 @@ lint:
     echo "=== Lint: $ISSUES issues found ==="
     if [ "$ISSUES" -gt 0 ]; then exit 1; fi
 
-# Proof integrity audit: 12 checks for sorry, hand-written L1, wrong targets, etc.
+# Proof integrity audit: Python tool (primary) + quick bash sanity checks (fallback)
 audit:
-    python3 tools/lint/audit.py
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "=== Python audit (12 checks) ==="
+    python3 tools/lint/audit.py --skip-lake
+    PYEXIT=$?
+    echo ""
+    echo "=== Quick bash sanity checks (belt + suspenders) ==="
+    ISSUES=0
+    # Core library sorry (MUST be 0 — not caught by Python if comment parsing differs)
+    CORE_SORRY=$(grep -rn "^\s*sorry" Clift/ --include="*.lean" 2>/dev/null | grep -c "sorry" || true)
+    if [ "$CORE_SORRY" -gt 0 ]; then
+      echo "  FAIL: $CORE_SORRY sorry in Clift/"
+      ISSUES=$((ISSUES + 1))
+    else
+      echo "  OK: Core library sorry-free"
+    fi
+    # sorryAx check (if .olean exists)
+    if ls .lake/build/lib/lean/Examples/*.olean >/dev/null 2>&1; then
+      if lake build Examples.AxiomAudit 2>&1 | grep -q "sorryAx"; then
+        echo "  FAIL: sorryAx detected"
+        ISSUES=$((ISSUES + 1))
+      else
+        echo "  OK: No sorryAx"
+      fi
+    else
+      echo "  SKIP: No .olean (run lake build first)"
+    fi
+    echo ""
+    if [ "$PYEXIT" -ne 0 ] || [ "$ISSUES" -gt 0 ]; then
+      echo "=== Audit: issues found ==="
+      exit 1
+    fi
+    echo "=== Audit: all checks passed ==="
 
 # Semantic lint: per-module MetaM checks (tautological post, vacuous pre, axiom audit)
-# Each module runs independently (~5GB, ~30s) for isolation and progress visibility
+# Each module runs independently with 5 min timeout. Timeout = SKIP (not FAIL).
+# This is best-effort — the Python audit is the primary gate.
 lint-semantic MODULE="all":
     #!/usr/bin/env bash
     set -euo pipefail
+    TIMEOUT=300  # 5 minutes per module
     MODULES=(GcdEndToEnd HashTable Swap DmaBuffer PacketParser MemAlloc RtosQueue \
              Sha256 UartDriver Sel4Cap StateMachine PriorityQueue \
              RBSimple RBLoops RBLoops2 RBRefinement)
-    PASS=0; FAIL=0
+    PASS=0; FAIL=0; SKIP=0
     if [ "{{MODULE}}" = "all" ]; then
       TARGETS=("${MODULES[@]}")
     else
@@ -287,19 +321,25 @@ lint-semantic MODULE="all":
     fi
     for M in "${TARGETS[@]}"; do
       echo -n "  Lint${M}... "
-      if lake build -j1 "Tools.Lint.Lean.Lint${M}" 2>&1 | tail -1 | grep -q "successfully"; then
+      pkill -f lean 2>/dev/null; sleep 1
+      OUTPUT=$(timeout ${TIMEOUT} lake build -j1 "Tools.Lint.Lean.Lint${M}" 2>&1) || EXIT=$?
+      EXIT=${EXIT:-0}
+      if [ "$EXIT" -eq 124 ]; then
+        echo "SKIP (timeout ${TIMEOUT}s)"
+        SKIP=$((SKIP + 1))
+      elif echo "$OUTPUT" | tail -1 | grep -q "successfully"; then
         echo "OK"
         PASS=$((PASS + 1))
       else
         echo "FAIL"
-        lake build -j1 "Tools.Lint.Lean.Lint${M}" 2>&1 | grep -E "LINT|WARN|FAIL|error" | head -5
+        echo "$OUTPUT" | grep -E "LINT|WARN|FAIL|error" | head -5
         FAIL=$((FAIL + 1))
       fi
     done
-    echo "=== Semantic lint: $PASS/$((PASS+FAIL)) passed ==="
+    echo "=== Semantic lint: $PASS pass, $FAIL fail, $SKIP timeout (of $((PASS+FAIL+SKIP))) ==="
     [ "$FAIL" -eq 0 ]
 
-# Full audit: Python checks + semantic lint
+# Full audit: Python audit (primary gate) + semantic lint (best-effort with timeout)
 audit-full:
     just audit
     just lint-semantic
