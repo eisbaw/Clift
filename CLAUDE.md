@@ -633,3 +633,11 @@ Tests:
 Full help available: `backlog --help`
 
 <!-- BACKLOG.MD GUIDELINES END -->
+
+---
+
+## GitHub CI
+
+- **No logic in CI workflow YAML.** GitHub Actions workflows must only call `nix develop` and `just` recipes.
+- All build, lint, test, and audit logic lives in the Justfile (and is runnable locally).
+- If CI needs a new check, add a Justfile recipe first, then call it from the workflow.

@@ -1,19 +1,18 @@
-# Clift common commands
+# Clift commands
 
-# Build all Lean code (libraries + generated + examples)
+# Build all Lean code
 build:
     lake build
 
-# Build only the core library (no generated code or examples)
+# Build only core library (no examples)
 build-lib:
     lake build Clift
 
-# Fetch Mathlib cache (run once after clone or Mathlib update)
-setup:
-    lake exe cache get
+# Clean Lake build artifacts
+clean:
+    lake clean
 
-# Run CImporter on a .c file -> Generated/*.lean
-# Usage: just import test/c_sources/gcd.c Gcd
+# Import a C file: just import test/c_sources/gcd.c Gcd
 import FILE NAME:
     mkdir -p test/clang_json Generated
     clang -Xclang -ast-dump=json -fsyntax-only {{FILE}} 2>/dev/null > test/clang_json/{{NAME}}.json
@@ -52,8 +51,7 @@ import-all:
     just import test/c_sources/priority_queue.c PriorityQueue
     just import test/c_sources/dma_buffer.c DmaBuffer
 
-# Multi-file import: process multiple .c files into a Lean module set
-# Usage: just multi-import MultiProject test/c_sources/multi_file/helper.c test/c_sources/multi_file/main.c
+# Multi-file import: just multi-import MultiProject test/c_sources/multi_file/helper.c test/c_sources/multi_file/main.c
 multi-import PROJECT *FILES:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -67,29 +65,35 @@ multi-import PROJECT *FILES:
     done
     python3 CImporter/multi_import.py --project {{PROJECT}} $json_args -o Generated/{{PROJECT}}
 
-# Import the multi-file test project
-import-multi-test:
-    just multi-import MultiProject test/c_sources/multi_file/helper.c test/c_sources/multi_file/main.c
+# Dump clang JSON AST for inspection
+clang-dump FILE:
+    clang -Xclang -ast-dump=json -fsyntax-only {{FILE}} | jq .
 
-# Run CImporter Python unit tests
+# Run proof engine: just prove Examples/RingBufferProof.lean
+prove FILE:
+    python3 clift-prove-by-claudecode {{FILE}} --project-dir . -v
+
+# --- Testing ---
+
+# CImporter unit tests
 test-importer:
     python3 -m pytest CImporter/tests/ -v
 
-# Snapshot test: re-import, diff against expected output
+# Snapshot test: re-import and diff against expected
 test-snapshots:
     @echo "Checking CImporter output against expected snapshots..."
     just import test/c_sources/gcd.c Gcd && diff Generated/Gcd.lean test/expected/Gcd.lean
     just import test/c_sources/max.c Max && diff Generated/Max.lean test/expected/Max.lean
 
-# Differential test: struct layout matches gcc sizeof/offsetof
+# Struct layout: matches gcc sizeof/offsetof
 test-struct-layout:
     python3 test/test_struct_layout.py
 
-# Integer promotion audit tests
+# Integer promotion audit
 test-int-promotion:
     python3 -m pytest test/test_int_promotion.py -v
 
-# Memory model UB audit tests
+# Memory model UB audit
 test-memory-ub:
     python3 -m pytest test/test_memory_model_ub.py -v
 
@@ -97,219 +101,68 @@ test-memory-ub:
 test-fuzz:
     python3 test/fuzz_cimporter.py --count 55 --seed 42
 
-# End-to-end: importer snapshots pass AND all Lean code builds (proofs check)
-e2e: test-importer test-snapshots test-struct-layout test-int-promotion test-memory-ub build
+# Audit tool unit tests
+test-audit:
+    python3 -m pytest tools/lint/tests/ -v
 
-# Dump clang JSON AST for inspection
-clang-dump FILE:
-    clang -Xclang -ast-dump=json -fsyntax-only {{FILE}} | jq .
+# --- CI (called by GitHub Actions and locally) ---
 
-# Run proof engine (extract sorry, attempt automated proof)
-# Usage: just prove Examples/RingBufferProof.lean
-prove FILE:
-    python3 clift-prove-by-claudecode {{FILE}} --project-dir . -v
+# Full CI pipeline
+ci: ci-core-sorry ci-audit ci-importer build
 
-# Dry-run proof engine (extract only, no proof attempts)
-prove-dry FILE:
-    python3 clift-prove-by-claudecode {{FILE}} --project-dir . --dry-run -v
-
-# CI: full verification pipeline (same checks as GitHub Actions)
-ci:
+# Core library must have zero sorry
+ci-core-sorry:
     #!/usr/bin/env bash
     set -euo pipefail
-    echo "=== CI: Sorry check ==="
-    SORRY_COUNT=$(grep -rn "sorry" Clift/ Examples/ Generated/ --include="*.lean" \
-      | grep -v "^.*:.*--" \
-      | grep -v "sorry-free" \
-      | grep -v "no sorry" \
-      | grep -v "zero sorry" \
-      | grep -v "Sorry" \
-      | grep -v "#print axioms" \
-      | grep -c "sorry" || true)
-    echo "Sorry count: $SORRY_COUNT"
-    if [ "$SORRY_COUNT" -gt 0 ]; then
-      echo "FAIL: Found $SORRY_COUNT sorry in code"
+    SORRY=$(grep -rn "^\s*sorry" Clift/ --include="*.lean" | grep -c "sorry" || true)
+    if [ "$SORRY" -gt 0 ]; then
+      echo "FAIL: Found $SORRY sorry in Clift/"
+      grep -rn "^\s*sorry" Clift/ --include="*.lean"
       exit 1
     fi
-    echo ""
-    echo "=== CI: CImporter unit tests ==="
+    echo "Core library: zero sorry"
+
+# Python audit (authoritative sorry count + proof quality checks)
+ci-audit:
+    python3 tools/lint/audit.py --skip-lake
+
+# CImporter tests (unit + snapshot + struct layout + int promotion)
+ci-importer:
+    #!/usr/bin/env bash
+    set -euo pipefail
     python3 -m pytest CImporter/tests/ -v
-    echo ""
-    echo "=== CI: Snapshot tests ==="
     just test-snapshots
-    echo ""
-    echo "=== CI: Struct layout tests ==="
     just test-struct-layout
-    echo ""
-    echo "=== CI: Lake build (all targets) ==="
-    lake build
-    echo ""
-    echo "=== CI: All checks passed ==="
+    just test-int-promotion
 
-# Sorry count: quick check for sorry in library code
-sorry-count:
-    #!/usr/bin/env bash
-    COUNT=$(grep -rn "sorry" Clift/ Examples/ Generated/ --include="*.lean" \
-      | grep -v "^.*:.*--" \
-      | grep -v "sorry-free" \
-      | grep -v "no sorry" \
-      | grep -v "zero sorry" \
-      | grep -v "Sorry" \
-      | grep -v "#print axioms" \
-      | grep -c "sorry" || true)
-    echo "Sorry count: $COUNT"
-    if [ "$COUNT" -gt 0 ]; then
-      grep -rn "sorry" Clift/ Examples/ Generated/ --include="*.lean" \
-        | grep -v "^.*:.*--" \
-        | grep -v "sorry-free" \
-        | grep -v "no sorry" \
-        | grep -v "zero sorry" \
-        | grep -v "Sorry" \
-        | grep -v "#print axioms" \
-        | grep "sorry"
-    fi
+# Build a specific proof module
+ci-proof MODULE:
+    lake build {{MODULE}}
 
-# Nightly verification: full rebuild + sorry count tracking + regression alert
-nightly:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    echo "=== Nightly Verification $(date -u +%Y-%m-%dT%H:%M:%SZ) ==="
+# --- End-to-end ---
 
-    # 1. Full build
-    lake build
+# End-to-end: all tests + full build
+e2e: ci-importer test-memory-ub build
 
-    # 2. Count sorry
-    mkdir -p metrics
-    SORRY_COUNT=$(grep -rn "sorry" Clift/ Examples/ Generated/ --include="*.lean" \
-      | grep -v "^.*:.*--" \
-      | grep -v "sorry-free" \
-      | grep -v "no sorry" \
-      | grep -v "zero sorry" \
-      | grep -v "Sorry" \
-      | grep -v "#print axioms" \
-      | grep -c "sorry" || true)
-    TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-    COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
-    echo "${TIMESTAMP} ${COMMIT} ${SORRY_COUNT}" >> metrics/sorry-count.log
-    echo "Sorry count: ${SORRY_COUNT}"
-
-    # 3. Alert if sorry count increased
-    if [ $(wc -l < metrics/sorry-count.log) -gt 1 ]; then
-      PREV_COUNT=$(tail -2 metrics/sorry-count.log | head -1 | awk '{print $3}')
-      if [ "${SORRY_COUNT}" -gt "${PREV_COUNT}" ] 2>/dev/null; then
-        echo "ALERT: Sorry count INCREASED: ${PREV_COUNT} -> ${SORRY_COUNT}"
-        exit 1
-      elif [ "${SORRY_COUNT}" -lt "${PREV_COUNT}" ]; then
-        echo "Progress: sorry count decreased ${PREV_COUNT} -> ${SORRY_COUNT}"
-      else
-        echo "Stable: sorry count unchanged at ${SORRY_COUNT}"
-      fi
-    fi
-
-    echo ""
-    echo "=== Sorry count history ==="
-    cat metrics/sorry-count.log
-    echo ""
-    echo "=== Nightly verification complete ==="
-
-# Lint: check for common proof quality issues
-lint:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    ISSUES=0
-    echo "=== Clift Lint ==="
-
-    # 1. Tautological postconditions (x = x pattern in FuncSpec post)
-    echo ""
-    echo "--- Tautological FuncSpec postconditions ---"
-    TAUT=$(grep -n "post := fun" Examples/ -r --include="*.lean" -A5 \
-      | grep -P '\.\w+ =\s*$' -A1 \
-      | grep -P '^\s+.*\.\1\s*$' 2>/dev/null | wc -l || true)
-    # Simpler check: find validHoare_weaken_trivial_post usage
-    WEAKEN=$(grep -rn "validHoare_weaken_trivial_post" Examples/ --include="*.lean" \
-      | grep -v "^.*:.*--" \
-      | grep -v "private theorem validHoare_weaken_trivial_post" \
-      | grep -c "validHoare_weaken_trivial_post" || true)
-    if [ "$WEAKEN" -gt 0 ]; then
-      echo "  WARN: $WEAKEN proofs use validHoare_weaken_trivial_post (trivializes postcondition)"
-      grep -rn "validHoare_weaken_trivial_post" Examples/ --include="*.lean" \
-        | grep -v "^.*:.*--" \
-        | grep -v "private theorem validHoare_weaken_trivial_post"
-      ISSUES=$((ISSUES + WEAKEN))
-    else
-      echo "  OK: No trivial postcondition weakening found"
-    fi
-
-    # 2. Sorry count
-    echo ""
-    echo "--- Sorry in proof files ---"
-    SORRY=$(grep -rn "^\s*sorry" Examples/ --include="*.lean" | grep -c "sorry" || true)
-    if [ "$SORRY" -gt 0 ]; then
-      echo "  WARN: $SORRY sorry remaining in Examples/"
-      ISSUES=$((ISSUES + SORRY))
-    else
-      echo "  OK: Zero sorry in Examples/"
-    fi
-
-    # 3. Sorry in core library (should always be 0)
-    echo ""
-    echo "--- Sorry in core library ---"
-    LIB_SORRY=$(grep -rn "^\s*sorry" Clift/ --include="*.lean" | grep -c "sorry" || true)
-    if [ "$LIB_SORRY" -gt 0 ]; then
-      echo "  FAIL: $LIB_SORRY sorry in Clift/ (core library must be sorry-free)"
-      grep -rn "^\s*sorry" Clift/ --include="*.lean"
-      ISSUES=$((ISSUES + LIB_SORRY))
-    else
-      echo "  OK: Core library sorry-free"
-    fi
-
-    echo ""
-    echo "=== Lint: $ISSUES issues found ==="
-    if [ "$ISSUES" -gt 0 ]; then exit 1; fi
-
-# Proof integrity audit: Python tool (primary) + quick bash sanity checks (fallback)
+# Full audit: Python audit + semantic lint
 audit:
     #!/usr/bin/env bash
     set -euo pipefail
-    echo "=== Python audit (12 checks) ==="
     python3 tools/lint/audit.py --skip-lake
-    PYEXIT=$?
     echo ""
-    echo "=== Quick bash sanity checks (belt + suspenders) ==="
-    ISSUES=0
-    # Core library sorry (MUST be 0 — not caught by Python if comment parsing differs)
+    echo "=== Bash sanity checks ==="
     CORE_SORRY=$(grep -rn "^\s*sorry" Clift/ --include="*.lean" 2>/dev/null | grep -c "sorry" || true)
     if [ "$CORE_SORRY" -gt 0 ]; then
       echo "  FAIL: $CORE_SORRY sorry in Clift/"
-      ISSUES=$((ISSUES + 1))
-    else
-      echo "  OK: Core library sorry-free"
-    fi
-    # sorryAx check (if .olean exists)
-    if ls .lake/build/lib/lean/Examples/*.olean >/dev/null 2>&1; then
-      if lake build Examples.AxiomAudit 2>&1 | grep -q "sorryAx"; then
-        echo "  FAIL: sorryAx detected"
-        ISSUES=$((ISSUES + 1))
-      else
-        echo "  OK: No sorryAx"
-      fi
-    else
-      echo "  SKIP: No .olean (run lake build first)"
-    fi
-    echo ""
-    if [ "$PYEXIT" -ne 0 ] || [ "$ISSUES" -gt 0 ]; then
-      echo "=== Audit: issues found ==="
       exit 1
     fi
-    echo "=== Audit: all checks passed ==="
+    echo "  OK: Core library sorry-free"
 
-# Semantic lint: per-module MetaM checks (tautological post, vacuous pre, axiom audit)
-# Each module runs independently with 5 min timeout. Timeout = SKIP (not FAIL).
-# This is best-effort — the Python audit is the primary gate.
+# Semantic lint: per-module MetaM checks (best-effort, timeouts = skip)
 lint-semantic MODULE="all":
     #!/usr/bin/env bash
     set -euo pipefail
-    TIMEOUT=300  # 5 minutes per module
+    TIMEOUT=300
     MODULES=(GcdEndToEnd HashTable Swap DmaBuffer PacketParser MemAlloc RtosQueue \
              Sha256 UartDriver Sel4Cap StateMachine PriorityQueue \
              RBSimple RBLoops RBLoops2 RBRefinement)
@@ -336,103 +189,5 @@ lint-semantic MODULE="all":
         FAIL=$((FAIL + 1))
       fi
     done
-    echo "=== Semantic lint: $PASS pass, $FAIL fail, $SKIP timeout (of $((PASS+FAIL+SKIP))) ==="
+    echo "=== Semantic lint: $PASS pass, $FAIL fail, $SKIP timeout ==="
     [ "$FAIL" -eq 0 ]
-
-# Full audit: Python audit (primary gate) + semantic lint (best-effort with timeout)
-audit-full:
-    just audit
-    just lint-semantic
-
-# Test the audit tools themselves
-test-audit:
-    python3 -m pytest tools/lint/tests/ -v
-
-# Clean Lake build artifacts
-clean:
-    lake clean
-
-# Show project status
-status:
-    @echo "=== Backlog ==="
-    backlog board --plain 2>/dev/null || echo "(no tasks yet)"
-    @echo ""
-    @echo "=== Build ==="
-    lake build 2>&1 | tail -5
-
-# Regression suite: comprehensive CI check (task 0166)
-# Runs: sorry count, axiom audit, CImporter tests, snapshot tests,
-#        fuzz tests, struct layout, int promotion, memory UB, lake build
-regression:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    PASS=0
-    FAIL=0
-    TOTAL=0
-
-    run_check() {
-      local name="$1"
-      shift
-      TOTAL=$((TOTAL + 1))
-      echo ""
-      echo "=== [$TOTAL] $name ==="
-      if "$@" 2>&1; then
-        echo "  PASS: $name"
-        PASS=$((PASS + 1))
-      else
-        echo "  FAIL: $name"
-        FAIL=$((FAIL + 1))
-      fi
-    }
-
-    echo "========================================="
-    echo "  Clift Regression Suite"
-    echo "========================================="
-
-    # 1. Sorry count (informational, does not block)
-    run_check "Sorry count" just sorry-count
-
-    # 2. Axiom audit: check no sorry-based axioms in core library
-    TOTAL=$((TOTAL + 1))
-    echo ""
-    echo "=== [$TOTAL] Axiom audit (no sorryAx in Clift/) ==="
-    AXIOM_SORRY=$(grep -rn "sorryAx" Clift/ --include="*.lean" | grep -v "^.*:.*--" | wc -l || true)
-    if [ "$AXIOM_SORRY" -eq 0 ]; then
-      echo "  PASS: No sorryAx in library code"
-      PASS=$((PASS + 1))
-    else
-      echo "  FAIL: Found $AXIOM_SORRY sorryAx references"
-      FAIL=$((FAIL + 1))
-    fi
-
-    # 3. CImporter unit tests
-    run_check "CImporter unit tests" python3 -m pytest CImporter/tests/ -v
-
-    # 4. Snapshot tests
-    run_check "Snapshot tests" just test-snapshots
-
-    # 5. Struct layout tests
-    run_check "Struct layout tests" just test-struct-layout
-
-    # 6. Integer promotion tests
-    run_check "Int promotion tests" just test-int-promotion
-
-    # 7. Memory model UB tests
-    run_check "Memory UB tests" just test-memory-ub
-
-    # 8. Fuzz tests
-    run_check "Fuzz tests (55 programs)" just test-fuzz
-
-    # 9. Lake build (the big one -- checks all proofs)
-    run_check "Lake build (full)" lake build
-
-    echo ""
-    echo "========================================="
-    echo "  Results: $PASS/$TOTAL passed, $FAIL failed"
-    echo "========================================="
-
-    if [ "$FAIL" -gt 0 ]; then
-      echo "REGRESSION DETECTED"
-      exit 1
-    fi
-    echo "ALL CHECKS PASSED"

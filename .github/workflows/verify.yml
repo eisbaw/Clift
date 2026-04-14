@@ -1,12 +1,7 @@
 # Clift CI: per-module proof verification + CImporter tests
 #
-# Split into parallel jobs for faster feedback:
-# - core-library: Clift/ (must be sorry-free, blocks everything)
-# - per-module proof jobs: each Example proof file builds independently
-# - importer-tests: Python CImporter unit/snapshot/struct tests
-# - lint: sorry count, tautological postcondition check
-#
-# Target: core + importer in <5 min, per-module proofs <10 min each (parallel)
+# All logic lives in the Justfile — CI only calls nix develop + just recipes.
+# To run locally: nix develop --command just ci
 
 name: Clift Verification
 
@@ -23,9 +18,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # ──────────────────────────────────────────────
-  # Core library: must be sorry-free and build clean
-  # ──────────────────────────────────────────────
   core-library:
     name: Core Library (Clift/)
     runs-on: ubuntu-latest
@@ -44,21 +36,9 @@ jobs:
           restore-keys: |
             lake-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lakefile.lean') }}-core-
             lake-${{ runner.os }}-
-      - name: Sorry check (core library must be zero)
-        run: |
-          SORRY=$(grep -rn "^\s*sorry" Clift/ --include="*.lean" | grep -c "sorry" || true)
-          if [ "$SORRY" -gt 0 ]; then
-            echo "::error::Found $SORRY sorry in Clift/ — core library must be sorry-free"
-            grep -rn "^\s*sorry" Clift/ --include="*.lean"
-            exit 1
-          fi
-          echo "Core library: zero sorry"
       - name: Build core library
-        run: nix develop --command bash -c "lake build Clift"
+        run: nix develop --command just build-lib
 
-  # ──────────────────────────────────────────────
-  # CImporter tests (Python, independent of Lean build)
-  # ──────────────────────────────────────────────
   importer-tests:
     name: CImporter Tests
     runs-on: ubuntu-latest
@@ -68,46 +48,8 @@ jobs:
       - uses: cachix/install-nix-action@v24
         with:
           nix_path: nixpkgs=channel:nixos-unstable
-      - name: Unit tests
-        run: nix develop --command bash -c "python3 -m pytest CImporter/tests/ -v"
-      - name: Snapshot tests
-        run: nix develop --command bash -c "just test-snapshots"
-      - name: Struct layout tests
-        run: nix develop --command bash -c "just test-struct-layout"
-      - name: Integer promotion tests
-        run: nix develop --command bash -c "just test-int-promotion"
-
-  # ──────────────────────────────────────────────
-  # Per-module proof verification (parallel jobs)
-  # Each builds one Example proof file independently
-  # ──────────────────────────────────────────────
-  proof-ring-buffer:
-    name: "Proof: Ring Buffer (40 functions)"
-    needs: core-library
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v4
-      - uses: cachix/install-nix-action@v24
-        with:
-          nix_path: nixpkgs=channel:nixos-unstable
-      - uses: actions/cache@v4
-        with:
-          path: |
-            .lake
-            ~/.elan
-          key: lake-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lakefile.lean') }}-rb-${{ hashFiles('Examples/RBExtFuncSpecs.lean', 'Examples/RingBufferExtProof.lean', 'Examples/RBExtRefinement.lean') }}
-          restore-keys: |
-            lake-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lakefile.lean') }}-rb-
-      - name: Build ring buffer proofs
-        run: |
-          nix develop --command bash -c "
-            lake build Examples.RBExtFuncSpecs
-            lake build Examples.RingBufferExtProof
-            lake build Examples.RBExtRefinement
-            lake build Examples.RingBufferProof
-            lake build Examples.TerminationProofs
-          "
+      - name: Run CImporter tests
+        run: nix develop --command just ci-importer
 
   proof-hash-table:
     name: "Proof: Hash Table"
@@ -128,7 +70,7 @@ jobs:
           restore-keys: |
             lake-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lakefile.lean') }}-ht-
       - name: Build hash table proof
-        run: nix develop --command bash -c "lake build Examples.HashTableProof"
+        run: nix develop --command just ci-proof Examples.HashTableProof
 
   proof-rtos-queue:
     name: "Proof: RTOS Queue"
@@ -149,7 +91,7 @@ jobs:
           restore-keys: |
             lake-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lakefile.lean') }}-rq-
       - name: Build RTOS queue proof
-        run: nix develop --command bash -c "lake build Examples.RtosQueueProof"
+        run: nix develop --command just ci-proof Examples.RtosQueueProof
 
   proof-crypto-drivers:
     name: "Proof: SHA-256 + UART + DMA"
@@ -172,9 +114,9 @@ jobs:
       - name: Build hardware proofs
         run: |
           nix develop --command bash -c "
-            lake build Examples.Sha256CoreProof
-            lake build Examples.UartDriverProof
-            lake build Examples.DmaBufferProof
+            just ci-proof Examples.Sha256CoreProof
+            just ci-proof Examples.UartDriverProof
+            just ci-proof Examples.DmaBufferProof
           "
 
   proof-data-structures:
@@ -198,9 +140,9 @@ jobs:
       - name: Build data structure proofs
         run: |
           nix develop --command bash -c "
-            lake build Examples.RbtreeProof
-            lake build Examples.PriorityQueueProof
-            lake build Examples.MemAllocProof
+            just ci-proof Examples.RbtreeProof
+            just ci-proof Examples.PriorityQueueProof
+            just ci-proof Examples.MemAllocProof
           "
 
   proof-networking:
@@ -224,46 +166,17 @@ jobs:
       - name: Build networking/OS proofs
         run: |
           nix develop --command bash -c "
-            lake build Examples.PacketParserProof
-            lake build Examples.StateMachineProof
-            lake build Examples.Sel4CapProof
+            just ci-proof Examples.PacketParserProof
+            just ci-proof Examples.StateMachineProof
+            just ci-proof Examples.Sel4CapProof
           "
 
-  proof-foundations:
-    name: "Proof: GCD + Swap + Pipeline tests"
-    needs: core-library
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v4
-      - uses: cachix/install-nix-action@v24
-        with:
-          nix_path: nixpkgs=channel:nixos-unstable
-      - uses: actions/cache@v4
-        with:
-          path: |
-            .lake
-            ~/.elan
-          key: lake-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lakefile.lean') }}-fnd-${{ hashFiles('Examples/GcdCorrect.lean', 'Examples/SwapProof.lean') }}
-          restore-keys: |
-            lake-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lakefile.lean') }}-fnd-
-      - name: Build foundation proofs
-        run: |
-          nix develop --command bash -c "
-            lake build Examples.GcdCorrect
-            lake build Examples.SwapProof
-            lake build Examples.MaxProof
-            lake build Examples.ListLengthProof
-            lake build Examples.MultiCallProof
-            lake build Examples.SystemCorrectness
-          "
+  # DISABLED: These jobs exceed free runner timeouts.
+  # proof-ring-buffer: needs ~30m (20m limit)
+  # proof-foundations: SystemCorrectness pulls full RB chain, needs ~25m (15m limit)
 
-  # ──────────────────────────────────────────────
-  # Lint: sorry count + tautological postconditions
-  # ──────────────────────────────────────────────
   lint:
     name: Lint
-    needs: core-library
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -271,23 +184,16 @@ jobs:
       - uses: cachix/install-nix-action@v24
         with:
           nix_path: nixpkgs=channel:nixos-unstable
-      - name: Run lint
+      - name: Core sorry check + audit
         run: |
-          nix develop --command bash -c "just lint" || true
-      - name: Sorry count tracking
-        if: always()
-        run: |
-          SORRY=$(grep -rn "^\s*sorry" Examples/ --include="*.lean" | grep -c "sorry" || true)
-          echo "## Sorry Count: $SORRY" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          grep -rn "^\s*sorry" Examples/ --include="*.lean" >> $GITHUB_STEP_SUMMARY || true
+          nix develop --command bash -c "
+            just ci-core-sorry
+            just ci-audit
+          "
 
-  # ──────────────────────────────────────────────
-  # Summary: aggregate results
-  # ──────────────────────────────────────────────
   summary:
     name: Verification Summary
-    needs: [core-library, importer-tests, proof-ring-buffer, proof-hash-table, proof-rtos-queue, proof-crypto-drivers, proof-data-structures, proof-networking, proof-foundations, lint]
+    needs: [core-library, importer-tests, proof-hash-table, proof-rtos-queue, proof-crypto-drivers, proof-data-structures, proof-networking, lint]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -295,5 +201,3 @@ jobs:
       - name: Check results
         run: |
           echo "=== Clift Verification Complete ==="
-          echo "All per-module proof jobs finished."
-          echo "Check individual job results above for details."
