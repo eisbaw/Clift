@@ -158,6 +158,22 @@ audit:
     fi
     echo "  OK: Core library sorry-free"
 
+# Count sorry in Examples/ (delegates to Python audit for accuracy)
+sorry-count:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    COUNT=$(python3 tools/lint/audit.py --skip-lake 2>&1 | grep -oP 'sorry_count: \K[0-9]+')
+    echo "sorry: $COUNT"
+
+# Nightly: record sorry count to metrics log
+nightly:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    COUNT=$(python3 tools/lint/audit.py --skip-lake 2>&1 | grep -oP 'sorry_count: \K[0-9]+')
+    ENTRY="$(date -u +%Y-%m-%dT%H:%M:%SZ) $(git rev-parse --short HEAD) $COUNT"
+    echo "$ENTRY" >> metrics/sorry-count.log
+    echo "Recorded: $ENTRY"
+
 # Semantic lint: per-module MetaM checks (best-effort, timeouts = skip)
 lint-semantic MODULE="all":
     #!/usr/bin/env bash

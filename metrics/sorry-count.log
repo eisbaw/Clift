@@ -1,1 +1,3 @@
-2026-04-11T07:24:55Z a3f36df 82
+2026-04-11T07:24:55Z a3f36df 82  # stale: broken grep, actual was ~17
+2026-04-14T00:00:00Z 8dd1984 17  # corrected: via python3 tools/lint/audit.py
+2026-04-14T22:07:45Z 3291545 17
