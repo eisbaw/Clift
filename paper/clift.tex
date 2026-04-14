@@ -693,20 +693,21 @@ Currently, only the CImporter is trusted; the five-stage refinement
 chain is machine-checked.  Under the proposed architecture, the
 CImporter would also be responsible for the correctness of the
 monadic translation---a responsibility currently discharged by
-\texttt{L1corres} theorems.  Notably, LeanCorres's four remaining
-\texttt{sorry} are concentrated precisely at this CLight-to-SpecM
+\texttt{L1corres} theorems.  Notably, as of March 2026, LeanCorres's remaining
+\texttt{sorry} are concentrated at this CLight-to-SpecM
 bridge, suggesting that proving the denotational semantics correct is
 not free, merely deferred.
 
 \paragraph{Feasibility evidence.}
-LeanCorres ($\sim$2,000~LOC, 8~commits) demonstrates that the
+LeanCorres ($\sim$2,000~LOC, as of March 2026) demonstrates that the
 approach works end to end: its \texttt{SpecM} monad supports
 \texttt{whileLoop} via CCPO least fixpoints with
 \texttt{WhileInvariant} (including well-founded termination via
 \texttt{Acc}), and its sorry-free Schorr--Waite proof ($\sim$800
 lines) shows that \texttt{mvcgen} handles complex pointer algorithms.
 Nondeterminism and while loops---two constructs central to C
-verification---are fully supported, so neither is a blocker for
+verification---are supported in LeanCorres's formulation (via custom
+\texttt{WP} instances), so neither is a fundamental blocker for
 adoption.
 
 % ─── 7. conclusion ─────────────────────────────────────────────────
