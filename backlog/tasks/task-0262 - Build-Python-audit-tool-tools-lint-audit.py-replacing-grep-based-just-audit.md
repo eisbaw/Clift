@@ -1,9 +1,11 @@
 ---
 id: TASK-0262
 title: Build Python audit tool (tools/lint/audit.py) replacing grep-based just audit
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-04-14 18:49'
+updated_date: '2026-04-14 18:57'
 labels:
   - tooling
   - audit
@@ -80,10 +82,27 @@ PRIOR TASKS TO REVIEW AND SUBSUME:
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 tools/lint/audit.py implemented with all 12 checks
-- [ ] #2 Output matches or exceeds current just audit coverage
-- [ ] #3 JSON output mode for CI (--json flag)
-- [ ] #4 just audit recipe updated to call audit.py
-- [ ] #5 All current grep-based checks pass identically
-- [ ] #6 Reviews and subsumes detection parts of TASK-0232, 0254, 0257, 0258
+- [x] #1 tools/lint/audit.py implemented with all 12 checks
+- [x] #2 Output matches or exceeds current just audit coverage
+- [x] #3 JSON output mode for CI (--json flag)
+- [x] #4 just audit recipe updated to call audit.py
+- [x] #5 All current grep-based checks pass identically
+- [x] #6 Reviews and subsumes detection parts of TASK-0232, 0254, 0257, 0258
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Replaced 120-line bash/grep audit recipe with structured Python tool at tools/lint/audit.py.
+
+All 12 checks implemented: sorry_count, hand_written_l1, wrong_target, tautological_weakening, circular_specs, custom_axioms, sorry_axiom, native_decide, csimp_smuggling, implemented_by, unsafe_defs, vacuous_preconditions.
+
+Improvements over old audit:
+- Block comment awareness (eliminates false positive from ProofIntegrityAudit.lean)
+- 4 new checks: csimp, implemented_by, unsafe, vacuous_preconditions
+- JSON output for CI (--json flag)
+- Structured severity levels (FAIL/WARN/INFO/OK)
+- Exit 0 if no FAIL, 1 if any FAIL
+
+just audit recipe updated to call the Python tool.
+<!-- SECTION:FINAL_SUMMARY:END -->
