@@ -225,8 +225,9 @@ AI-driven development of a formal verification framework at this scale.
 
 \subsection{The Five-Stage Lifting Pipeline}
 
-Clift follows AutoCorres's architecture with five abstraction stages,
-each producing a transformed program and a refinement proof:
+Clift follows AutoCorres's architecture with five abstraction stages
+(Figure~\ref{fig:pipeline}), each producing a transformed program and
+a refinement proof:
 
 \begin{center}
 \small
@@ -257,7 +258,8 @@ final clean functional model.
 A Python script ($\sim$5,000 LOC) reads \texttt{clang
 -Xclang -ast-dump=json} output and emits Lean~4 files containing
 \texttt{CSimpl} terms. This follows the same trust model as seL4's
-StrictC parser: the importer is in the Trusted Computing Base (TCB). If
+StrictC parser: the importer is in the Trusted Computing Base
+(TCB; see Figure~\ref{fig:trust}). If
 it mistranslates C to CSimpl, proofs apply to the wrong program.
 
 Mitigation includes 150+ regression tests against known C semantics
@@ -336,8 +338,8 @@ marking \texttt{hVal} and \texttt{heapUpdate} as
 
 \subsection{Worked Example: Ring Buffer Push}
 
-To illustrate the end-to-end flow, consider a ring buffer \texttt{push}
-operation in C:
+To illustrate the end-to-end flow (see also Figure~\ref{fig:worked}),
+consider a ring buffer \texttt{push} operation in C:
 
 \begin{lstlisting}[language=CSubset]
 void rb_push(ring_buffer_t *rb, uint32_t val) {
@@ -382,7 +384,8 @@ with \texttt{omega}.
 The entire Clift codebase was developed through a collaboration between
 a human architect and Claude Opus~4.6 (1M token context), operating
 through the Claude Code CLI\@. The methodology evolved into a
-\emph{layered delegation architecture} with three tiers:
+\emph{layered delegation architecture} (Figure~\ref{fig:delegation})
+with three tiers:
 
 \begin{enumerate}
 \item \textbf{Human director.} Sets architectural goals, decomposes
@@ -501,7 +504,8 @@ providing a complete record of the human--AI collaboration.
 
 \subsection{Test Suite}
 
-We verify 32 C programs spanning multiple domains:
+We verify 32 C programs spanning multiple domains
+(Figure~\ref{fig:codebase} shows the overall composition):
 
 \begin{center}
 \small
@@ -585,7 +589,8 @@ verification with complex aliasing patterns.
 
 \subsection{AI Success Rates}
 
-We tracked sorry elimination across proof files using a combination of
+We tracked sorry elimination across proof files
+(Figure~\ref{fig:sorry-timeline}) using a combination of
 direct Claude Code proof writing and ``model racing'' (running multiple
 AI models in parallel on isolated git worktrees):
 

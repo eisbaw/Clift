@@ -2,7 +2,7 @@
 -- Inter-procedural: calls rb_pop via dynCom pattern
 -- Template: rb_push_if_not_full_validHoare in RBExtProofRbPushIfNotFull.lean
 import Examples.RBExtSpecs
-import Examples.RBPopProof
+import Examples.RBExtProofRbPop
 set_option maxHeartbeats 51200000
 set_option maxRecDepth 4096
 open RingBufferExt
