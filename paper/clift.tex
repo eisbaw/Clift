@@ -136,10 +136,10 @@ in Lean~4~\cite{demoura2021lean4}. Our motivation is threefold:
   \texttt{omega}/\texttt{grind} automation, and growing Mathlib
   library~\cite{mathlib2020} offer a productive verification
   environment.
-\item \textbf{AI compatibility.} Large language models perform
-  significantly better at Lean~4 proof synthesis than at Isabelle/HOL,
-  due to Lean's prevalence in AI training data. This opens the door to
-  AI-assisted verification at scale.
+\item \textbf{AI compatibility.} Lean~4's syntax is better
+  represented in LLM training corpora than Isabelle/HOL, and
+  anecdotally LLMs produce higher-quality Lean~4 tactic scripts.
+  This opens the door to AI-assisted verification at scale.
 \item \textbf{Lower adoption costs.} Lean~4's growing community
   reduces the barrier for organizations considering formal verification
   of their C code.
@@ -200,7 +200,15 @@ Lean~4~\cite{demoura2021lean4} is a dependently typed programming
 language and theorem prover. Its \texttt{simp}, \texttt{omega}, and
 \texttt{grind} tactics provide strong automation, while dependent
 types allow encoding invariants that Isabelle's simple type theory
-cannot express directly. Lean~4's metaprogramming framework enables
+cannot express directly. For example, Clift's pointer validity
+predicate is parameterized by the pointed-to type~\texttt{T}:
+\texttt{validPtr (T : Type) (addr : UInt64) (htd : HeapTypeDesc)},
+where the type descriptor carries proof-relevant size and alignment
+information indexed by~\texttt{T}. In Isabelle, this requires
+ad-hoc type-class encodings or \texttt{OFCLASS} constraints;
+in Lean~4, the dependent parameter is first-class and
+the kernel checks it during unification.
+Lean~4's metaprogramming framework enables
 programmatic construction of proof terms, which we use for the
 lifting stages.
 
@@ -532,10 +540,22 @@ Commits & 208 \\
 \end{tabular}
 \end{center}
 
-The 12 remaining \texttt{sorry} are concentrated in three areas:
+The 12 remaining \texttt{sorry} are concentrated in three files:
 priority queue proofs (5), ring buffer drain-to loop obligations (4),
 and refinement theorems transitively blocked on validHoare
-completeness (3).
+completeness (3). Of the 21 programs with proofs, \textbf{18 have
+fully sorry-free proof chains} from C through all lifting stages to
+user-level Hoare-logic properties; 3 programs (priority queue, ring
+buffer extended drain-to, ring buffer extended refinement) retain
+sorry in specific subgoals.
+
+\paragraph{Human effort.} Development spanned 7~calendar days
+(first commit 2026-04-08, last commit 2026-04-15). The human author
+spent approximately 4--6 hours per day on architectural decisions,
+task decomposition, review, and debugging---roughly 30--40 person-hours
+total. AI compute cost was approximately 200 Claude Code sessions
+at varying lengths. The Lean~4 toolchain build and proof checking
+consumed an additional $\sim$50 CPU-hours on an 8-core workstation.
 
 \subsection{Comparison with AutoCorres2}
 
@@ -638,7 +658,11 @@ OS-kernel verification.
 \paragraph{Scale.} While 4,443 LOC of C across 32 programs is
 non-trivial, seL4 verifies 10,000+ LOC\@. Scaling Clift to this
 level requires improving build times (currently minutes per proof
-module) and MetaM automation maturity.
+module), MetaM automation maturity, and stronger VCG tactics for
+programs with $>$20 sequential heap operations. Our largest
+verified program (ring buffer extended, 40 operations) shows the
+approach scales to moderate complexity, but multi-module
+inter-procedural verification remains untested.
 
 \paragraph{Maturity.} Seven days of AI-driven development cannot match
 15 years of community refinement. Clift demonstrates feasibility, not
@@ -663,12 +687,25 @@ responsibility currently discharged by machine-checked
 are concentrated at exactly this denotational-semantics bridge,
 confirming the cost is real but tractable.
 
+\paragraph{Lasting contributions.}
+Even if the specific architecture evolves (e.g., toward SpecM/mvcgen),
+several contributions persist: (1)~the CImporter, which parses
+\texttt{clang -ast-dump=json} into typed Lean~4 representations and is
+reusable regardless of the backend monad; (2)~the memory model and heap
+reasoning library, which encodes Tuch-style typed pointers with
+disjointness lemmas applicable to any monadic framework; (3)~the
+empirical data on AI-driven formal methods---proof success rates by
+category, failure modes, and effective prompt patterns---which inform
+future human--AI verification workflows; and (4)~evidence that the
+AutoCorres methodology transfers to dependent type theory, establishing
+a design point for the Lean verification community.
+
 % ─── 7. conclusion ─────────────────────────────────────────────────
 \section{Conclusion}
 
 We have demonstrated that the seL4/AutoCorres verification methodology
 can be replicated in Lean~4, and that AI can drive the development of
-a formal verification framework at surprising scale and depth. Clift's
+a formal verification framework producing 1,698 theorems. Clift's
 76,000 lines of Lean~4, 1,698 theorems, and 32 C programs
 (21 with machine-checked proofs)
 were produced in approximately 7~days through human--AI collaboration,
@@ -677,7 +714,7 @@ with Lean's kernel serving as an incorruptible verification oracle.
 The combination of Lean~4's modern proof infrastructure, AI's ability
 to write and repair proofs, and the AutoCorres refinement methodology
 creates a workflow where formal verification of C code becomes
-substantially more accessible. The Lean community's size and AI
+more accessible. The Lean community's size and AI
 compatibility suggest that Clift-style tools could lower the adoption
 barrier for formal verification significantly compared to the
 Isabelle/HOL ecosystem.
