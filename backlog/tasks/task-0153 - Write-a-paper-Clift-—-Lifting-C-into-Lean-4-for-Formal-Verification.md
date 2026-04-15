@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-04-10 18:46'
-updated_date: '2026-04-12 22:42'
+updated_date: '2026-04-15 06:10'
 labels:
   - phase-p
   - community
@@ -57,3 +57,9 @@ Target venues: CPP, ITP, or PLDI.
 6. Build PDF, extract JPG pages, visual inspect, iterate (done)
 7. Final review pass for submission readiness
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+$Added 8 TikZ figures (TASK-0241-0248). Updated all stats to current numbers (76K LOC, 1699 theorems, 8 sorry, 197 commits). Fixed pipeline figure to include L4 HeapLift. MPED review caught stat inconsistencies, all fixed.
+<!-- SECTION:NOTES:END -->
