@@ -533,6 +533,69 @@ private theorem pq_swap_ok_hoare :
   have ⟨h_nf, h_ok⟩ := pq_swap_body_nf s hdi hdj
   exact ⟨h_nf, fun r s' h_mem => h_ok r s' h_mem⟩
 
+-- Stronger pq_swap spec: result = ok AND all heapPtrValid preserved.
+-- Builds on pq_swap_body_nf (which computes the singleton result) and adds
+-- heapPtrValid preservation through the 3 heapUpdate steps.
+private theorem pq_swap_preserves_hpv (s : ProgramState)
+    (hdi : heapPtrValid s.globals.rawHeap (Ptr.elemOffset s.locals.data s.locals.i.toNat))
+    (hdj : heapPtrValid s.globals.rawHeap (Ptr.elemOffset s.locals.data s.locals.j.toNat)) :
+    ∀ r s', (r, s') ∈ (PriorityQueue.l1_pq_swap_body s).results →
+      r = Except.ok () ∧
+      (∀ (α : Type) [inst : CType α] (p : Ptr α),
+        @heapPtrValid α inst s.globals.rawHeap p → @heapPtrValid α inst s'.globals.rawHeap p) := by
+  rw [← pq_swap_body_decomposed_eq]
+  -- Reuse the existing decomposition to get the singleton result.
+  -- Step results from pq_swap_body_nf's proof pattern:
+  have h_step1_res : (pq_swap_l1_step1 s).results = {(Except.ok (), pq_swap_f1 s)} := by
+    unfold pq_swap_l1_step1
+    exact (L1_guard_modify_result _ pq_swap_f1 s hdi).1
+  have h_step1_nf : ¬(pq_swap_l1_step1 s).failed := by
+    unfold pq_swap_l1_step1
+    exact (L1_guard_modify_result _ pq_swap_f1 s hdi).2
+  have hdi1 := pq_swap_f1_preserves_hpv_di s hdi
+  have hdj1 := pq_swap_f1_preserves_hpv_dj s hdj
+  have h_step2_res : (pq_swap_l1_step2 (pq_swap_f1 s)).results =
+      {(Except.ok (), pq_swap_f2 (pq_swap_f1 s))} := by
+    unfold pq_swap_l1_step2
+    exact (L1_guard_guard_modify_result _ _ pq_swap_f2 (pq_swap_f1 s) hdi1 hdj1).1
+  have h_step2_nf : ¬(pq_swap_l1_step2 (pq_swap_f1 s)).failed := by
+    unfold pq_swap_l1_step2
+    exact (L1_guard_guard_modify_result _ _ pq_swap_f2 (pq_swap_f1 s) hdi1 hdj1).2
+  have hdj2 := pq_swap_f2_preserves_hpv_dj (pq_swap_f1 s) hdj1
+  have h_step3_res : (pq_swap_l1_step3 (pq_swap_f2 (pq_swap_f1 s))).results =
+      {(Except.ok (), pq_swap_f3 (pq_swap_f2 (pq_swap_f1 s)))} := by
+    unfold pq_swap_l1_step3
+    exact (L1_guard_modify_result _ pq_swap_f3 (pq_swap_f2 (pq_swap_f1 s)) hdj2).1
+  have h_step3_nf : ¬(pq_swap_l1_step3 (pq_swap_f2 (pq_swap_f1 s))).failed := by
+    unfold pq_swap_l1_step3
+    exact (L1_guard_modify_result _ pq_swap_f3 (pq_swap_f2 (pq_swap_f1 s)) hdj2).2
+  -- Chain
+  have h_seq23 := L1_seq_singleton_ok h_step2_res h_step2_nf (m₂ := pq_swap_l1_step3)
+  have h_seq23_res : (L1.seq pq_swap_l1_step2 pq_swap_l1_step3 (pq_swap_f1 s)).results =
+      {(Except.ok (), pq_swap_f3 (pq_swap_f2 (pq_swap_f1 s)))} := by
+    rw [h_seq23.1, h_step3_res]
+  have h_seq23_nf : ¬(L1.seq pq_swap_l1_step2 pq_swap_l1_step3 (pq_swap_f1 s)).failed :=
+    fun hf => h_step3_nf (h_seq23.2.mp hf)
+  have h_inner := L1_seq_singleton_ok h_step1_res h_step1_nf
+    (m₂ := L1.seq pq_swap_l1_step2 pq_swap_l1_step3)
+  have h_inner_res : (L1.seq pq_swap_l1_step1 (L1.seq pq_swap_l1_step2 pq_swap_l1_step3) s).results =
+      {(Except.ok (), pq_swap_f3 (pq_swap_f2 (pq_swap_f1 s)))} := by
+    rw [h_inner.1, h_seq23_res]
+  have h_inner_nf : ¬(L1.seq pq_swap_l1_step1 (L1.seq pq_swap_l1_step2 pq_swap_l1_step3) s).failed :=
+    fun hf => h_seq23_nf (h_inner.2.mp hf)
+  have h_catch := L1_catch_singleton_ok h_inner_res h_inner_nf
+  intro r s' h_mem
+  unfold pq_swap_body_decomposed at h_mem
+  rw [h_catch.1] at h_mem
+  have ⟨hr, hs⟩ := Prod.mk.inj h_mem
+  subst hr; subst hs
+  refine ⟨rfl, fun α inst p hp => ?_⟩
+  -- heapPtrValid preserved: f1 keeps globals, f2/f3 do heapUpdate
+  have hg1 : (pq_swap_f1 s).globals = s.globals := pq_swap_f1_globals s
+  exact heapUpdate_preserves_heapPtrValid _ _ _ _
+    (heapUpdate_preserves_heapPtrValid _ _ _ _
+      (by rw [hg1]; exact hp))
+
 -- pq_bubble_up: non-failure + ok-only result.
 -- Proof uses L1_hoare_while with invariant tracking dataArrayValid and i bounds.
 -- The h_body_inv (loop invariant preservation through ok results) requires
@@ -550,6 +613,80 @@ private theorem pq_swap_ok_hoare :
 -- bubble_up preserves pq validity because it only does heapUpdates (via pq_swap),
 -- and heapUpdate_preserves_heapPtrValid applies universally.
 -- Also includes s'.locals.pq = s_input.locals.pq (bubble_up doesn't modify the pq local).
+-- NondetM-level helpers (same as HashTableProof but not private there)
+private theorem pq_L1_seq_failed_iff (m₁ m₂ : L1Monad ProgramState) (s : ProgramState) :
+    (L1.seq m₁ m₂ s).failed ↔
+    ((m₁ s).failed ∨ ∃ s', (Except.ok (), s') ∈ (m₁ s).results ∧ (m₂ s').failed) :=
+  Iff.rfl
+
+private theorem pq_L1_seq_ok_mem {m₁ m₂ : L1Monad ProgramState} {s s' : ProgramState}
+    (h : (Except.ok (), s') ∈ (L1.seq m₁ m₂ s).results) :
+    ∃ s₁, (Except.ok (), s₁) ∈ (m₁ s).results ∧ (Except.ok (), s') ∈ (m₂ s₁).results := by
+  change (_ ∨ _) at h
+  rcases h with ⟨s₁, h₁, h₂⟩ | ⟨_, h_tag⟩
+  · exact ⟨s₁, h₁, h₂⟩
+  · exact absurd h_tag (by intro h; cases h)
+
+private theorem pq_L1_seq_error_mem {m₁ m₂ : L1Monad ProgramState} {s s' : ProgramState}
+    (h : (Except.error (), s') ∈ (L1.seq m₁ m₂ s).results) :
+    (∃ s₁, (Except.ok (), s₁) ∈ (m₁ s).results ∧ (Except.error (), s') ∈ (m₂ s₁).results) ∨
+    (Except.error (), s') ∈ (m₁ s).results := by
+  change (_ ∨ _) at h
+  rcases h with ⟨s₁, h₁, h₂⟩ | ⟨h_err, h_tag⟩
+  · exact Or.inl ⟨s₁, h₁, h₂⟩
+  · have : Except.error () = Except.error () := h_tag
+    exact Or.inr h_err
+
+-- Bridge: derive L1_hoare_while side-conditions from a single body Hoare proof.
+private theorem pq_L1_hoare_while_from_body {c : ProgramState → Bool} {body : L1Monad ProgramState}
+    {I : ProgramState → Prop} {Q : Except Unit Unit → ProgramState → Prop}
+    (h_body : validHoare (fun s => I s ∧ c s = true) body
+        (fun r s => match r with | Except.ok () => I s | Except.error () => Q (Except.error ()) s))
+    (h_exit : ∀ s, I s → c s = false → Q (Except.ok ()) s) :
+    validHoare I (L1.while c body) Q := by
+  apply L1_hoare_while (I := I)
+  · intro s h; exact h
+  · intro s hi hc; exact (h_body s ⟨hi, hc⟩).1
+  · intro s s' hi hc h_mem; exact (h_body s ⟨hi, hc⟩).2 (Except.ok ()) s' h_mem
+  · exact h_exit
+  · intro s s' hi hc h_mem; exact (h_body s ⟨hi, hc⟩).2 (Except.error ()) s' h_mem
+
+-- UInt32 arithmetic: ((i - 1) / 2).toNat = (i.toNat - 1) / 2 when i > 0
+private theorem uint32_parent_toNat_eq (i : UInt32) (h : i.toNat > 0) :
+    ((i - 1) / 2).toNat = (i.toNat - 1) / 2 := by
+  -- UInt32 is BitVec 32. Convert and use BitVec lemmas.
+  show ((i.toBitVec - 1) / 2).toNat = (i.toBitVec.toNat - 1) / 2
+  -- Sub: BitVec.toNat (a - b) = (a.toNat - b.toNat) % 2^32 when a ≥ b
+  -- i.toBitVec.toNat > 0 and (1 : BitVec 32).toNat = 1
+  -- So (i - 1).toNat = (i.toNat - 1) % 2^32 = i.toNat - 1 (since i.toNat ≤ 2^32 - 1)
+  have h_bnd := i.toBitVec.isLt -- i.toNat < 2^32
+  have h_sub : (i.toBitVec - 1).toNat = i.toBitVec.toNat - 1 := by
+    rw [BitVec.toNat_sub]
+    have h1 : (1 : BitVec 32).toNat = 1 := by native_decide
+    rw [h1]
+    -- Goal: (2^32 - 1 + i.toBitVec.toNat) % 2^32 = i.toBitVec.toNat - 1
+    -- Rewrite: 2^32 - 1 + x = (x - 1) + 2^32 for x ≥ 1
+    have h_pos : i.toBitVec.toNat > 0 := h
+    have h_rw : 2^32 - 1 + i.toBitVec.toNat = (i.toBitVec.toNat - 1) + 2^32 := by omega
+    rw [h_rw, Nat.add_mod_right]
+    exact Nat.mod_eq_of_lt (by omega)
+  -- Div: BitVec.toNat (a / b) = a.toNat / b.toNat (unsigned division)
+  rw [show (2 : BitVec 32) = BitVec.ofNat 32 2 from rfl]
+  rw [BitVec.toNat_udiv, h_sub]
+  simp [BitVec.toNat_ofNat]
+
+-- UInt32 arithmetic helper: (i - 1) / 2 < i for i > 0
+private theorem uint32_parent_lt (i : UInt32) (h : i.toNat > 0) :
+    ((i - 1) / 2).toNat < i.toNat := by
+  rw [uint32_parent_toNat_eq i h]; omega
+
+-- The bubble_up invariant.
+private def bubble_up_inv (n : Nat) (pq₀ : Ptr PriorityQueue.C_pqueue) (s : ProgramState) : Prop :=
+  dataArrayValid s.globals.rawHeap s.locals.data n ∧
+  s.locals.i.toNat < n ∧
+  heapPtrValid s.globals.rawHeap s.locals.pq ∧
+  s.locals.pq = pq₀
+
 private theorem pq_bubble_up_ok_hoare (n : Nat) (pq₀ : Ptr PriorityQueue.C_pqueue) :
     validHoare
       (fun s => dataArrayValid s.globals.rawHeap s.locals.data n ∧
@@ -559,7 +696,234 @@ private theorem pq_bubble_up_ok_hoare (n : Nat) (pq₀ : Ptr PriorityQueue.C_pqu
       PriorityQueue.l1_pq_bubble_up_body
       (fun r s => r = Except.ok () ∧
                   heapPtrValid s.globals.rawHeap pq₀) := by
-  sorry
+  -- bubble_up = catch (while cond body) skip
+  unfold PriorityQueue.l1_pq_bubble_up_body
+  apply L1_hoare_catch (R := fun s => heapPtrValid s.globals.rawHeap pq₀)
+  · -- While loop: validHoare P (while c body) (fun r s => match r | ok => Q ok s | error => R s)
+    apply pq_L1_hoare_while_from_body
+      (I := fun s => dataArrayValid s.globals.rawHeap s.locals.data n ∧
+                     s.locals.i.toNat < n ∧
+                     heapPtrValid s.globals.rawHeap s.locals.pq ∧
+                     s.locals.pq = pq₀)
+    · -- Body Hoare triple: I ∧ c=true → body → ok ⇒ I, error ⇒ heapPtrValid pq₀
+      -- Body = seq (seq guard modify_parent) (condition ...)
+      -- Step 1: guard(2≠0) + modify(parent := (i-1)/2)
+      apply L1_hoare_seq_ok
+        (R := fun s => dataArrayValid s.globals.rawHeap s.locals.data n ∧
+                       s.locals.i.toNat < n ∧
+                       heapPtrValid s.globals.rawHeap s.locals.pq ∧
+                       s.locals.pq = pq₀ ∧
+                       s.locals.i > 0 ∧
+                       s.locals.parent = (s.locals.i - 1) / 2)
+      · -- guard(2≠0) + modify(parent := (i-1)/2)
+        intro s ⟨⟨hdav, hi_lt, hpq, hpq_eq⟩, hc⟩
+        simp only [decide_eq_true_eq] at hc
+        have h_guard : (2 : Nat) ≠ 0 := by omega
+        have h_gm := L1_guard_modify_result (fun _ : ProgramState => (2 : Nat) ≠ 0)
+          (fun s : ProgramState => { s with locals := { s.locals with parent := ((s.locals.i - 1) / 2) } })
+          s h_guard
+        exact ⟨h_gm.2, fun r s' h_mem => by
+          rw [h_gm.1] at h_mem
+          have ⟨hr, hs⟩ := Prod.mk.inj h_mem; subst hr; subst hs
+          exact ⟨rfl, hdav, hi_lt, hpq, hpq_eq, hc, rfl⟩⟩
+      · -- condition(data[i] < data[parent]): true → swap+advance, false → throw
+        apply L1_hoare_condition
+        · -- TRUE branch: data[i] < data[parent] → swap + i:=parent
+          intro s ⟨⟨hdav, hi_lt, hpq, hpq_eq, hi_pos, h_parent⟩, _⟩
+          have h_i_pos_nat : s.locals.i.toNat > 0 := by
+            simp only [GT.gt, UInt32.lt_iff_toNat_lt] at hi_pos; exact hi_pos
+          have h_parent_lt : s.locals.parent.toNat < n := by
+            rw [h_parent]; exact Nat.lt_trans (uint32_parent_lt s.locals.i h_i_pos_nat) hi_lt
+          have hdi : heapPtrValid s.globals.rawHeap (Ptr.elemOffset s.locals.data s.locals.i.toNat) :=
+            hdav s.locals.i.toNat hi_lt
+          have hdp : heapPtrValid s.globals.rawHeap (Ptr.elemOffset s.locals.data s.locals.parent.toNat) :=
+            hdav s.locals.parent.toNat h_parent_lt
+          -- Seq(dynCom(swap), modify(i:=parent)):
+          -- Prove using pq_swap_ok_hoare.
+          -- The dynCom runs: setup(j:=parent), call pq_swap, restore(saved.locals).
+          -- After restore + i_assign, invariant is preserved.
+          --
+          -- Key: pq_swap only does heapUpdates. So:
+          -- - dataArrayValid preserved (heapUpdate_preserves_heapPtrValid)
+          -- - heapPtrValid pq preserved (heapUpdate_preserves_heapPtrValid)
+          -- - pq local unchanged (restore puts back saved.locals)
+          -- - i becomes parent, parent.toNat < n
+          --
+          -- Resolve the L1.call by unfolding the env:
+          have h_swap_ok := @pq_swap_ok_hoare
+          -- Use validHoare from pq_swap to get nf + postcond.
+          -- Work at NondetM level for the seq(dynCom, modify):
+          --
+          -- The dynCom+call runs the swap body, which only produces ok results (pq_swap_ok_hoare).
+          -- After restore: locals = saved.locals, globals = swapped.
+          -- After modify(i:=parent): locals.i = parent, everything else = saved.
+          -- dataArrayValid preserved: heapUpdate preserves all heapPtrValid
+          -- heapPtrValid pq preserved: heapUpdate preserves heapPtrValid
+          --
+          -- Strategy: resolve call by simp on L1.call + L1ProcEnv.insert,
+          -- then use pq_swap_ok_hoare for the resolved body.
+          constructor
+          · -- non-failure
+            intro hf
+            -- Outer seq: failed iff dynCom failed or modify after dynCom-ok failed (impossible)
+            rw [pq_L1_seq_failed_iff] at hf
+            rcases hf with hf_dyn | ⟨s1, hs1_ok, hf_mod⟩
+            · -- dynCom failed
+              -- L1.dynCom f s = f s s. f s = seq(modify setup)(seq(call "pq_swap")(modify restore))
+              -- After modify setup: state = setup s, never fails
+              -- Call: resolved to l1_pq_swap_body. At (setup s): need hpv data[i] and data[j=parent].
+              --   setup keeps i and sets j=parent. So data[i] valid (hdi) and data[j=parent] valid (hdp).
+              -- Modify restore: never fails.
+              -- So dynCom doesn't fail.
+              show False
+              change (L1.dynCom _ s).failed at hf_dyn
+              simp only [L1.dynCom] at hf_dyn
+              -- Now hf_dyn : (seq(modify setup)(seq(call env "pq_swap")(modify restore)) s).failed
+              rw [pq_L1_seq_failed_iff] at hf_dyn
+              rcases hf_dyn with hf_setup | ⟨s_setup, hs_setup, hf_rest⟩
+              · exact hf_setup -- modify never fails
+              · -- After setup: s_setup = setup s. Resolve call.
+                rw [pq_L1_seq_failed_iff] at hf_rest
+                have hs_eq : s_setup = { s with locals := { s.locals with data := s.locals.data, i := s.locals.i, j := s.locals.parent } } := by
+                  have ⟨_, hs⟩ := Prod.mk.inj hs_setup; exact hs
+                rcases hf_rest with hf_call | ⟨s_swap, hs_swap, hf_restore⟩
+                · -- Call failed. Resolve the call and use pq_swap_ok_hoare.
+                  -- After setup: data = s.locals.data, i = s.locals.i, j = s.locals.parent
+                  -- pq_swap needs: heapPtrValid data[i] and heapPtrValid data[j]
+                  -- At s_setup: i = s.locals.i, j = s.locals.parent, data = s.locals.data
+                  -- heapPtrValid data[i] = hdi, heapPtrValid data[j] = hdp
+                  -- pq_swap_ok_hoare gives non-failure.
+                  -- But we need the call to resolve to l1_pq_swap_body.
+                  -- The call uses the incremental env. Resolve by unfolding.
+                  rw [hs_eq] at hf_call
+                  simp only [L1.call, L1.L1ProcEnv.insert, L1.L1ProcEnv.empty] at hf_call
+                  -- Now hf_call should be about l1_pq_swap_body
+                  -- Use pq_swap_ok_hoare to show non-failure
+                  have h_setup_i : ({ s with locals := { s.locals with data := s.locals.data, i := s.locals.i, j := s.locals.parent } } : ProgramState).locals.i = s.locals.i := rfl
+                  have h_setup_j : ({ s with locals := { s.locals with data := s.locals.data, i := s.locals.i, j := s.locals.parent } } : ProgramState).locals.j = s.locals.parent := rfl
+                  have h_setup_data : ({ s with locals := { s.locals with data := s.locals.data, i := s.locals.i, j := s.locals.parent } } : ProgramState).locals.data = s.locals.data := rfl
+                  have h_setup_globals : ({ s with locals := { s.locals with data := s.locals.data, i := s.locals.i, j := s.locals.parent } } : ProgramState).globals = s.globals := rfl
+                  have hdi' : heapPtrValid ({ s with locals := { s.locals with data := s.locals.data, i := s.locals.i, j := s.locals.parent } } : ProgramState).globals.rawHeap
+                      (Ptr.elemOffset ({ s with locals := { s.locals with data := s.locals.data, i := s.locals.i, j := s.locals.parent } } : ProgramState).locals.data
+                        ({ s with locals := { s.locals with data := s.locals.data, i := s.locals.i, j := s.locals.parent } } : ProgramState).locals.i.toNat) := by
+                    rw [h_setup_globals, h_setup_data, h_setup_i]; exact hdi
+                  have hdp' : heapPtrValid ({ s with locals := { s.locals with data := s.locals.data, i := s.locals.i, j := s.locals.parent } } : ProgramState).globals.rawHeap
+                      (Ptr.elemOffset ({ s with locals := { s.locals with data := s.locals.data, i := s.locals.i, j := s.locals.parent } } : ProgramState).locals.data
+                        ({ s with locals := { s.locals with data := s.locals.data, i := s.locals.i, j := s.locals.parent } } : ProgramState).locals.j.toNat) := by
+                    rw [h_setup_globals, h_setup_data, h_setup_j]; exact hdp
+                  have ⟨h_nf, _⟩ := h_swap_ok _ ⟨hdi', hdp'⟩
+                  exact h_nf hf_call
+                · exact hf_restore -- modify never fails
+            · exact hf_mod -- modify never fails
+          · -- postcondition: ok ⇒ I, error ⇒ hpv pq₀
+            intro r s' h_mem
+            -- Decompose: seq(dynCom, modify(i:=parent))
+            change (_ ∨ _) at h_mem
+            rcases h_mem with ⟨s_dyn, h_dyn_mem, h_mod_mem⟩ | ⟨h_err_dyn, h_tag⟩
+            · -- ok from dynCom, then modify(i:=parent) produces ok
+              have ⟨hr_mod, hs_mod⟩ := Prod.mk.inj h_mod_mem
+              subst hr_mod; subst hs_mod
+              -- s_dyn comes from dynCom: f s s
+              change (Except.ok (), s_dyn) ∈ (L1.dynCom _ s).results at h_dyn_mem
+              simp only [L1.dynCom] at h_dyn_mem
+              -- Decompose: seq(modify setup)(seq(call)(modify restore))
+              have ⟨s_setup, h_setup_mem, h_rest⟩ := pq_L1_seq_ok_mem h_dyn_mem
+              have h_setup_eq : s_setup = { s with locals := { s.locals with data := s.locals.data, i := s.locals.i, j := s.locals.parent } } := by
+                have ⟨_, hs⟩ := Prod.mk.inj h_setup_mem; exact hs
+              have ⟨s_call, h_call_mem, h_restore_mem⟩ := pq_L1_seq_ok_mem h_rest
+              have h_dyn_eq : s_dyn = { s_call with locals := s.locals } := by
+                have ⟨_, hs⟩ := Prod.mk.inj h_restore_mem; exact hs
+              -- Resolve the call: simp to get l1_pq_swap_body
+              simp only [L1.call, L1.L1ProcEnv.insert, L1.L1ProcEnv.empty] at h_call_mem
+              -- h_call_mem should now be about l1_pq_swap_body at s_setup
+              -- Use pq_swap_preserves_hpv to get heapPtrValid preservation
+              -- Setup state: i = s.i, j = s.parent, data = s.data, globals = s.globals
+              have h_setup_globals : s_setup.globals = s.globals := by rw [h_setup_eq]
+              have h_setup_i : s_setup.locals.i = s.locals.i := by rw [h_setup_eq]
+              have h_setup_j : s_setup.locals.j = s.locals.parent := by rw [h_setup_eq]
+              have h_setup_data : s_setup.locals.data = s.locals.data := by rw [h_setup_eq]
+              have hdi' : heapPtrValid s_setup.globals.rawHeap (Ptr.elemOffset s_setup.locals.data s_setup.locals.i.toNat) := by
+                rw [h_setup_globals, h_setup_data, h_setup_i]; exact hdi
+              have hdp' : heapPtrValid s_setup.globals.rawHeap (Ptr.elemOffset s_setup.locals.data s_setup.locals.j.toNat) := by
+                rw [h_setup_globals, h_setup_data, h_setup_j]; exact hdp
+              have ⟨_, h_hpv_pres⟩ := pq_swap_preserves_hpv s_setup hdi' hdp' _ s_call h_call_mem
+              -- Now h_hpv_pres: ∀ p, hpv s_setup.heap p → hpv s_call.heap p
+              -- Since s_setup.globals = s.globals: hpv s.heap p → hpv s_call.heap p
+              -- s_dyn = { s_call with locals := s.locals }
+              -- s' = { s_dyn with locals := { s_dyn.locals with i := s_dyn.locals.parent } }
+              -- s'.globals = s_dyn.globals = s_call.globals
+              -- s'.locals.i = s_dyn.locals.parent = s.locals.parent
+              -- s'.locals.pq = s_dyn.locals.pq = s.locals.pq = pq₀
+              -- s'.locals.data = s_dyn.locals.data = s.locals.data
+              -- Show I holds (ok case of match):
+              simp only [Except.ok.injEq]
+              refine ⟨?_, ?_, ?_, ?_⟩
+              · -- dataArrayValid: all data[k] for k < n are heapPtrValid
+                intro k hk
+                have : heapPtrValid s.globals.rawHeap (Ptr.elemOffset s.locals.data k) := hdav k hk
+                have := h_hpv_pres UInt32 (Ptr.elemOffset s.locals.data k) (by rw [h_setup_globals]; exact this)
+                rw [h_dyn_eq]; exact this
+              · -- i.toNat < n: i = parent, parent < n
+                rw [h_dyn_eq]; simp only; rw [show ({ s_call with locals := s.locals } : ProgramState).locals.parent = s.locals.parent from rfl]
+                exact h_parent_lt
+              · -- heapPtrValid pq
+                have := h_hpv_pres _ s.locals.pq (by rw [h_setup_globals]; exact hpq)
+                rw [h_dyn_eq]; exact this
+              · -- pq = pq₀
+                rw [h_dyn_eq]; exact hpq_eq
+            · -- error from dynCom → error from seq → impossible since modify only produces ok
+              -- and dynCom(f s s) only produces ok (swap always ok, modify always ok)
+              -- In the L1.seq error branch: (error, s') ∈ (dynCom s).results ∧ r = error
+              -- But dynCom only produces ok results (see non-failure proof above).
+              -- Actually, the "error" side of L1.seq says:
+              -- (Except.error (), s') ∈ (m₁ s).results ∧ r = Except.error ()
+              -- So (Except.error (), s') ∈ (dynCom s).results
+              -- We need to show this is False.
+              -- DynCom = f s s = seq(modify)(seq(call_ok)(modify))
+              -- All three produce only ok results.
+              -- Actually, the h_tag says r = error
+              have h_r_err : r = Except.error () := h_tag
+              -- h_err_dyn : (Except.error (), s') ∈ (L1.dynCom _ s).results
+              simp only [L1.dynCom] at h_err_dyn
+              -- Decompose: (error, s') ∈ seq(modify)(seq(call)(modify)) s
+              rcases pq_L1_seq_error_mem h_err_dyn with ⟨s1, h1_ok, h1_err⟩ | h_mod_err
+              · -- ok from modify, error from seq(call)(modify)
+                rcases pq_L1_seq_error_mem h1_err with ⟨s2, h2_ok, h2_err⟩ | h_call_err
+                · -- ok from call, error from modify(restore) — impossible (modify only produces ok)
+                  exact absurd h2_err (by intro h; exact absurd (Prod.mk.inj h).1 (by intro h; cases h))
+                · -- error from call
+                  simp only [L1.call, L1.L1ProcEnv.insert, L1.L1ProcEnv.empty] at h_call_err
+                  -- Resolved: call = l1_pq_swap_body
+                  -- pq_swap always returns ok (pq_swap_ok_hoare or pq_swap_preserves_hpv)
+                  have h_setup_eq' : s1 = { s with locals := { s.locals with data := s.locals.data, i := s.locals.i, j := s.locals.parent } } := by
+                    have ⟨_, hs⟩ := Prod.mk.inj (show (Except.ok (), s1) ∈ (L1.modify _ s).results from h1_ok); exact hs
+                  have h_setup_globals' : s1.globals = s.globals := by rw [h_setup_eq']
+                  have h_setup_i' : s1.locals.i = s.locals.i := by rw [h_setup_eq']
+                  have h_setup_j' : s1.locals.j = s.locals.parent := by rw [h_setup_eq']
+                  have h_setup_data' : s1.locals.data = s.locals.data := by rw [h_setup_eq']
+                  have hdi'' : heapPtrValid s1.globals.rawHeap (Ptr.elemOffset s1.locals.data s1.locals.i.toNat) := by
+                    rw [h_setup_globals', h_setup_data', h_setup_i']; exact hdi
+                  have hdp'' : heapPtrValid s1.globals.rawHeap (Ptr.elemOffset s1.locals.data s1.locals.j.toNat) := by
+                    rw [h_setup_globals', h_setup_data', h_setup_j']; exact hdp
+                  have ⟨h_rok, _⟩ := pq_swap_preserves_hpv s1 hdi'' hdp'' _ _ h_call_err
+                  exact absurd h_rok (by intro h; cases h)
+              · -- error from modify(setup) — impossible (modify only produces ok)
+                exact absurd h_mod_err (by intro h; exact absurd (Prod.mk.inj h).1 (by intro h; cases h))
+        · -- FALSE branch: throw (error) → error postcond: heapPtrValid pq₀
+          intro s ⟨⟨_, _, hpq, hpq_eq, _, _⟩, _⟩
+          subst hpq_eq
+          exact ⟨not_false, fun r s' h_mem => by
+            have ⟨hr, hs⟩ := Prod.mk.inj h_mem; subst hr; subst hs; exact hpq⟩
+    · -- Exit: I ∧ c=false → ok ∧ heapPtrValid pq₀
+      intro s ⟨_, _, h_pq, h_eq⟩ _
+      subst h_eq; exact ⟨rfl, h_pq⟩
+  · -- Handler: skip passes through (R → ok ∧ heapPtrValid pq₀)
+    unfold validHoare
+    intro s hrs
+    refine ⟨not_false, fun r s' h_mem => ?_⟩
+    have ⟨hr, hs⟩ := Prod.mk.inj h_mem
+    subst hr; subst hs
+    exact ⟨rfl, hrs⟩
 
 /-! ## pq_insert proof
 
