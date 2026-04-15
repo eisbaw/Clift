@@ -322,6 +322,72 @@ theorem ListSumIs.decompose {heap : HeapRawState} {p : Ptr C_rb_node} {total : U
   | null => exact absurd rfl hp
   | cons _ rest _ hv hn => exact ⟨rest, rfl, hv, hn⟩
 
+/-- ListCountAboveIs at null gives 0. -/
+theorem ListCountAboveIs.null_zero {heap : HeapRawState} {threshold n : UInt32}
+    (h : ListCountAboveIs heap Ptr.null threshold n) : n = 0 := by
+  cases h with
+  | null => rfl
+  | cons_above _ _ _ hp => exact absurd rfl hp
+  | cons_not_above _ _ _ hp => exact absurd rfl hp
+
+/-- ListCountAboveIs at non-null can be decomposed. -/
+theorem ListCountAboveIs.decompose {heap : HeapRawState} {p : Ptr C_rb_node}
+    {threshold n : UInt32}
+    (h : ListCountAboveIs heap p threshold n) (hp : p ≠ Ptr.null) :
+    heapPtrValid heap p ∧
+    (((hVal heap p).value > threshold ∧
+      ∃ m, n = m + 1 ∧ ListCountAboveIs heap (hVal heap p).next threshold m) ∨
+    (¬((hVal heap p).value > threshold) ∧
+      ListCountAboveIs heap (hVal heap p).next threshold n)) := by
+  cases h with
+  | null => exact absurd rfl hp
+  | cons_above _ m _ _ hv h_above hn =>
+    exact ⟨hv, Or.inl ⟨h_above, m, rfl, hn⟩⟩
+  | cons_not_above _ _ _ _ hv h_not hn =>
+    exact ⟨hv, Or.inr ⟨h_not, hn⟩⟩
+
+/-- ListCountAboveIs implies LinkedListValid. -/
+theorem ListCountAboveIs.toValid {heap : HeapRawState} {p : Ptr C_rb_node}
+    {threshold n : UInt32}
+    (h : ListCountAboveIs heap p threshold n) : LinkedListValid heap p := by
+  induction h with
+  | null => exact .null
+  | cons_above p _ _ hp hv _ _ ih => exact .cons p hp hv ih
+  | cons_not_above p _ _ hp hv _ _ ih => exact .cons p hp hv ih
+
+/-- ListCountAtOrBelowIs at null gives 0. -/
+theorem ListCountAtOrBelowIs.null_zero {heap : HeapRawState} {threshold n : UInt32}
+    (h : ListCountAtOrBelowIs heap Ptr.null threshold n) : n = 0 := by
+  cases h with
+  | null => rfl
+  | cons_at_or_below _ _ _ hp => exact absurd rfl hp
+  | cons_not_at_or_below _ _ _ hp => exact absurd rfl hp
+
+/-- ListCountAtOrBelowIs at non-null can be decomposed. -/
+theorem ListCountAtOrBelowIs.decompose {heap : HeapRawState} {p : Ptr C_rb_node}
+    {threshold n : UInt32}
+    (h : ListCountAtOrBelowIs heap p threshold n) (hp : p ≠ Ptr.null) :
+    heapPtrValid heap p ∧
+    (((hVal heap p).value <= threshold ∧
+      ∃ m, n = m + 1 ∧ ListCountAtOrBelowIs heap (hVal heap p).next threshold m) ∨
+    (¬((hVal heap p).value <= threshold) ∧
+      ListCountAtOrBelowIs heap (hVal heap p).next threshold n)) := by
+  cases h with
+  | null => exact absurd rfl hp
+  | cons_at_or_below _ m _ _ hv h_leq hn =>
+    exact ⟨hv, Or.inl ⟨h_leq, m, rfl, hn⟩⟩
+  | cons_not_at_or_below _ _ _ _ hv h_not hn =>
+    exact ⟨hv, Or.inr ⟨h_not, hn⟩⟩
+
+/-- ListCountAtOrBelowIs implies LinkedListValid. -/
+theorem ListCountAtOrBelowIs.toValid {heap : HeapRawState} {p : Ptr C_rb_node}
+    {threshold n : UInt32}
+    (h : ListCountAtOrBelowIs heap p threshold n) : LinkedListValid heap p := by
+  induction h with
+  | null => exact .null
+  | cons_at_or_below p _ _ hp hv _ _ ih => exact .cons p hp hv ih
+  | cons_not_at_or_below p _ _ hp hv _ _ ih => exact .cons p hp hv ih
+
 /-! # New FuncSpecs: Traversal / loop functions -/
 
 /-- rb_count_nodes: counts nodes by traversing the linked list.
