@@ -227,29 +227,9 @@ AI-driven development of a formal verification framework at this scale.
 
 Clift follows AutoCorres's architecture with five abstraction stages
 (Figure~\ref{fig:pipeline}), each producing a transformed program and
-a refinement proof:
-
-\begin{center}
-\small
-\begin{tabular}{@{}lll@{}}
-\toprule
-\textbf{Stage} & \textbf{Transform} & \textbf{Effect} \\
-\midrule
-L0: CSimpl   & C $\to$ deep embedding  & Formal C semantics \\
-L1: SimplConv & CSimpl $\to$ monadic    & \texttt{NondetM} state monad \\
-L2: LocalVarExtract & State $\to$ lambdas & Locals become params \\
-L3: TypeStrengthen  & Narrow monad type  & Pure/option/nondet \\
-L4: HeapLift  & Flat bytes $\to$ typed  & Split heap model \\
-L5: WordAbstract & BitVec $\to$ Int/Nat & Human-readable \\
-\bottomrule
-\end{tabular}
-\end{center}
-
-Each stage $i$ is connected by a \texttt{corres} relation (backward
-simulation) proving that behaviors of the stage-$i$ program are
-contained in those of the stage-$(i{+}1)$ program. Composing these
-via transitivity yields a chain from the original C semantics to the
-final clean functional model.
+a machine-checked \texttt{corres} proof (backward simulation).
+Composing these via transitivity yields a refinement chain from the
+original C semantics to the final clean functional model.
 
 \input{figures/trust-boundary}
 
@@ -485,17 +465,6 @@ QA sub-agents ran automatically before every commit: a test runner
 verified builds, and an architecture reviewer checked code quality.
 CI tracked sorry counts per module, providing regression detection.
 
-\subsection{Scale of AI Contribution}
-
-Over 7 days and 197 commits, this methodology produced:
-\begin{itemize}
-\item 76,000+ lines of Lean~4 across 175 files
-\item 6,800 lines of Python (CImporter + tooling)
-\item 1,699 theorems and lemmas, of which 1,691 are sorry-free
-\item 228 completed backlog tasks with acceptance criteria
-\item CI/CD pipeline with per-module proof verification
-\end{itemize}
-
 All Claude Code session transcripts are preserved as JSONL files,
 providing a complete record of the human--AI collaboration.
 
@@ -591,30 +560,11 @@ verification with complex aliasing patterns.
 \subsection{AI Success Rates}
 
 We tracked sorry elimination across proof files
-(Figure~\ref{fig:sorry-timeline}) using a combination of
-direct Claude Code proof writing and ``model racing'' (running multiple
-AI models in parallel on isolated git worktrees), broken down by
-category in Figure~\ref{fig:ai-success}:
-
-\begin{center}
-\small
-\begin{tabular}{@{}lrr@{}}
-\toprule
-\textbf{Proof category} & \textbf{Attempted} & \textbf{Solved} \\
-\midrule
-Straight-line Hoare (guard/modify) & 45 & 43 (96\%) \\
-Loop invariant proofs              & 12 & 10 (83\%) \\
-Heap-mutation chains               &  8 &  6 (75\%) \\
-Complex multi-heap operations      &  5 &  1 (20\%) \\
-\midrule
-\textbf{Total}                     & \textbf{70} & \textbf{60 (86\%)} \\
-\bottomrule
-\end{tabular}
-\end{center}
-
-The remaining unsolved obligations require either novel
-mathematical arguments or workarounds for Lean~4 kernel depth limits
-that the AI could not discover independently.
+(Figure~\ref{fig:sorry-timeline}). Figure~\ref{fig:ai-success} breaks
+down AI success by proof category: 96\% on straight-line Hoare proofs,
+dropping to 20\% on complex multi-heap operations requiring novel
+workarounds. Figure~\ref{fig:radar} compares Clift and AutoCorres2
+qualitatively.
 
 \input{figures/radar-comparison}
 
@@ -684,59 +634,22 @@ production readiness.
 
 \subsection{Architecture Pivot: mvcgen and SpecM}
 
-Feedback from Sebastian Graf (Lean FRO) suggests a significant
-architectural simplification.  Two changes are proposed, both
-validated by his LeanCorres proof of
-concept~\cite{leancorres2026}:
+Feedback from Sebastian Graf (Lean FRO), validated by his LeanCorres
+proof of concept~\cite{leancorres2026}, suggests two simplifications:
+(1)~replace Clift's custom \texttt{validHoare} and $\sim$1,600 lines
+of Hoare rules with Lean's standard \texttt{Std.Do.Triple} and the
+\texttt{mvcgen} VCG tactic; and (2)~skip the CSimpl deep embedding
+entirely, emitting monadic \texttt{SpecM} code directly from the
+CImporter.  Together these would eliminate $\sim$2,500 lines of
+infrastructure and may alleviate the kernel depth issues, since
+\texttt{mvcgen} operates at the tactic level rather than through
+definitional unfolding.
 
-\paragraph{Replace custom Hoare logic with \texttt{Std.Do.Triple} and
-\texttt{mvcgen}.}
-Clift currently defines its own \texttt{validHoare} triple and
-maintains $\sim$960 lines of Hoare rules (\texttt{L1HoareRules}) plus
-$\sim$675 lines of VCG tactics.  Lean's standard library now includes
-\texttt{Std.Do.Triple}, a weakest-precondition Hoare logic for
-monadic programs, together with \texttt{mvcgen}, a tactic that
-automates verification-condition generation.  Adopting these would
-eliminate the painful \texttt{simp only [L1.seq]} chains that
-currently dominate Clift proofs, and may alleviate the kernel
-reduction depth issues described above, since \texttt{mvcgen} operates
-at the tactic level rather than through definitional unfolding.
-
-\paragraph{Skip CSimpl, emit monadic code directly from CImporter.}
-Industry users of AutoCorres2 have reported that CSimpl---the deeply
-embedded intermediate representation---is a ``legacy artifact'' that
-adds complexity without proportional benefit.  LeanCorres demonstrates
-the alternative: a denotational semantics maps C~AST statements
-directly into a \texttt{SpecM} monad (a faithful port of AutoCorres2's
-\texttt{Spec\_Monad} with demonic nondeterminism and CCPO-based least
-fixpoints for loops).  This would eliminate Clift's CSimpl
-($\sim$64~LOC), Exec ($\sim$239~LOC), SimplConv ($\sim$604~LOC), and
-all \texttt{L1corres} refinement proofs---roughly 2,500 lines of code
-and proof.
-
-\paragraph{Tradeoffs.}
-The simplification comes at a cost: absorbing \texttt{L1corres}
-proofs into the CImporter expands the Trusted Computing Base.
-Currently, only the CImporter is trusted; the five-stage refinement
-chain is machine-checked.  Under the proposed architecture, the
-CImporter would also be responsible for the correctness of the
-monadic translation---a responsibility currently discharged by
-\texttt{L1corres} theorems.  Notably, as of March 2026, LeanCorres's remaining
-\texttt{sorry} are concentrated at this CLight-to-SpecM
-bridge, suggesting that proving the denotational semantics correct is
-not free, merely deferred.
-
-\paragraph{Feasibility evidence.}
-LeanCorres ($\sim$2,000~LOC, as of March 2026) demonstrates that the
-approach works end to end: its \texttt{SpecM} monad supports
-\texttt{whileLoop} via CCPO least fixpoints with
-\texttt{WhileInvariant} (including well-founded termination via
-\texttt{Acc}), and its sorry-free Schorr--Waite proof ($\sim$800
-lines) shows that \texttt{mvcgen} handles complex pointer algorithms.
-Nondeterminism and while loops---two constructs central to C
-verification---are supported in LeanCorres's formulation (via custom
-\texttt{WP} instances), so neither is a fundamental blocker for
-adoption.
+The tradeoff is TCB expansion: the CImporter would absorb the
+responsibility currently discharged by machine-checked
+\texttt{L1corres} proofs.  LeanCorres's own remaining \texttt{sorry}
+are concentrated at exactly this denotational-semantics bridge,
+confirming the cost is real but tractable.
 
 % ─── 7. conclusion ─────────────────────────────────────────────────
 \section{Conclusion}
