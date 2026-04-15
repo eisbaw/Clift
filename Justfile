@@ -4,10 +4,6 @@
 build:
     lake build
 
-# Build with flock to prevent concurrent builds (use from agents)
-build-lock MODULE:
-    flock --timeout 600 /tmp/clift-build.lock lake build {{MODULE}}
-
 # Build only core library (no examples)
 build-lib:
     lake build Clift
