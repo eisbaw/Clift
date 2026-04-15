@@ -167,10 +167,10 @@ produced 76,000 lines of Lean~4, 6,800 lines of Python, and
   red-black trees, UART drivers, SHA-256 cores, and packet parsers.
 \item Evidence that AI can produce non-trivial formal verification
   artifacts at scale, including Hoare-logic proofs, separation logic
-  reasoning, and sorry elimination.
+  reasoning, and \texttt{sorry} elimination.
 \item An open-source, Nix-reproducible codebase with 12 remaining
   \texttt{sorry} out of 1,698 theorems (99.3\% of attempted proofs
-  are sorry-free).
+  are \texttt{sorry}-free).
 \end{itemize}
 
 % ─── 2. background ──────────────────────────────────────────────────
@@ -340,6 +340,7 @@ using a library of Hoare rules for sequential composition, conditionals,
 loops with invariants, and heap operations.
 
 \subsection{Memory Model}
+\label{sec:memory}
 
 Following Tuch~\cite{tuch2009types}, our heap is a flat byte-addressed
 store with typed access functions. The state comprises a raw heap
@@ -430,7 +431,7 @@ with three tiers:
 \item \textbf{Primary AI agent.} Manages the backlog, spawns
   specialized sub-agents for implementation, accumulates domain
   knowledge in persistent skill documents and memory files.
-\item \textbf{Lean 4 kernel.} Serves as the ultimate arbiter---proofs
+\item \textbf{Lean~4 kernel.} Serves as the ultimate arbiter---proofs
   either type-check or they do not. The \texttt{sorry} count is an
   objective, machine-checked progress metric.
 \end{enumerate}
@@ -443,7 +444,7 @@ hallucinated proof simply fails to compile.
 
 The project was decomposed into 230+ backlog tasks organized by
 dependency across 10+ phases (pipeline stages, proof infrastructure,
-sorry elimination, hardening). Tasks were implemented by spawning fresh
+\texttt{sorry} elimination, hardening). Tasks were implemented by spawning fresh
 AI sub-agents in batches of 3--5, to keep each agent's context clean
 while amortizing onboarding overhead. Each sub-agent was bootstrapped
 by reading \texttt{plan.md} and relevant reference material.
@@ -456,7 +457,7 @@ mechanisms prevented context exhaustion:
   delegated to fresh sub-agents to prevent build output from bloating
   the main conversation.
 \item \textbf{Persistent memory.} Cross-session knowledge was captured
-  in memory files: kernel depth workarounds, sorry elimination
+  in memory files: kernel depth workarounds, \texttt{sorry} elimination
   patterns, model effectiveness data. These loaded automatically at
   session start.
 \item \textbf{Backlog as external memory.} The backlog system served as
@@ -473,8 +474,8 @@ codified as reusable artifacts:
 
 \textbf{The Prover persona} (158 lines) encoded domain-specific proof
 knowledge: five proof patterns, the kernel depth workaround
-(Section~3.5), heap reasoning rules, and a verification checklist.
-This persona was invoked for every sorry-elimination attempt.
+(Section~\ref{sec:memory}), heap reasoning rules, and a verification checklist.
+This persona was invoked for every \texttt{sorry}-elimination attempt.
 
 \textbf{The model-race skill} provided diversity when the primary agent
 failed: multiple AI models received identical prompts in isolated git
@@ -491,7 +492,7 @@ diagnose root cause $\to$ codify workaround $\to$ update
 skill/persona/memory $\to$ never hit the same issue again.
 When specifications were too weak for proof, the human directed
 \emph{progressive spec strengthening} before re-attempting proofs.
-Blocked sorry were parked as backlog tasks for later resolution.
+Blocked \texttt{sorry} were parked as backlog tasks for later resolution.
 
 \subsection{Quality Assurance}
 
@@ -503,13 +504,13 @@ codified into every prompt:
   instead of the real specification.
 \item \textbf{Fused body substitution}: proving against a hand-written
   body instead of the generated one.
-\item \textbf{Hidden sorry}: placing \texttt{sorry} in helper lemmas
+\item \textbf{Hidden \texttt{sorry}}: placing \texttt{sorry} in helper lemmas
   or using \texttt{axiom} declarations.
 \end{enumerate}
 
 QA sub-agents ran automatically before every commit: a test runner
 verified builds, and an architecture reviewer checked code quality.
-CI tracked sorry counts per module, providing regression detection.
+CI tracked \texttt{sorry} counts per module, providing regression detection.
 
 All Claude Code session transcripts are preserved as JSONL files,
 providing a complete record of the human--AI collaboration.
@@ -559,7 +560,7 @@ Proof files (Examples/) & 22,957 \\
 Generated code (Generated/) & 38,978 \\
 Theorems and lemmas & 1,698 \\
 Remaining \texttt{sorry} & 12 \\
-Sorry-free rate (of attempted proofs) & 99.3\% \\
+\texttt{sorry}-free rate (of attempted proofs) & 99.3\% \\
 C programs processed (21 with proofs) & 32 \\
 Python (CImporter + tooling) & 6,782 LOC \\
 Development time & $\sim$7 calendar days \\
@@ -572,10 +573,10 @@ The 12 remaining \texttt{sorry} are concentrated in three files:
 priority queue proofs (5), ring buffer drain-to loop obligations (4),
 and refinement theorems transitively blocked on validHoare
 completeness (3). Of the 21 programs with proofs, \textbf{18 have
-fully sorry-free proof chains} from C through all lifting stages to
+fully \texttt{sorry}-free proof chains} from C through all lifting stages to
 user-level Hoare-logic properties; 3 programs (priority queue, ring
 buffer extended drain-to, ring buffer extended refinement) retain
-sorry in specific subgoals.
+\texttt{sorry} in specific subgoals.
 
 \paragraph{Human effort.} Development spanned 7~calendar days
 (first commit 2026-04-08, last commit 2026-04-15). The human author
@@ -593,7 +594,7 @@ consumed an additional $\sim$50 CPU-hours on an 8-core workstation.
 \toprule
 \textbf{Aspect} & \textbf{AutoCorres2} & \textbf{Clift} \\
 \midrule
-Proof assistant   & Isabelle/HOL      & Lean 4 \\
+Proof assistant   & Isabelle/HOL      & Lean~4 \\
 C parser          & StrictC (custom)  & clang JSON \\
 Type theory       & Simple types      & Dependent types \\
 Automation        & Eisbach, wpsimp   & simp, omega, grind \\
@@ -619,7 +620,7 @@ verification with complex aliasing patterns.
 
 \subsection{AI Success Rates}
 
-We tracked sorry elimination across proof files
+We tracked \texttt{sorry} elimination across proof files
 (Figure~\ref{fig:sorry-timeline}). Figure~\ref{fig:ai-success} breaks
 down AI success by proof category: 96\% on straight-line Hoare proofs,
 dropping to 20\% on complex multi-heap operations requiring novel
@@ -662,7 +663,7 @@ The entire project is deterministically reproducible via a Nix
 flake: \texttt{nix develop} provides the exact Lean toolchain,
 clang version, and Python environment. Proof checking requires
 only \texttt{lake build} inside the Nix shell. CI runs on GitHub
-Actions with per-module proof verification and sorry-count
+Actions with per-module proof verification and \texttt{sorry}-count
 tracking.
 
 % ─── 6. limitations ────────────────────────────────────────────────
@@ -686,7 +687,7 @@ OS-kernel verification.
 \paragraph{Scale.} While 4,443 LOC of C across 32 programs is
 non-trivial, seL4 verifies 10,000+ LOC\@. Scaling Clift to this
 level requires improving build times (currently minutes per proof
-module), MetaM automation maturity, and stronger VCG tactics for
+module), \texttt{MetaM} automation maturity, and stronger VCG tactics for
 programs with $>$20 sequential heap operations. Our largest
 verified program (ring buffer extended, 40 operations) shows the
 approach scales to moderate complexity, but multi-module
@@ -696,7 +697,7 @@ inter-procedural verification remains untested.
 15 years of community refinement. Clift demonstrates feasibility, not
 production readiness.
 
-\subsection{Architecture Pivot: mvcgen and SpecM}
+\subsection{Architecture Pivot: \texttt{mvcgen} and \texttt{SpecM}}
 
 Feedback from Sebastian Graf, validated by his LeanCorres
 proof of concept~\cite{leancorres2026}, suggests two simplifications:
@@ -716,7 +717,7 @@ are concentrated at exactly this denotational-semantics bridge,
 confirming the cost is real but tractable.
 
 \paragraph{Lasting contributions.}
-Even if the specific architecture evolves (e.g., toward SpecM/mvcgen),
+Even if the specific architecture evolves (e.g., toward \texttt{SpecM}/\texttt{mvcgen}),
 several contributions persist: (1)~the CImporter, which parses
 \texttt{clang -ast-dump=json} into typed Lean~4 representations and is
 reusable regardless of the backend monad; (2)~the memory model and heap
