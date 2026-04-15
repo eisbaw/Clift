@@ -977,7 +977,46 @@ theorem pq_insert_correct :
                        (hVal s.globals.rawHeap s.locals.pq).size <
                          (hVal s.globals.rawHeap s.locals.pq).capacity)
       · -- guard(heapPtrValid data[pq.size]) + modify(heapUpdate data[size]:=value)
-        sorry
+        intro s ⟨hpq, hlt, hdav⟩
+        have h_size_lt_cap : (hVal s.globals.rawHeap s.locals.pq).size.toNat <
+            (hVal s.globals.rawHeap s.locals.pq).capacity.toNat :=
+          UInt32.lt_iff_toNat_lt.mp hlt
+        have h_dsize : heapPtrValid s.globals.rawHeap
+            (Ptr.elemOffset s.locals.data (hVal s.globals.rawHeap s.locals.pq).size.toNat) :=
+          hdav _ h_size_lt_cap
+        -- Guard: h_dsize ensures heapPtrValid data[size]
+        -- Use L1_guard_modify_result to get singleton ok result
+        let p := fun s : ProgramState => heapPtrValid s.globals.rawHeap
+            (Ptr.elemOffset s.locals.data (hVal s.globals.rawHeap s.locals.pq).size.toNat)
+        let f := fun s : ProgramState =>
+          { s with globals := { s.globals with
+            rawHeap := heapUpdate s.globals.rawHeap
+              (Ptr.elemOffset s.locals.data (hVal s.globals.rawHeap s.locals.pq).size.toNat)
+              s.locals.value } }
+        have h_gm := L1_guard_modify_result p f s h_dsize
+        constructor
+        · exact h_gm.2
+        · intro r s' h_mem
+          rw [h_gm.1] at h_mem
+          have ⟨hr, hs⟩ := Prod.mk.inj h_mem; subst hr; subst hs
+          -- After heapUpdate: need hpv pq ∧ dav ∧ size < cap
+          -- 1. heapPtrValid pq preserved
+          have hpq' : heapPtrValid (f s).globals.rawHeap s.locals.pq :=
+            heapUpdate_preserves_heapPtrValid _ _ _ _ hpq
+          -- 2. dataArrayValid preserved
+          have hdav' : dataArrayValid (f s).globals.rawHeap s.locals.data
+              (hVal s.globals.rawHeap s.locals.pq).capacity.toNat :=
+            dataArrayValid_heapUpdate _ _ _ _ _ hdav
+          -- 3. hVal at pq unchanged (UInt32 and C_pqueue have different type tags)
+          have h_disj : ptrDisjoint
+              (Ptr.elemOffset s.locals.data (hVal s.globals.rawHeap s.locals.pq).size.toNat)
+              s.locals.pq :=
+            heapPtrValid_different_type_disjoint h_dsize hpq uint32_pqueue_typeTag_ne
+          have h_hval_eq : hVal (f s).globals.rawHeap s.locals.pq =
+              hVal s.globals.rawHeap s.locals.pq :=
+            hVal_heapUpdate_disjoint _ _ _ _ (heapPtrValid_bound h_dsize) (heapPtrValid_bound hpq) h_disj
+          rw [h_hval_eq]
+          exact ⟨hpq', h_hval_eq ▸ hdav', hlt⟩
       · -- seq(dynCom(bubble_up), seq(guards+size++, ret_val:=0+throw))
         -- After data write: heapPtrValid pq preserved (different types),
         -- dataArrayValid preserved (heapUpdate_preserves_heapPtrValid).
