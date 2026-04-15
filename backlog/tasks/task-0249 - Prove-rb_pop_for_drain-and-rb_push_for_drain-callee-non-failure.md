@@ -1,9 +1,11 @@
 ---
 id: TASK-0249
 title: Prove rb_pop_for_drain and rb_push_for_drain callee non-failure
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-04-14 07:02'
+updated_date: '2026-04-15 01:54'
 labels:
   - sorry-elimination
   - drain-to
@@ -30,3 +32,15 @@ Approach: copy the guard chain proofs from RBExtProofRbPop.lean and adapt inline
 - [ ] #1 rb_pop_for_drain proven (0 sorry)
 - [ ] #2 rb_push_for_drain proven (0 sorry)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Progress on rb_pop/rb_push non-failure:
+- Eliminated 1 sorry (rb_push not-full): strengthened precondition with ptrDisjoint to match rb_push_spec.pre, then used rb_push_validHoare for non-failure
+- rb_pop head≠null sorry remains: the intro+simp approach gets 5 guards deep but the condition(new_head=null) split creates existential chains that simp cannot fully eliminate. Needs manual rcases or a guard-chain tactic.
+- Added projection lemmas (setFront_globals/rb/out_val/front, heapUpd_locals) for 47-field Locals struct
+- Added catch_skip_nf helper
+- RBExtProofRbPop.lean has kernel depth regression (rb_pop_validHoare cannot build)
+- Sorry count: 5→4
+<!-- SECTION:NOTES:END -->

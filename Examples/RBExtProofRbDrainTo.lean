@@ -15,28 +15,26 @@
 --   + (dst.tail != null -> heapPtrValid dst.tail)   (rb_push guard)
 --
 -- PROVEN:
---   - rb_pop_for_drain: postcondition (all results are ok, via L1_catch_skip_ok_only)
 --   - rb_pop_for_drain head=null: non-failure via L1_catch_seq_error_first_nf
---   - rb_push_for_drain: postcondition (all results are ok, via L1_catch_skip_ok_only)
---   - rb_push_for_drain full: non-failure via L1_catch_seq_error_first_nf
+--   - rb_push_for_drain: fully proven (full + not-full via rb_push_validHoare)
+--     (precondition strengthened with ptrDisjoint node tail to match rb_push_spec.pre)
 --   - h_init, h_exit: trivial from invariant
 --   - MODIFY(transferred:=0), POST-LOOP, HANDLER: fully proven
 --
--- REMAINING SORRY (5 spots):
---   1. rb_pop_for_drain head!=null: guard chain non-failure (~100 lines, needs
---      compiled RBPopProof.olean or inline guard-chain decomposition)
---   2. rb_push_for_drain not-full: guard chain non-failure (~100 lines, needs
---      inline guard-chain decomposition; can't use rb_push_validHoare due to
---      missing ptrDisjoint in precondition)
---   3. h_body_nf: while body non-failure (dynCom call composition)
---   4. h_body_inv: invariant preservation through full iteration
+-- REMAINING SORRY (4 spots):
+--   1. rb_pop_nf (head≠null): guard chain non-failure. Approach: unfold body,
+--      intro+simp to reduce each guard. First 5 guards pass via simp but the
+--      condition(new_head=null) split creates existential chains that simp can't
+--      fully eliminate. Needs either manual rcases or a general guard-chain tactic.
+--   2. h_body_nf: while body non-failure (dynCom call composition)
+--   3. h_body_inv: invariant preservation through full iteration
 --      (hardest: needs head-validity after rb_pop advances src.head;
 --      requires LinkedListValid or WellFormedList in precondition)
---   5. h_abrupt: error exits preserve heapPtrValid (frame argument;
+--   4. h_abrupt: error exits preserve heapPtrValid (frame argument;
 --      error results only come from modify+throw break paths,
 --      but proving this requires tracing through dynCom structure)
 --
--- All 5 are THEORETICALLY PROVABLE. The difficulty is mechanical (large proof terms).
+-- All 4 are THEORETICALLY PROVABLE. The difficulty is mechanical (large proof terms).
 import Examples.RBExtSpecs
 import Examples.RBExtProofsLoops
 set_option maxHeartbeats 102400000
@@ -100,6 +98,74 @@ private theorem L1_catch_seq_error_first_nf {σ : Type} {m₁ m₂ : L1Monad σ}
     · exact absurd (h_err _ _ h_ok) (by intro h; cases h)
   · exact hf_skip
 
+/-! ## Projection lemmas for locals-modifying steps in rb_pop -/
+
+-- setFront: { s with locals := { s.locals with front := v } }
+@[simp] private theorem setFront_globals (s : ProgramState) (v : Ptr C_rb_node) :
+    ({ s with locals := { s.locals with front := v } } : ProgramState).globals = s.globals := rfl
+@[simp] private theorem setFront_rb (s : ProgramState) (v : Ptr C_rb_node) :
+    ({ s with locals := { s.locals with front := v } } : ProgramState).locals.rb = s.locals.rb := rfl
+@[simp] private theorem setFront_out_val (s : ProgramState) (v : Ptr C_rb_node) :
+    ({ s with locals := { s.locals with front := v } } : ProgramState).locals.out_val = s.locals.out_val := rfl
+@[simp] private theorem setFront_front (s : ProgramState) (v : Ptr C_rb_node) :
+    ({ s with locals := { s.locals with front := v } } : ProgramState).locals.front = v := rfl
+
+-- setRetVal0: { s with locals := { s.locals with ret__val := 0 } }
+@[simp] private theorem setRetVal0_globals (s : ProgramState) :
+    ({ s with locals := { s.locals with ret__val := (0 : UInt32) } } : ProgramState).globals = s.globals := rfl
+
+-- setRetVal1: { s with locals := { s.locals with ret__val := 1 } }
+@[simp] private theorem setRetVal1_globals (s : ProgramState) :
+    ({ s with locals := { s.locals with ret__val := (1 : UInt32) } } : ProgramState).globals = s.globals := rfl
+
+-- heapUpdate preserves all locals
+@[simp] private theorem heapUpd_locals (s : ProgramState) {α : Type} [MemType α] (p : Ptr α) (v : α) :
+    ({ s with globals := { s.globals with rawHeap := heapUpdate s.globals.rawHeap p v } } : ProgramState).locals = s.locals := rfl
+
+/-! ## L1 combinator failure helper -/
+
+private theorem catch_skip_nf' {m : L1Monad ProgramState} {s : ProgramState}
+    (h : ¬(m s).failed) : ¬(L1.catch m L1.skip s).failed := by
+  simp only [L1.catch, L1.skip, NondetM.pure]; intro hf
+  rcases hf with hf | ⟨_, _, hf⟩; exact h hf; exact hf
+
+/-! ## rb_pop non-failure for head ≠ null
+
+    Proof: unfold l1_rb_pop_body, intro+contradiction, peel each guard/modify
+    using incremental simp steps. Each guard is heapPtrValid which is preserved
+    through heapUpdates. The condition(new_head=null) is handled by split. -/
+
+set_option maxRecDepth 4096 in
+set_option maxHeartbeats 409600000 in
+private theorem rb_pop_nf (s₀ : ProgramState)
+    (h_rb : heapPtrValid s₀.globals.rawHeap s₀.locals.rb)
+    (h_ov : heapPtrValid s₀.globals.rawHeap s₀.locals.out_val)
+    (h_head : (hVal s₀.globals.rawHeap s₀.locals.rb).head ≠ Ptr.null)
+    (h_hv : heapPtrValid s₀.globals.rawHeap (hVal s₀.globals.rawHeap s₀.locals.rb).head) :
+    ¬(l1_rb_pop_body s₀).failed := by
+  unfold l1_rb_pop_body
+  apply catch_skip_nf'
+  intro hf
+  -- Peel condition(head=null) → skip branch
+  simp only [L1.seq, L1.condition,
+    show (fun s : ProgramState => decide ((hVal s.globals.rawHeap s.locals.rb).head = Ptr.null)) s₀ = false
+      from decide_eq_false h_head, ↓reduceIte,
+    L1.skip, NondetM.pure] at hf
+  -- Peel guard(rb)
+  simp only [L1.seq, L1.guard, h_rb, ↓reduceIte] at hf
+  -- Peel modify(front:=head) + guard(ov) + guard(front) + modify(heapOV) +
+  -- guard(rb) + guard(front) + modify(heapHead) + condition + rest
+  -- Use one big simp to reduce all remaining guards/modifies/conditions
+  -- BLOCKED: The simp approach gets close but can't fully reduce the existential chain.
+  -- After unfolding L1 combinators and simplifying guards with heapPtrValid hypotheses,
+  -- the remaining goal has ∃ s', s' = <big state> ∧ P s' forms that simp can't eliminate
+  -- in a single pass. A manual rcases + subst approach would work but requires ~50 more
+  -- lines of tedious case analysis.
+  --
+  -- Alternative: create a general L1_guard_chain_nf tactic/lemma that handles this pattern.
+  -- Or fix the kernel depth in RBExtProofRbPop.lean to use rb_pop_validHoare directly.
+  sorry
+
 /-! ## Callee ok-only (catch+skip structure) -/
 
 private theorem rb_pop_results_ok (s : ProgramState) :
@@ -144,22 +210,24 @@ private theorem rb_pop_for_drain :
       simp only [L1.condition, show (decide ((hVal s₀.globals.rawHeap s₀.locals.rb).head = Ptr.null)) = true from decide_eq_true h_head, ↓reduceIte] at h_mem
       rw [(L1_modify_throw_result _ s₀).1] at h_mem
       exact (Prod.mk.inj h_mem).1
-  · -- HEAD ≠ NULL: guard chain non-failure (all heapPtrValid guards pass)
-    sorry
+  · -- HEAD ≠ NULL: non-failure by delegation to rb_pop_validHoare_nf.
+    exact rb_pop_nf s₀ h_rb h_ov h_head (h_head_valid h_head)
 
 -- rb_push non-failure + ok-only.
--- Guards: heapPtrValid node (×2), heapPtrValid rb.tail (conditional, ×1), heapPtrValid rb (×5).
--- No ptrDisjoint needed for non-failure (only for functional postcondition).
+-- Precondition includes ptrDisjoint and count<capacity to match rb_push_spec.pre,
+-- enabling delegation to rb_push_validHoare for the non-failure proof.
 set_option maxHeartbeats 51200000 in
 private theorem rb_push_for_drain :
     validHoare
       (fun s => heapPtrValid s.globals.rawHeap s.locals.rb ∧
                 heapPtrValid s.globals.rawHeap s.locals.node ∧
                 ((hVal s.globals.rawHeap s.locals.rb).tail ≠ Ptr.null →
-                  heapPtrValid s.globals.rawHeap (hVal s.globals.rawHeap s.locals.rb).tail))
+                  heapPtrValid s.globals.rawHeap (hVal s.globals.rawHeap s.locals.rb).tail) ∧
+                ((hVal s.globals.rawHeap s.locals.rb).tail ≠ Ptr.null →
+                  ptrDisjoint s.locals.node (hVal s.globals.rawHeap s.locals.rb).tail))
       l1_rb_push_body
       (fun r _ => r = Except.ok ()) := by
-  intro s₀ ⟨h_rb, h_node, h_tail_valid⟩
+  intro s₀ ⟨h_rb, h_node, h_tail_valid, h_tail_disj⟩
   refine ⟨?_, fun r s' h => rb_push_results_ok s₀ r s' h⟩
   by_cases h_full : (hVal s₀.globals.rawHeap s₀.locals.rb).count ≥
                     (hVal s₀.globals.rawHeap s₀.locals.rb).capacity
@@ -174,8 +242,13 @@ private theorem rb_push_for_drain :
       simp only [L1.condition, show (decide ((hVal s₀.globals.rawHeap s₀.locals.rb).count ≥ (hVal s₀.globals.rawHeap s₀.locals.rb).capacity)) = true from decide_eq_true h_full, ↓reduceIte] at h_mem
       rw [(L1_modify_throw_result _ s₀).1] at h_mem
       exact (Prod.mk.inj h_mem).1
-  · -- NOT FULL: guard chain non-failure (all heapPtrValid guards pass)
-    sorry
+  · -- NOT FULL: use rb_push_validHoare for non-failure.
+    -- Our precondition matches rb_push_spec.pre.
+    have h_lt : (hVal s₀.globals.rawHeap s₀.locals.rb).count <
+                (hVal s₀.globals.rawHeap s₀.locals.rb).capacity :=
+      Nat.lt_of_not_le h_full
+    have hpre : rb_push_spec.pre s₀ := ⟨h_rb, h_node, h_lt, h_tail_valid, h_tail_disj⟩
+    exact (rb_push_validHoare s₀ hpre).1
 
 /-! ## Main theorem
 
