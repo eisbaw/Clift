@@ -1,0 +1,58 @@
+% Figure: Layered delegation architecture
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[
+  box/.style={draw, rounded corners=4pt, minimum width=3cm,
+              minimum height=0.8cm, font=\small\sffamily, align=center},
+  arrow/.style={->, >=stealth, thick},
+  darrow/.style={<->, >=stealth, thick, dashed},
+]
+  % Human
+  \node[box, fill=orange!15] (human) at (0, 4.5) {Human Director};
+
+  % Primary agent
+  \node[box, fill=blue!12, minimum width=4cm] (primary) at (0, 3.0)
+    {Primary AI Agent\\[-2pt]\scriptsize Claude Opus 4.6, 1M ctx};
+
+  % Sub-agents row
+  \node[box, fill=blue!8, minimum width=2.2cm, font=\scriptsize\sffamily] (prover) at (-2.5, 1.2)
+    {Prover\\Persona};
+  \node[box, fill=blue!8, minimum width=2.2cm, font=\scriptsize\sffamily] (subagent) at (0, 1.2)
+    {Sub-agents\\(3--5 parallel)};
+  \node[box, fill=blue!8, minimum width=2.2cm, font=\scriptsize\sffamily] (race) at (2.5, 1.2)
+    {Model Race\\Skill};
+
+  % Lean kernel
+  \node[box, fill=green!15, minimum width=5cm] (kernel) at (0, -0.3)
+    {Lean 4 Kernel (verification oracle)};
+
+  % Backlog
+  \node[box, fill=yellow!15, minimum width=2.2cm] (backlog) at (4.5, 3.0)
+    {Backlog\\[-2pt]\scriptsize 230+ tasks};
+
+  % Memory
+  \node[box, fill=yellow!15, minimum width=2.2cm] (memory) at (4.5, 1.8)
+    {Persistent\\[-2pt]\scriptsize Memory};
+
+  % Arrows
+  \draw[arrow] (human) -- node[right, font=\scriptsize] {goals, review} (primary);
+  \draw[arrow] (primary) -- (prover);
+  \draw[arrow] (primary) -- (subagent);
+  \draw[arrow] (primary) -- (race);
+  \draw[arrow] (prover) -- (kernel);
+  \draw[arrow] (subagent) -- (kernel);
+  \draw[arrow] (race) -- (kernel);
+  \draw[darrow] (primary) -- (backlog);
+  \draw[darrow] (primary) -- (memory);
+
+  % Feedback arrow from kernel
+  \draw[arrow, color=green!50!black] (kernel.south) -- ++(0,-0.4) -| (-4.5,3.0)
+    node[near start, below, font=\scriptsize, text=green!50!black] {type-checks?}
+    -- (primary.west);
+\end{tikzpicture}
+\caption{Layered delegation architecture. The human sets goals; the
+primary agent decomposes work and spawns specialists; the Lean~4 kernel
+provides ground truth. The backlog and memory files serve as persistent
+external state across sessions.}
+\label{fig:delegation}
+\end{figure}

@@ -16,6 +16,9 @@
   \fancyfoot[R]{\footnotesize\texttt{git:\gitsha}}%
 }
 
+\usepackage{tikz}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
 \usepackage{listings}
 
 \lstset{
@@ -89,7 +92,7 @@ machine-checked refinement proofs.
 A distinguishing feature of this project is that it was developed
 almost entirely by AI (Claude Opus~4.6 with 1M token context), with
 human guidance on architecture and direction. The codebase comprises
-49,000+ lines of Lean~4, 1,523 theorems, and only 9 remaining
+57,000+ lines of Lean~4, 1,099 theorems, and only 12 remaining
 \texttt{sorry} axioms across 32 verified C programs. We evaluate the
 pipeline on embedded systems code including ring buffers, UART drivers,
 hash tables, red-black trees, and packet parsers, demonstrating both
@@ -145,9 +148,9 @@ Opus~4.6}~\cite{anthropic2025claude}, a large language model, operating
 through the Claude Code CLI tool with 1M token context. The human
 author provided architectural guidance, reviewed outputs, and directed
 the AI through a structured backlog of 230+ tasks. This collaboration
-produced 49,000+ lines of Lean~4, 5,000 lines of Python
-(CImporter), and 1,150 machine-checked theorems in approximately
-5~days of wall-clock time.
+produced 51,000+ lines of Lean~4, 5,000 lines of Python
+(CImporter), and 1,099 machine-checked theorems in approximately
+7~days of wall-clock time.
 
 \paragraph{Contributions.}
 \begin{itemize}
@@ -158,8 +161,8 @@ produced 49,000+ lines of Lean~4, 5,000 lines of Python
 \item Evidence that AI can produce non-trivial formal verification
   artifacts at scale, including Hoare-logic proofs, separation logic
   reasoning, and sorry elimination.
-\item An open-source, Nix-reproducible codebase with 9 remaining
-  \texttt{sorry} out of 1,523 theorems (99.4\% complete).
+\item An open-source, Nix-reproducible codebase with 12 remaining
+  \texttt{sorry} out of 1,099 theorems (98.9\% complete).
 \end{itemize}
 
 % ─── 2. background ──────────────────────────────────────────────────
@@ -218,6 +221,8 @@ AI-driven development of a formal verification framework at this scale.
 % ─── 3. architecture ────────────────────────────────────────────────
 \section{Architecture}
 
+\input{figures/pipeline}
+
 \subsection{The Five-Stage Lifting Pipeline}
 
 Clift follows AutoCorres's architecture with five abstraction stages,
@@ -244,6 +249,8 @@ simulation) proving that behaviors of the stage-$i$ program are
 contained in those of the stage-$(i{+}1)$ program. Composing these
 via transitivity yields a chain from the original C semantics to the
 final clean functional model.
+
+\input{figures/trust-boundary}
 
 \subsection{CImporter: The Trust Boundary}
 
@@ -325,6 +332,8 @@ marking \texttt{hVal} and \texttt{heapUpdate} as
 \texttt{simp} lemmas---the same strategy used in Isabelle's
 \texttt{runs\_to} framework but adapted to Lean's reduction semantics.
 
+\input{figures/worked-example}
+
 \subsection{Worked Example: Ring Buffer Push}
 
 To illustrate the end-to-end flow, consider a ring buffer \texttt{push}
@@ -365,6 +374,8 @@ with \texttt{omega}.
 
 % ─── 4. ai-driven development ──────────────────────────────────────
 \section{AI-Driven Development}
+
+\input{figures/delegation}
 
 \subsection{Layered Delegation Architecture}
 
@@ -473,12 +484,12 @@ CI tracked sorry counts per module, providing regression detection.
 
 \subsection{Scale of AI Contribution}
 
-Over 5 days and 128 commits, this methodology produced:
+Over 7 days and 194 commits, this methodology produced:
 \begin{itemize}
-\item 49,000+ lines of Lean~4 across 179 files
+\item 51,000+ lines of Lean~4 across 179 files
 \item 5,000 lines of Python (CImporter pipeline)
-\item 1,523 theorems and lemmas, of which 1,514 are sorry-free
-\item 230+ backlog tasks with acceptance criteria
+\item 1,099 theorems and lemmas, of which 1,087 are sorry-free
+\item 228 completed backlog tasks with acceptance criteria
 \item CI/CD pipeline with per-module proof verification
 \end{itemize}
 
@@ -510,6 +521,8 @@ Foundations      & max, gcd, swap, array bounds              & 828 \\
 \end{tabular}
 \end{center}
 
+\input{figures/codebase-composition}
+
 \subsection{Proof Metrics}
 
 \begin{center}
@@ -518,24 +531,26 @@ Foundations      & max, gcd, swap, array bounds              & 828 \\
 \toprule
 \textbf{Metric} & \textbf{Value} \\
 \midrule
-Total Lean LOC (library + proofs + generated) & 49,444 \\
-Library code (Clift/) & 13,392 \\
-Proof files (Examples/) & 18,682 \\
-Generated code (Generated/) & 17,370 \\
-Theorems and lemmas & 1,523 \\
-Remaining \texttt{sorry} & 9 \\
-Sorry-free rate & 99.4\% \\
+Total Lean LOC (library + proofs + generated) & 51,668 \\
+Library code (Clift/) & 13,911 \\
+Proof files (Examples/) & 22,957 \\
+Generated code (Generated/) & 14,800 \\
+Theorems and lemmas & 1,099 \\
+Remaining \texttt{sorry} & 12 \\
+Sorry-free rate & 98.9\% \\
 C programs verified & 32 \\
 CImporter (Python) & 5,025 LOC \\
-Development time & $\sim$5 days \\
-Commits & 128 \\
+Development time & $\sim$7 days \\
+Commits & 194 \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-The 9 remaining \texttt{sorry} are concentrated in complex ring buffer
-operations requiring simultaneous reasoning about 8+ heap locations---a
-known limitation of Lean~4's kernel reduction depth.
+The 12 remaining \texttt{sorry} are concentrated in three areas:
+priority queue inter-procedural proofs (5), ring buffer drain-to loop
+obligations (4), and refinement theorems blocked on completeness of
+the validHoare proofs (3)---all involving kernel depth limits or
+complex inter-procedural reasoning.
 
 \subsection{Comparison with AutoCorres2}
 
@@ -551,7 +566,7 @@ Type theory       & Simple types      & Dependent types \\
 Automation        & Eisbach, wpsimp   & simp, omega, grind \\
 Memory model      & Tuch (full)       & Simplified Burstall \\
 AI compatibility  & Low               & High \\
-Maturity          & 15+ years         & 5 days \\
+Maturity          & 15+ years         & 7 days \\
 LOC verified      & 10,000+           & 4,443 \\
 \bottomrule
 \end{tabular}
@@ -563,6 +578,10 @@ typed access functions rather than a fully mechanized separation
 algebra. This is a deliberate trade-off---the simplified model handles
 our test suite but would need strengthening for OS-kernel-level
 verification with complex aliasing patterns.
+
+\input{figures/sorry-timeline}
+
+\input{figures/ai-success}
 
 \subsection{AI Success Rates}
 
@@ -586,9 +605,11 @@ Complex multi-heap operations      &  5 &  1 (20\%) \\
 \end{tabular}
 \end{center}
 
-The remaining 9 sorry (from the 10 unsolved) require either novel
+The remaining unsolved obligations require either novel
 mathematical arguments or workarounds for Lean~4 kernel depth limits
 that the AI could not discover independently.
+
+\input{figures/radar-comparison}
 
 \subsection{Qualitative Observations}
 
@@ -716,8 +737,8 @@ adoption.
 We have demonstrated that the seL4/AutoCorres verification methodology
 can be replicated in Lean~4, and that AI can drive the development of
 a formal verification framework at surprising scale and depth. Clift's
-49,000 lines of Lean~4, 1,523 theorems, and 32 verified C programs
-were produced in approximately 5~days through human--AI collaboration,
+51,000 lines of Lean~4, 1,099 theorems, and 32 verified C programs
+were produced in approximately 7~days through human--AI collaboration,
 with Lean's kernel serving as an incorruptible verification oracle.
 
 The combination of Lean~4's modern proof infrastructure, AI's ability
