@@ -938,6 +938,73 @@ Key non-failure obligations:
 3. guard(heapPtrValid pq) x2: pq validity preserved through heapUpdates
    (type safety: UInt32/C_pqueue have different type tags → ptrDisjoint) -/
 
+-- Step function for dynCom setup: i := pq.size (avoids kernel deep recursion on 16-field Locals)
+private noncomputable def pq_insert_setup (s : ProgramState) : ProgramState :=
+  ⟨s.globals, ⟨s.locals.capacity, s.locals.data, s.locals.heap_size,
+    (hVal s.globals.rawHeap s.locals.pq).size,
+    s.locals.iters, s.locals.j, s.locals.left, s.locals.out, s.locals.parent,
+    s.locals.pq, s.locals.ret__val, s.locals.right, s.locals.root_idx, s.locals.smallest,
+    s.locals.tmp, s.locals.value⟩⟩
+
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem pq_insert_setup_locals_eq (s : ProgramState) :
+    (pq_insert_setup s).locals = ⟨s.locals.capacity, s.locals.data, s.locals.heap_size,
+      (hVal s.globals.rawHeap s.locals.pq).size,
+      s.locals.iters, s.locals.j, s.locals.left, s.locals.out, s.locals.parent,
+      s.locals.pq, s.locals.ret__val, s.locals.right, s.locals.root_idx, s.locals.smallest,
+      s.locals.tmp, s.locals.value⟩ := by
+  show (⟨s.globals, ⟨s.locals.capacity, s.locals.data, s.locals.heap_size,
+    (hVal s.globals.rawHeap s.locals.pq).size,
+    s.locals.iters, s.locals.j, s.locals.left, s.locals.out, s.locals.parent,
+    s.locals.pq, s.locals.ret__val, s.locals.right, s.locals.root_idx, s.locals.smallest,
+    s.locals.tmp, s.locals.value⟩⟩ : ProgramState).locals = _; rfl
+
+@[simp] private theorem pq_insert_setup_globals (s : ProgramState) :
+    (pq_insert_setup s).globals = s.globals := by
+  show (⟨s.globals, _⟩ : ProgramState).globals = _; rfl
+
+@[simp] private theorem pq_insert_setup_data (s : ProgramState) :
+    (pq_insert_setup s).locals.data = s.locals.data := by rw [pq_insert_setup_locals_eq]
+
+@[simp] private theorem pq_insert_setup_i (s : ProgramState) :
+    (pq_insert_setup s).locals.i = (hVal s.globals.rawHeap s.locals.pq).size := by
+  rw [pq_insert_setup_locals_eq]
+
+@[simp] private theorem pq_insert_setup_pq (s : ProgramState) :
+    (pq_insert_setup s).locals.pq = s.locals.pq := by rw [pq_insert_setup_locals_eq]
+
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem pq_insert_setup_funext :
+    (fun s : ProgramState => { s with locals := { s.locals with data := s.locals.data, i := (hVal s.globals.rawHeap s.locals.pq).size } }) = pq_insert_setup := by
+  funext s; show _ = pq_insert_setup s; unfold pq_insert_setup; rfl
+
+-- Step function for ret_val := 0 (avoids kernel deep recursion on 16-field Locals)
+private noncomputable def pq_insert_set_ret0 (s : ProgramState) : ProgramState :=
+  ⟨s.globals, ⟨s.locals.capacity, s.locals.data, s.locals.heap_size, s.locals.i,
+    s.locals.iters, s.locals.j, s.locals.left, s.locals.out, s.locals.parent,
+    s.locals.pq, 0, s.locals.right, s.locals.root_idx, s.locals.smallest,
+    s.locals.tmp, s.locals.value⟩⟩
+
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem pq_insert_set_ret0_locals_eq (s : ProgramState) :
+    (pq_insert_set_ret0 s).locals = ⟨s.locals.capacity, s.locals.data, s.locals.heap_size, s.locals.i,
+      s.locals.iters, s.locals.j, s.locals.left, s.locals.out, s.locals.parent,
+      s.locals.pq, 0, s.locals.right, s.locals.root_idx, s.locals.smallest,
+      s.locals.tmp, s.locals.value⟩ := by
+  show (⟨s.globals, ⟨s.locals.capacity, s.locals.data, s.locals.heap_size, s.locals.i,
+    s.locals.iters, s.locals.j, s.locals.left, s.locals.out, s.locals.parent,
+    s.locals.pq, 0, s.locals.right, s.locals.root_idx, s.locals.smallest,
+    s.locals.tmp, s.locals.value⟩⟩ : ProgramState).locals = _; rfl
+
+@[simp] private theorem pq_insert_set_ret0_ret_val (s : ProgramState) :
+    (pq_insert_set_ret0 s).locals.ret__val = 0 := by
+  rw [pq_insert_set_ret0_locals_eq]
+
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
+private theorem pq_insert_set_ret0_funext :
+    (fun s : ProgramState => { s with locals := { s.locals with ret__val := 0 } }) = pq_insert_set_ret0 := by
+  funext s; show _ = pq_insert_set_ret0 s; unfold pq_insert_set_ret0; rfl
+
 -- The insert proof uses L1_hoare_catch with R = (ret_val = 0).
 -- The catch body always ends in throw with ret_val = 0.
 -- The catch handler (skip) converts error to ok, preserving ret_val = 0.
@@ -1018,11 +1085,98 @@ theorem pq_insert_correct :
           rw [h_hval_eq]
           exact ⟨hpq', h_hval_eq ▸ hdav', hlt⟩
       · -- seq(dynCom(bubble_up), seq(guards+size++, ret_val:=0+throw))
-        -- After data write: heapPtrValid pq preserved (different types),
-        -- dataArrayValid preserved (heapUpdate_preserves_heapPtrValid).
-        -- dynCom(bubble_up): bubble_up preserves heapPtrValid pq.
-        -- After bubble_up: guard+guard+modify(size++), modify(ret_val:=0)+throw.
-        sorry
+        -- Split: dynCom then rest. dynCom always ok and preserves hpv pq.
+        apply L1_hoare_seq_ok
+          (R := fun s => heapPtrValid s.globals.rawHeap s.locals.pq)
+        · -- dynCom(bubble_up): always ok, preserves heapPtrValid pq
+          apply L1_hoare_dynCom_basic
+          intro s₀ ⟨hpq₀, hdav₀, hlt₀⟩
+          unfold validHoare
+          intro s hs; rw [hs]
+          have h_size_lt : (hVal s₀.globals.rawHeap s₀.locals.pq).size.toNat <
+              (hVal s₀.globals.rawHeap s₀.locals.pq).capacity.toNat :=
+            UInt32.lt_iff_toNat_lt.mp hlt₀
+          -- The setup modify result equals pq_insert_setup s₀ (avoids { s₀ with locals := ... } in kernel)
+          have h_setup_step : { s₀ with locals := { s₀.locals with data := s₀.locals.data, i := (hVal s₀.globals.rawHeap s₀.locals.pq).size } } = pq_insert_setup s₀ :=
+            congrFun pq_insert_setup_funext s₀
+          -- bubble_up precondition at setup state
+          have h_bu_pre_at_setup : dataArrayValid (pq_insert_setup s₀).globals.rawHeap
+              (pq_insert_setup s₀).locals.data
+              (hVal s₀.globals.rawHeap s₀.locals.pq).capacity.toNat ∧
+              (pq_insert_setup s₀).locals.i.toNat <
+                (hVal s₀.globals.rawHeap s₀.locals.pq).capacity.toNat ∧
+              heapPtrValid (pq_insert_setup s₀).globals.rawHeap (pq_insert_setup s₀).locals.pq ∧
+              (pq_insert_setup s₀).locals.pq = s₀.locals.pq := by
+            simp only [pq_insert_setup_globals, pq_insert_setup_data, pq_insert_setup_i, pq_insert_setup_pq]
+            exact ⟨hdav₀, h_size_lt, hpq₀, trivial⟩
+          constructor
+          · -- non-failure
+            intro hf
+            rw [pq_L1_seq_failed_iff] at hf
+            rcases hf with hf_setup | ⟨s_setup, hs_setup, hf_rest⟩
+            · exact hf_setup -- modify never fails
+            · -- Subst s_setup = pq_insert_setup s₀
+              have h_eq : s_setup = pq_insert_setup s₀ := by
+                have ⟨_, hs'⟩ := Prod.mk.inj hs_setup; rw [hs']; exact h_setup_step
+              subst h_eq
+              rw [pq_L1_seq_failed_iff] at hf_rest
+              rcases hf_rest with hf_call | ⟨_, _, hf_restore⟩
+              · -- Call failed: resolve and use pq_bubble_up_ok_hoare
+                have ⟨h_nf, _⟩ := pq_bubble_up_ok_hoare
+                  (hVal s₀.globals.rawHeap s₀.locals.pq).capacity.toNat s₀.locals.pq
+                  (pq_insert_setup s₀) h_bu_pre_at_setup
+                simp [L1.call, L1.L1ProcEnv.insert, L1.L1ProcEnv.empty] at hf_call
+                exact h_nf hf_call
+              · exact hf_restore -- modify never fails
+          · -- postcondition: r = ok ∧ hpv pq
+            intro r s' h_mem
+            change (_ ∨ _) at h_mem
+            rcases h_mem with ⟨s_setup, h_setup_mem, h_rest_mem⟩ | ⟨h_err, _⟩
+            · have h_eq : s_setup = pq_insert_setup s₀ := by
+                have ⟨_, hs'⟩ := Prod.mk.inj h_setup_mem; rw [hs']; exact h_setup_step
+              subst h_eq
+              change (_ ∨ _) at h_rest_mem
+              rcases h_rest_mem with ⟨s_bu, h_bu_mem, h_restore_mem⟩ | ⟨h_err_call, _⟩
+              · -- ok from call, then restore
+                simp [L1.call, L1.L1ProcEnv.insert, L1.L1ProcEnv.empty] at h_bu_mem
+                have ⟨_, h_bu_post⟩ := pq_bubble_up_ok_hoare
+                  (hVal s₀.globals.rawHeap s₀.locals.pq).capacity.toNat s₀.locals.pq
+                  (pq_insert_setup s₀) h_bu_pre_at_setup
+                have h_bu_q := h_bu_post (Except.ok ()) s_bu h_bu_mem
+                have h_hpv_bu : heapPtrValid s_bu.globals.rawHeap s₀.locals.pq := h_bu_q.2
+                have ⟨hr, hs'⟩ := Prod.mk.inj h_restore_mem
+                subst hr
+                exact ⟨rfl, hs' ▸ h_hpv_bu⟩
+              · -- error from call: bubble_up always produces ok, contradiction
+                simp [L1.call, L1.L1ProcEnv.insert, L1.L1ProcEnv.empty] at h_err_call
+                have ⟨_, h_bu_post⟩ := pq_bubble_up_ok_hoare
+                  (hVal s₀.globals.rawHeap s₀.locals.pq).capacity.toNat s₀.locals.pq
+                  (pq_insert_setup s₀) h_bu_pre_at_setup
+                have h_bu_q := h_bu_post (Except.error ()) s' h_err_call
+                exact absurd h_bu_q.1 (by intro h; cases h)
+            · -- error from setup modify: impossible
+              exact absurd h_err (by intro h; exact absurd (Prod.mk.inj h).1 (by intro h; cases h))
+        · -- rest: seq(guard+guard+modify(size++), seq(modify(ret:=0), throw))
+          apply L1_hoare_seq
+            (R := fun _s => True)
+          · -- guard+guard+modify(size++): heapPtrValid pq satisfies both guards
+            apply L1_hoare_guard_guard_modify_fused
+            · intro s hpq; exact hpq
+            · intro _s _hpq; trivial
+          · -- modify(ret_val:=0) + throw: produces error with ret_val=0
+            intro s _
+            have h_mt := L1_modify_throw_result
+              (fun s : ProgramState => { s with locals := { s.locals with ret__val := 0 } }) s
+            constructor
+            · exact h_mt.2
+            · intro r s' h_mem
+              rw [h_mt.1] at h_mem
+              have ⟨hr, hs'⟩ := Prod.mk.inj h_mem
+              subst hr
+              -- Use step function to avoid kernel deep recursion on ret_val projection
+              rw [show ({ s with locals := { s.locals with ret__val := 0 } } : ProgramState) =
+                  pq_insert_set_ret0 s from congrFun pq_insert_set_ret0_funext s] at hs'
+              rw [hs']; exact pq_insert_set_ret0_ret_val s
   · -- HANDLER (skip): from R (ret_val = 0), skip gives ok with same state
     intro s hrs
     exact ⟨not_false, fun r s' h_mem => by
