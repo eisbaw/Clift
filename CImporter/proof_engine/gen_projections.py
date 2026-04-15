@@ -1,36 +1,29 @@
-"""Auto-generate projection simp lemmas for L1.modify step functions.
+"""Auto-generate step functions and projection simp lemmas from Generated/*.lean files.
 
-Given a Lean function definition like:
-    def swap_f1 (s : ProgramState) : ProgramState := <s.globals, <s.locals.a, s.locals.b, hVal s.globals.rawHeap s.locals.a>>
+Given a Generated file (e.g., Generated/Swap.lean), this script:
+1. Parses the Locals struct to get field names and types
+2. Finds each .basic lambda (the modify steps) in function bodies
+3. Generates for each step:
+   - A `private noncomputable def stepN` using anonymous constructors
+   - A `stepN_locals_eq` or `stepN_globals_eq` theorem (first-level projection)
+   - Per-field @[simp] projection lemmas (second-level, via rw)
+   - A `stepN_funext` theorem matching the original lambda
 
-This generates @[simp] projection lemmas:
-    @[simp] theorem swap_f1_globals (s : ProgramState) :
-        (swap_f1 s).globals = s.globals := by
-      unfold swap_f1; rfl
-
-    @[simp] theorem swap_f1_locals_a (s : ProgramState) :
-        (swap_f1 s).locals.a = s.locals.a := by
-      unfold swap_f1; rfl
-
-This is string-level analysis of the Lean definition, not MetaM.
-The pattern: for each field that appears in the anonymous constructor,
-determine what it equals in terms of the input state `s`, and emit a
-rfl-based simp lemma.
-
-The [local irreducible] pattern is added for heap-related definitions
-(those mentioning hVal or heapUpdate) to prevent kernel deep recursion.
+The two-step projection pattern avoids kernel depth issues on large Locals structs:
+  Layer 1: (step s).locals = <f1, ..., fN>  -- by show + rfl on anonymous ctor
+  Layer 2: (step s).locals.field = expr      -- by rw [step_locals_eq]
 
 Usage:
-    python -m CImporter.proof_engine.gen_projections Examples/SwapProof.lean
-
-    # Or as a library:
-    from CImporter.proof_engine.gen_projections import generate_projection_lemmas
-    lean_code = generate_projection_lemmas(lean_source)
+    python -m CImporter.proof_engine.gen_projections Generated/Swap.lean
+    python -m CImporter.proof_engine.gen_projections Generated/Swap.lean -o Generated/SwapProjections.lean
+    python -m CImporter.proof_engine.gen_projections Generated/Swap.lean --func-prefix swap
 """
 
 import re
+import sys
 import logging
-from dataclasses import dataclass
+import argparse
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
@@ -38,276 +31,490 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
-class StepFunction:
-    """A parsed L1.modify step function definition."""
+class LocalField:
+    """A field in the Locals struct."""
     name: str
-    state_var: str  # typically "s"
-    state_type: str  # typically "ProgramState"
-    body: str  # the anonymous constructor body
-    # Parsed field assignments: {"globals": "s.globals", "locals.a": "s.locals.a", ...}
-    field_assignments: dict[str, str]
-    uses_heap: bool  # whether body mentions hVal or heapUpdate
+    type: str
 
 
 @dataclass
-class ProjectionLemma:
-    """A generated @[simp] projection lemma."""
-    func_name: str
-    field_path: str  # e.g., "globals" or "locals.a"
-    state_var: str
-    rhs: str  # what the field equals
-    needs_local_irreducible: bool
+class BasicLambda:
+    """A parsed .basic lambda from the Generated file."""
+    func_name: str        # e.g., "swap" from swap_body
+    step_index: int       # 1-based index within the function
+    raw_lambda: str       # the full (fun s => ...) text
+    # What kind of update:
+    update_kind: str      # "locals" | "globals" | "both"
+    # For locals updates: which fields change and to what
+    locals_updates: dict  # field_name -> expression (in terms of s)
+    # For globals updates: the rawHeap expression
+    globals_rawheap_expr: Optional[str]
 
 
-def _parse_step_functions(lean_source: str) -> list[StepFunction]:
-    """Parse step function definitions from Lean source.
+@dataclass
+class ParsedModule:
+    """Parsed information from a Generated/*.lean file."""
+    namespace: str
+    locals_fields: list[LocalField]
+    basic_lambdas: list[BasicLambda]
 
-    Looks for patterns like:
-        private noncomputable def swap_f1 (s : ProgramState) : ProgramState :=
-          <...>
 
-    or:
-        def swap_f1 (s : ProgramState) : ProgramState :=
-          <...>
-    """
-    results = []
-
-    # Match def with angle-bracket body (anonymous constructor)
-    # The definition may span multiple lines until the next def/theorem/private/end
-    pattern = re.compile(
-        r'(?:private\s+)?(?:noncomputable\s+)?def\s+(\w+)\s+'
-        r'\((\w+)\s*:\s*(\w+)\)\s*:\s*\w+\s*:=\s*'
-        r'((?:.|\n)*?)(?=\n(?:private |noncomputable |def |theorem |lemma |end |/-|#)|\Z)',
-        re.MULTILINE
+def parse_generated_file(source: str) -> ParsedModule:
+    """Parse a Generated/*.lean file to extract namespace, Locals fields, and .basic lambdas."""
+    namespace = _parse_namespace(source)
+    locals_fields = _parse_locals_struct(source)
+    basic_lambdas = _parse_basic_lambdas(source, locals_fields)
+    return ParsedModule(
+        namespace=namespace,
+        locals_fields=locals_fields,
+        basic_lambdas=basic_lambdas,
     )
 
-    for m in pattern.finditer(lean_source):
-        name = m.group(1)
-        state_var = m.group(2)
-        state_type = m.group(3)
-        body = m.group(4).strip()
 
-        # Only process functions that return ProgramState and use constructors
-        if state_type not in ("ProgramState", "CState"):
+def _parse_namespace(source: str) -> str:
+    """Extract the namespace from `namespace Foo`."""
+    m = re.search(r'^namespace\s+(\w+)', source, re.MULTILINE)
+    if not m:
+        raise ValueError("No namespace found in source")
+    return m.group(1)
+
+
+def _parse_locals_struct(source: str) -> list[LocalField]:
+    """Parse `structure Locals where` to get field names and types."""
+    # Find the structure block
+    m = re.search(
+        r'structure\s+Locals\s+where\s*\n(.*?)(?:\n\s*deriving|\n\s*\n)',
+        source, re.DOTALL
+    )
+    if not m:
+        raise ValueError("No `structure Locals where` found in source")
+
+    fields = []
+    for line in m.group(1).split('\n'):
+        line = line.strip()
+        if not line or line.startswith('--') or line.startswith('deriving'):
             continue
-        if not (body.startswith("⟨") or body.startswith("<") or body.startswith("{")):
-            continue
-
-        uses_heap = "hVal" in body or "heapUpdate" in body
-
-        # Parse field assignments from the constructor body
-        field_assignments = _parse_constructor_fields(body, state_var)
-
-        if field_assignments:
-            results.append(StepFunction(
-                name=name,
-                state_var=state_var,
-                state_type=state_type,
-                body=body,
-                field_assignments=field_assignments,
-                uses_heap=uses_heap,
-            ))
-            logger.info(f"Parsed step function: {name} ({len(field_assignments)} fields)")
-
-    return results
-
-
-def _parse_constructor_fields(body: str, state_var: str) -> dict[str, str]:
-    """Parse anonymous constructor to extract field assignments.
-
-    For a body like:
-        ⟨s.globals, ⟨s.locals.a, s.locals.b, hVal s.globals.rawHeap s.locals.a⟩⟩
-
-    Returns:
-        {"globals": "s.globals",
-         "locals.a": "s.locals.a",
-         "locals.b": "s.locals.b",
-         "locals.t": "hVal s.globals.rawHeap s.locals.a"}
-
-    This is a simplified parser that handles the two-level structure:
-        ⟨globals_expr, ⟨local1, local2, ...⟩⟩
-    or:
-        ⟨⟨rawHeap_expr⟩, locals_expr⟩
-    """
-    fields = {}
-
-    # Normalize angle brackets
-    normalized = body.replace("⟨", "<").replace("⟩", ">")
-
-    # Try to parse the two-level anonymous constructor
-    # Pattern: < outer1, < inner1, inner2, ... > >
-    # or: < < inner1 >, outer2 >
-    inner = _strip_outer_brackets(normalized)
-    if not inner:
-        return fields
-
-    # Split at top-level commas (respecting nested brackets)
-    top_parts = _split_at_commas(inner)
-
-    if len(top_parts) == 2:
-        # Two-level: ⟨globals_part, locals_part⟩
-        globals_part = top_parts[0].strip()
-        locals_part = top_parts[1].strip()
-
-        # Check which is globals and which is locals
-        if globals_part.startswith("<"):
-            # Globals is a nested constructor: ⟨⟨rawHeap_expr⟩, locals_expr⟩
-            globals_inner = _strip_outer_brackets(globals_part)
-            if globals_inner:
-                fields["globals.rawHeap"] = globals_inner.strip()
-            # locals_part is the whole locals struct
-            if locals_part == f"{state_var}.locals":
-                pass  # locals unchanged, no projection needed per-field
-            else:
-                fields["locals"] = locals_part.strip()
-        elif locals_part.startswith("<"):
-            # Locals is nested: ⟨globals_expr, ⟨l1, l2, ...⟩⟩
-            fields["globals"] = globals_part.strip()
-            locals_inner = _strip_outer_brackets(locals_part)
-            if locals_inner:
-                local_parts = _split_at_commas(locals_inner)
-                # We don't know field names from the constructor alone,
-                # but we can generate indexed projections
-                for i, lp in enumerate(local_parts):
-                    fields[f"locals_field_{i}"] = lp.strip()
-        else:
-            # Both are simple: ⟨globals_expr, locals_expr⟩
-            fields["globals"] = globals_part.strip()
-            fields["locals"] = locals_part.strip()
+        # Parse "fieldname : Type"
+        fm = re.match(r'(\w+)\s*:\s*(.+)', line)
+        if fm:
+            fields.append(LocalField(name=fm.group(1), type=fm.group(2).strip()))
 
     return fields
 
 
-def _strip_outer_brackets(s: str) -> Optional[str]:
-    """Remove matching outer < > brackets."""
-    s = s.strip()
-    if s.startswith("<") and s.endswith(">"):
-        return s[1:-1].strip()
+def _parse_basic_lambdas(source: str, locals_fields: list[LocalField]) -> list[BasicLambda]:
+    """Find all .basic (fun s => ...) lambdas in function bodies."""
+    results = []
+
+    # Find function bodies: def foo_body : CSimpl ProgramState :=
+    func_pattern = re.compile(
+        r'def\s+(\w+)_body\s*:\s*CSimpl\s+ProgramState\s*:=\s*\n(.*?)(?=\ndef\s|\nend\s)',
+        re.DOTALL
+    )
+
+    for func_match in func_pattern.finditer(source):
+        func_name = func_match.group(1)
+        func_body = func_match.group(2)
+
+        # Find all .basic lambdas in this function body
+        # Pattern: .basic (fun s => { s with ... })
+        # We need to find matching parens after ".basic ("
+        step_index = 0
+        pos = 0
+        while True:
+            idx = func_body.find('.basic (fun ', pos)
+            if idx == -1:
+                break
+
+            # Find the state variable name
+            lambda_start = idx + len('.basic (')
+            # Extract the full lambda by matching parens
+            lambda_text = _extract_balanced_parens(func_body, lambda_start - 1)
+            if not lambda_text:
+                pos = idx + 1
+                continue
+
+            step_index += 1
+            parsed = _parse_lambda_body(func_name, step_index, lambda_text, locals_fields)
+            if parsed:
+                results.append(parsed)
+
+            pos = idx + 1
+
+    return results
+
+
+def _extract_balanced_parens(text: str, start: int) -> Optional[str]:
+    """Extract text from opening '(' at `start` to matching ')'."""
+    if start >= len(text) or text[start] != '(':
+        return None
+    depth = 0
+    for i in range(start, len(text)):
+        if text[i] == '(':
+            depth += 1
+        elif text[i] == ')':
+            depth -= 1
+            if depth == 0:
+                return text[start + 1:i]  # inner content without outer parens
     return None
 
 
-def _split_at_commas(s: str) -> list[str]:
-    """Split string at top-level commas, respecting nested < > and ( )."""
-    parts = []
-    depth = 0
-    current = []
-    for ch in s:
-        if ch in "<(":
-            depth += 1
-            current.append(ch)
-        elif ch in ">)":
-            depth -= 1
-            current.append(ch)
-        elif ch == "," and depth == 0:
-            parts.append("".join(current))
-            current = []
+def _parse_lambda_body(
+    func_name: str,
+    step_index: int,
+    lambda_inner: str,
+    locals_fields: list[LocalField],
+) -> Optional[BasicLambda]:
+    """Parse the inner content of a .basic lambda.
+
+    lambda_inner is the content between the outer parens of .basic (...),
+    e.g.: fun s => { s with locals := { s.locals with ret__val := 1 } }
+    """
+    # Extract state variable and body
+    m = re.match(r'fun\s+(\w+)\s*=>\s*(.*)', lambda_inner, re.DOTALL)
+    if not m:
+        return None
+
+    state_var = m.group(1)
+    body = m.group(2).strip()
+
+    locals_updates = {}
+    globals_rawheap_expr = None
+    update_kind = None
+
+    # Pattern 1: { s with locals := { s.locals with field := expr } }
+    locals_match = re.match(
+        r'\{\s*' + re.escape(state_var) + r'\s+with\s+locals\s*:=\s*'
+        r'\{\s*' + re.escape(state_var) + r'\.locals\s+with\s+(.*?)\s*\}\s*\}',
+        body, re.DOTALL
+    )
+    if locals_match:
+        update_kind = "locals"
+        # Parse field assignments: field1 := expr1, field2 := expr2, ...
+        assignments_text = locals_match.group(1)
+        locals_updates = _parse_with_assignments(assignments_text, state_var)
+
+    # Pattern 2: { s with globals := { s.globals with rawHeap := expr } }
+    globals_match = re.match(
+        r'\{\s*' + re.escape(state_var) + r'\s+with\s+globals\s*:=\s*'
+        r'\{\s*' + re.escape(state_var) + r'\.globals\s+with\s+rawHeap\s*:=\s*(.*?)\s*\}\s*\}',
+        body, re.DOTALL
+    )
+    if globals_match:
+        update_kind = "globals"
+        globals_rawheap_expr = globals_match.group(1).strip()
+
+    if not update_kind:
+        logger.warning(f"Could not parse .basic lambda in {func_name} step {step_index}: {body[:100]}...")
+        return None
+
+    return BasicLambda(
+        func_name=func_name,
+        step_index=step_index,
+        raw_lambda=lambda_inner,
+        update_kind=update_kind,
+        locals_updates=locals_updates,
+        globals_rawheap_expr=globals_rawheap_expr,
+    )
+
+
+def _parse_with_assignments(text: str, state_var: str) -> dict:
+    """Parse 'field1 := expr1, field2 := expr2' from a `with` clause.
+
+    Handles nested expressions by tracking bracket/paren depth.
+    """
+    result = {}
+    # Split on top-level `:=` patterns
+    # Pattern: fieldname := expr (where expr may contain nested parens etc.)
+    pos = 0
+    text = text.strip()
+    while pos < len(text):
+        # Skip whitespace and commas
+        while pos < len(text) and text[pos] in ' \t\n,':
+            pos += 1
+        if pos >= len(text):
+            break
+
+        # Read field name
+        field_start = pos
+        while pos < len(text) and text[pos] not in ' \t\n:':
+            pos += 1
+        field_name = text[field_start:pos].strip()
+        if not field_name:
+            break
+
+        # Skip whitespace
+        while pos < len(text) and text[pos] in ' \t\n':
+            pos += 1
+
+        # Expect :=
+        if pos + 1 < len(text) and text[pos:pos+2] == ':=':
+            pos += 2
         else:
-            current.append(ch)
-    if current:
-        parts.append("".join(current))
-    return parts
+            break
+
+        # Skip whitespace
+        while pos < len(text) and text[pos] in ' \t\n':
+            pos += 1
+
+        # Read expression until top-level comma or end
+        expr_start = pos
+        depth = 0
+        while pos < len(text):
+            ch = text[pos]
+            if ch in '({':
+                depth += 1
+            elif ch in ')}':
+                depth -= 1
+                if depth < 0:
+                    break
+            elif ch == ',' and depth == 0:
+                break
+            pos += 1
+
+        expr = text[expr_start:pos].strip()
+        if field_name and expr:
+            result[field_name] = expr
+
+    return result
 
 
-def _generate_lemmas_for_function(func: StepFunction) -> list[ProjectionLemma]:
-    """Generate projection lemmas for a single step function."""
-    lemmas = []
+def generate_projections(module: ParsedModule, func_prefix: Optional[str] = None) -> str:
+    """Generate Lean 4 source with step functions and projection lemmas.
 
-    for field_path, rhs in func.field_assignments.items():
-        # Skip internal indexed fields - we need actual field names
-        if field_path.startswith("locals_field_"):
-            continue
-
-        lemmas.append(ProjectionLemma(
-            func_name=func.name,
-            field_path=field_path,
-            state_var=func.state_var,
-            rhs=rhs,
-            needs_local_irreducible=func.uses_heap,
-        ))
-
-    return lemmas
-
-
-def _lemma_to_lean(lemma: ProjectionLemma) -> str:
-    """Render a ProjectionLemma as Lean 4 source code."""
-    safe_name = lemma.field_path.replace(".", "_")
-    theorem_name = f"{lemma.func_name}_{safe_name}"
-
-    # Build the LHS: (func_name s).field_path
-    lhs = f"({lemma.func_name} {lemma.state_var}).{lemma.field_path}"
-    rhs = lemma.rhs
-
+    Args:
+        module: Parsed module info
+        func_prefix: If provided, only generate for functions starting with this prefix
+    """
+    field_names = [f.name for f in module.locals_fields]
     lines = []
 
-    if lemma.needs_local_irreducible:
-        lines.append(f"@[simp] theorem {theorem_name} ({lemma.state_var} : ProgramState) :")
-        lines.append(f"    {lhs} = {rhs} := by")
-        lines.append(f"  local irreducible_def hVal heapUpdate")
-        lines.append(f"  unfold {lemma.func_name}; rfl")
-    else:
-        lines.append(f"@[simp] theorem {theorem_name} ({lemma.state_var} : ProgramState) :")
-        lines.append(f"    {lhs} = {rhs} := by")
-        lines.append(f"  unfold {lemma.func_name}; rfl")
+    lines.append(f"-- Auto-generated projection lemmas for {module.namespace}")
+    lines.append(f"-- Generated by: python -m CImporter.proof_engine.gen_projections")
+    lines.append(f"-- DO NOT EDIT: regenerate with `just gen-projections`")
+    lines.append("")
+    lines.append(f"import Generated.{module.namespace}")
+    lines.append(f"import Clift.Lifting.Pipeline")
+    lines.append("")
+    lines.append(f"set_option maxHeartbeats 400000")
+    lines.append(f"set_option maxRecDepth 4096")
+    lines.append("")
+    lines.append(f"namespace {module.namespace}.Projections")
+    lines.append("")
+    lines.append(f"open {module.namespace}")
+    lines.append("")
 
+    for bl in module.basic_lambdas:
+        if func_prefix and not bl.func_name.startswith(func_prefix):
+            continue
+
+        step_name = f"{bl.func_name}_step{bl.step_index}"
+        step_lines = _generate_step_function(step_name, bl, field_names, module.namespace)
+        if step_lines:
+            lines.extend(step_lines)
+            lines.append("")
+
+    lines.append(f"end {module.namespace}.Projections")
     return "\n".join(lines)
 
 
-def generate_projection_lemmas(lean_source: str) -> str:
-    """Main entry point: given Lean source with step functions, generate all projection lemmas.
+def _generate_step_function(
+    step_name: str,
+    bl: BasicLambda,
+    field_names: list[str],
+    namespace: str,
+) -> list[str]:
+    """Generate step function + projection lemmas for one .basic lambda."""
+    lines = []
+    uses_heap = "hVal" in bl.raw_lambda or "heapUpdate" in bl.raw_lambda
+    irreducible_attrs = []
+    if uses_heap:
+        if "hVal" in bl.raw_lambda:
+            irreducible_attrs.append("hVal")
+        if "heapUpdate" in bl.raw_lambda:
+            irreducible_attrs.append("heapUpdate")
+        if "heapPtrValid" in bl.raw_lambda:
+            irreducible_attrs.append("heapPtrValid")
+    irreducible_str = " ".join(irreducible_attrs) if irreducible_attrs else None
 
-    Returns a block of Lean code with @[simp] projection lemmas.
+    if bl.update_kind == "locals":
+        lines.extend(_gen_locals_update(step_name, bl, field_names, irreducible_str))
+    elif bl.update_kind == "globals":
+        lines.extend(_gen_globals_update(step_name, bl, field_names, irreducible_str))
+
+    return lines
+
+
+def _gen_locals_update(
+    step_name: str,
+    bl: BasicLambda,
+    field_names: list[str],
+    irreducible_str: Optional[str],
+) -> list[str]:
+    """Generate step function + projections for a locals-only update."""
+    lines = []
+    sv = "s"  # state variable in generated code
+
+    # Build the anonymous constructor fields for locals
+    # For each field: if it's updated, use the new expression; otherwise use s.locals.field
+    ctor_fields = []
+    for fname in field_names:
+        if fname in bl.locals_updates:
+            # Replace state var in expression with 's'
+            expr = _rewrite_state_var(bl.locals_updates[fname], sv)
+            ctor_fields.append(expr)
+        else:
+            ctor_fields.append(f"{sv}.locals.{fname}")
+
+    locals_ctor = ", ".join(ctor_fields)
+
+    # Step function definition
+    lines.append(f"/-- {bl.func_name} step {bl.step_index}: locals update -/")
+    lines.append(f"noncomputable def {step_name} ({sv} : ProgramState) : ProgramState :=")
+    lines.append(f"  \u27E8{sv}.globals, \u27E8{locals_ctor}\u27E9\u27E9")
+    lines.append("")
+
+    # locals_eq theorem (Layer 1)
+    attr_prefix = f"attribute [local irreducible] {irreducible_str} in\n" if irreducible_str else ""
+    lines.append(f"{attr_prefix}theorem {step_name}_locals_eq ({sv} : ProgramState) :")
+    lines.append(f"    ({step_name} {sv}).locals = \u27E8{locals_ctor}\u27E9 := by")
+    lines.append(f"  show (\u27E8{sv}.globals, \u27E8{locals_ctor}\u27E9\u27E9 : ProgramState).locals = _; rfl")
+    lines.append("")
+
+    # globals projection (unchanged for locals-only update)
+    lines.append(f"{attr_prefix}@[simp] theorem {step_name}_globals ({sv} : ProgramState) :")
+    lines.append(f"    ({step_name} {sv}).globals = {sv}.globals := by")
+    lines.append(f"  show (\u27E8{sv}.globals, \u27E8{locals_ctor}\u27E9\u27E9 : ProgramState).globals = _; rfl")
+    lines.append("")
+
+    # Per-field projection lemmas (Layer 2)
+    for fname in field_names:
+        if fname in bl.locals_updates:
+            expr = _rewrite_state_var(bl.locals_updates[fname], sv)
+            # If expression involves heap ops, add irreducible attribute
+            field_attr = ""
+            if irreducible_str and ("hVal" in expr or "heapUpdate" in expr):
+                field_attr = f"attribute [local irreducible] {irreducible_str} in\n"
+            lines.append(f"{field_attr}@[simp] theorem {step_name}_{fname} ({sv} : ProgramState) :")
+            lines.append(f"    ({step_name} {sv}).locals.{fname} = {expr} := by rw [{step_name}_locals_eq]")
+        else:
+            lines.append(f"@[simp] theorem {step_name}_{fname} ({sv} : ProgramState) :")
+            lines.append(f"    ({step_name} {sv}).locals.{fname} = {sv}.locals.{fname} := by rw [{step_name}_locals_eq]")
+
+    lines.append("")
+
+    # funext theorem
+    # Reconstruct the original lambda body
+    with_parts = ", ".join(f"{fname} := {_rewrite_state_var(bl.locals_updates[fname], sv)}"
+                           for fname in bl.locals_updates)
+    original_body = f"{{ {sv} with locals := {{ {sv}.locals with {with_parts} }} }}"
+
+    lines.append(f"{attr_prefix}theorem {step_name}_funext :")
+    lines.append(f"    (fun {sv} => {original_body}) = {step_name} := by")
+    lines.append(f"  funext {sv}; show _ = {step_name} {sv}; unfold {step_name}; rfl")
+    lines.append("")
+
+    return lines
+
+
+def _gen_globals_update(
+    step_name: str,
+    bl: BasicLambda,
+    field_names: list[str],
+    irreducible_str: Optional[str],
+) -> list[str]:
+    """Generate step function + projections for a globals-only (heap) update."""
+    lines = []
+    sv = "s"
+    heap_expr = _rewrite_state_var(bl.globals_rawheap_expr, sv)
+
+    # Step function: ⟨⟨heap_expr⟩, s.locals⟩
+    lines.append(f"/-- {bl.func_name} step {bl.step_index}: heap update -/")
+    lines.append(f"noncomputable def {step_name} ({sv} : ProgramState) : ProgramState :=")
+    lines.append(f"  \u27E8\u27E8{heap_expr}\u27E9, {sv}.locals\u27E9")
+    lines.append("")
+
+    attr_prefix = f"attribute [local irreducible] {irreducible_str} in\n" if irreducible_str else ""
+
+    # globals_eq theorem (Layer 1)
+    lines.append(f"{attr_prefix}theorem {step_name}_globals_eq ({sv} : ProgramState) :")
+    lines.append(f"    ({step_name} {sv}).globals = \u27E8{heap_expr}\u27E9 := by")
+    lines.append(f"  show (\u27E8\u27E8{heap_expr}\u27E9, {sv}.locals\u27E9 : ProgramState).globals = _; rfl")
+    lines.append("")
+
+    # globals.rawHeap projection
+    lines.append(f"{attr_prefix}@[simp] theorem {step_name}_globals_rawHeap ({sv} : ProgramState) :")
+    lines.append(f"    ({step_name} {sv}).globals.rawHeap = {heap_expr} := by rw [{step_name}_globals_eq]")
+    lines.append("")
+
+    # locals projection (unchanged)
+    lines.append(f"{attr_prefix}@[simp] theorem {step_name}_locals ({sv} : ProgramState) :")
+    lines.append(f"    ({step_name} {sv}).locals = {sv}.locals := by")
+    lines.append(f"  show (\u27E8\u27E8{heap_expr}\u27E9, {sv}.locals\u27E9 : ProgramState).locals = _; rfl")
+    lines.append("")
+
+    # Per-field locals projections (all unchanged, via the locals lemma)
+    for fname in field_names:
+        lines.append(f"@[simp] theorem {step_name}_{fname} ({sv} : ProgramState) :")
+        lines.append(f"    ({step_name} {sv}).locals.{fname} = {sv}.locals.{fname} := by rw [{step_name}_locals]")
+
+    lines.append("")
+
+    # funext theorem
+    original_body = f"{{ {sv} with globals := {{ {sv}.globals with rawHeap := {heap_expr} }} }}"
+    lines.append(f"{attr_prefix}theorem {step_name}_funext :")
+    lines.append(f"    (fun {sv} => {original_body}) = {step_name} := by")
+    lines.append(f"  funext {sv}; show _ = {step_name} {sv}; unfold {step_name}; rfl")
+    lines.append("")
+
+    return lines
+
+
+def _rewrite_state_var(expr: str, target_var: str) -> str:
+    """Rewrite state variable references in an expression.
+
+    The parsed expression uses whatever variable name was in the lambda
+    (typically 's'). We normalize to the target_var.
+    This is mostly a no-op since Generated files always use 's'.
     """
-    funcs = _parse_step_functions(lean_source)
-    if not funcs:
-        logger.info("No step functions found")
-        return ""
-
-    sections = []
-    sections.append("/-! ## Auto-generated projection simp lemmas")
-    sections.append("")
-    sections.append("    Generated by CImporter.proof_engine.gen_projections.")
-    sections.append("    Each lemma proves that a field of a step function result")
-    sections.append("    equals the expected expression, by unfolding and rfl. -/")
-    sections.append("")
-
-    for func in funcs:
-        lemmas = _generate_lemmas_for_function(func)
-        if not lemmas:
-            continue
-
-        sections.append(f"-- Projections for {func.name}")
-        for lemma in lemmas:
-            sections.append(_lemma_to_lean(lemma))
-            sections.append("")
-
-    return "\n".join(sections)
+    return expr
 
 
 def main():
-    import sys
+    parser = argparse.ArgumentParser(
+        description="Generate projection simp lemmas from Generated/*.lean files"
+    )
+    parser.add_argument("input", help="Path to Generated/*.lean file")
+    parser.add_argument("-o", "--output", help="Output file path (default: stdout)")
+    parser.add_argument("--func-prefix", help="Only process functions with this prefix")
+    parser.add_argument("-v", "--verbose", action="store_true", help="Verbose logging")
 
-    logging.basicConfig(level=logging.INFO)
+    args = parser.parse_args()
 
-    if len(sys.argv) < 2:
-        print("Usage: python -m CImporter.proof_engine.gen_projections <file.lean>")
-        print()
-        print("Scans a Lean file for step function definitions (def xxx_f1 ...)")
-        print("and generates @[simp] projection lemmas.")
+    logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO)
+
+    input_path = Path(args.input)
+    if not input_path.exists():
+        logger.error(f"File not found: {input_path}")
         sys.exit(1)
 
-    filepath = sys.argv[1]
-    if not Path(filepath).exists():
-        logger.error(f"File not found: {filepath}")
-        sys.exit(1)
+    source = input_path.read_text()
+    module = parse_generated_file(source)
 
-    source = Path(filepath).read_text()
-    output = generate_projection_lemmas(source)
+    logger.info(f"Namespace: {module.namespace}")
+    logger.info(f"Locals fields: {[f.name for f in module.locals_fields]}")
+    logger.info(f"Basic lambdas found: {len(module.basic_lambdas)}")
+    for bl in module.basic_lambdas:
+        logger.info(f"  {bl.func_name} step {bl.step_index}: {bl.update_kind} "
+                     f"({', '.join(bl.locals_updates.keys()) if bl.locals_updates else 'heap'})")
 
-    if output:
-        print(output)
+    output = generate_projections(module, func_prefix=args.func_prefix)
+
+    if args.output:
+        Path(args.output).write_text(output)
+        logger.info(f"Written to {args.output}")
     else:
-        print("No step functions found in the input file.")
-        sys.exit(1)
+        print(output)
 
 
 if __name__ == "__main__":

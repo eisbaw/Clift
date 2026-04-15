@@ -39,7 +39,9 @@ lean_lib Generated where
              `Generated.Rbtree,
              `Generated.StateMachine,
              `Generated.PriorityQueue,
-             `Generated.DmaBuffer]
+             `Generated.DmaBuffer,
+             `Generated.SwapProjections,
+             `Generated.RingBufferExtProjections]
 
 -- User proof examples
 @[default_target]
