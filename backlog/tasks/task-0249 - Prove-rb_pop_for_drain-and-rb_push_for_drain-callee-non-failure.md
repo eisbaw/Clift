@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-04-14 07:02'
-updated_date: '2026-04-15 01:54'
+updated_date: '2026-04-15 01:55'
 labels:
   - sorry-elimination
   - drain-to
@@ -44,3 +44,22 @@ Progress on rb_pop/rb_push non-failure:
 - RBExtProofRbPop.lean has kernel depth regression (rb_pop_validHoare cannot build)
 - Sorry count: 5→4
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Partially completed: eliminated 1 of 2 target sorry.
+
+Changes:
+- rb_push_for_drain non-failure (not-full branch): PROVEN by strengthening precondition with ptrDisjoint node tail to match rb_push_spec.pre, then using rb_push_validHoare
+- rb_pop_for_drain non-failure (head≠null branch): NOT PROVEN. Blocked by:
+  1. RBExtProofRbPop.lean rb_pop_validHoare has kernel deep recursion (47-field Locals struct)
+  2. Direct intro+simp approach gets 5 guards deep but existential chains from L1.seq/guard membership remain unsimplified
+  3. Would need ~50 more lines of manual rcases+subst or a general guard-chain tactic
+
+Infrastructure added:
+- Projection lemmas (setFront_globals/rb/out_val/front, heapUpd_locals)
+- catch_skip_nf helper for L1.catch(m, skip) non-failure
+
+Sorry count: 5→4 in RBExtProofRbDrainTo.lean
+<!-- SECTION:FINAL_SUMMARY:END -->
