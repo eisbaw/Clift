@@ -181,13 +181,21 @@ produced 76,000 lines of Lean~4, 6,800 lines of Python, and
 The seL4 microkernel~\cite{klein2009sel4} is verified in Isabelle/HOL
 using a pipeline: C source $\to$ C parser $\to$ Simpl $\to$
 AutoCorres $\to$ user proofs. The C parser produces a \emph{deep
-embedding}---the source language's syntax represented as data types in
-the host language---which AutoCorres~\cite{greenaway2014autocorres,greenaway2012autocorres}
-then lifts through four abstraction levels with machine-checked
-refinement at each step. The key insight is \emph{backward
-simulation}: for every behavior of the concrete C program, the
-abstract specification can match it, so properties proved about the
-abstract program hold for the real C.
+embedding}---the source language's syntax tree represented as
+\emph{data types} in the proof assistant, so that every construct
+(assignment, branch, loop) can be inspected and reasoned about
+by the prover. In Isabelle, the intermediate representation is
+called \textbf{Simpl}; our Lean~4 analogue is
+\textbf{CSimpl}.
+AutoCorres~\cite{greenaway2014autocorres,greenaway2012autocorres}
+then lifts the deep embedding through four abstraction levels, each
+producing a cleaner \emph{monadic} program---a computation
+structured as a sequence of state-transforming steps composed with
+\texttt{bind} ($\texttt{>>=}$). At each level, a machine-checked
+\emph{refinement} proof guarantees that the abstract program
+preserves all behaviors of the concrete one (a \emph{backward
+simulation}). Properties proved about the final abstract program
+therefore hold for the real C.
 
 AutoCorres2~\cite{autocorres2} is the current maintained version,
 extending the original with improved type strengthening and struct
@@ -249,7 +257,25 @@ Clift follows AutoCorres's architecture with five abstraction stages
 (Figure~\ref{fig:pipeline}), each producing a transformed program and
 a machine-checked \texttt{corres} proof (backward simulation).
 Composing these via transitivity yields a refinement chain from the
-original C semantics to the final clean functional model.
+original C semantics to the final clean functional model:
+
+\begin{enumerate}
+\item \textbf{L1 (SimplConv):} Converts the deeply embedded CSimpl AST
+  into monadic \texttt{NondetM} code, mapping each statement to a
+  monadic combinator (bind, cond, whileLoop).
+\item \textbf{L2 (LocalVarExtract):} Extracts local variables from the
+  global state record into lambda parameters, so each function's proof
+  context only mentions the variables it uses.
+\item \textbf{L3 (TypeStrengthen):} Narrows the monad's return and state
+  types from a generic catch-all to the specific types each function
+  operates on.
+\item \textbf{L4 (HeapLift):} Replaces raw byte-addressed heap
+  operations with typed accessors (\texttt{hVal}/\texttt{heapUpdate}),
+  introducing pointer-validity obligations.
+\item \textbf{L5 (WordAbstract):} Replaces fixed-width bitvector
+  arithmetic (\texttt{BitVec~32}) with unbounded \texttt{Nat}/\texttt{Int},
+  eliminating overflow reasoning when bounds are known.
+\end{enumerate}
 
 \input{figures/trust-boundary}
 
@@ -332,7 +358,9 @@ structure CState where
 Pointer validity requires all bytes in
 \texttt{[addr,~addr+sizeof(T))} to carry the correct type tag. Disjointness of typed pointers follows from
 non-overlapping tag ranges, giving us a lightweight separation property
-without a full separation algebra.
+without a full separation algebra (an algebraic structure that
+formalizes ``this memory region is disjoint from that one'' as a
+composable resource calculus).
 
 A key engineering challenge was Lean~4's kernel reduction depth. When
 heap-update terms nest deeply (e.g., 8+ sequential writes), the kernel
