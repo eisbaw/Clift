@@ -89,9 +89,10 @@ stages---each progressively abstracting low-level C semantics into
 clean functional programs, accompanied by machine-checked refinement
 proofs.
 
-A distinguishing feature of this project is that it was developed
-almost entirely by AI (Claude Opus~4.6 with 1M token context), with
-human guidance on architecture and direction. The codebase comprises
+A distinguishing feature of this project is its development
+methodology: Claude Opus~4.6 (1M token context) generated the vast
+majority of the code, with the human author providing architecture
+and direction. The codebase comprises
 76,000 lines of Lean~4 (37,000 hand-written, 39,000 generated),
 1,698 theorems, and 12 remaining \texttt{sorry}.
 The pipeline processes 32~C programs; 21 have dedicated proof files
@@ -416,9 +417,8 @@ with \texttt{omega}.
 
 \subsection{Layered Delegation Architecture}
 
-The entire Clift codebase was developed through a collaboration between
-a human architect and Claude Opus~4.6 (1M token context), operating
-through the Claude Code CLI\@. The methodology evolved into a
+A human architect and Claude Opus~4.6 (1M token context) developed
+the Clift codebase collaboratively through the Claude Code CLI\@. The methodology evolved into a
 \emph{layered delegation architecture} (Figure~\ref{fig:delegation})
 with three tiers:
 
@@ -440,7 +440,7 @@ hallucinated proof simply fails to compile.
 
 \subsection{Task Structure and Context Management}
 
-The project was decomposed into 230+ backlog tasks organized by
+We decomposed the project into 230+ backlog tasks organized by
 dependency across 10+ phases (pipeline stages, proof infrastructure,
 \texttt{sorry} elimination, hardening). Tasks were implemented by spawning fresh
 AI sub-agents in batches of 3--5, to keep each agent's context clean
@@ -491,8 +491,8 @@ before re-attempting proofs.
 
 \subsection{Quality Assurance}
 
-Three AI cheating patterns were identified through experience and
-codified into every prompt:
+We identified three AI cheating patterns through experience and
+codified them into every prompt:
 
 \begin{enumerate}
 \item \textbf{Trivial postconditions}: proving \texttt{count = count}
@@ -624,10 +624,10 @@ qualitatively.
 \subsection{Qualitative Observations}
 
 \paragraph{Lean~4 suitability.}
-Lean~4's dependent type system proved both a blessing and a curse.
-On one hand, we could express invariants (e.g., pointer validity
-predicates parameterized by type) that would require ad-hoc
-encodings in Isabelle's simple type theory. On the other hand,
+Lean~4's dependent type system offers trade-offs.
+We could express invariants (e.g., pointer validity
+predicates parameterized by type) that require ad-hoc
+encodings in Isabelle's simple type theory. However,
 Lean~4's kernel performs more aggressive reduction than
 Isabelle's, causing definitional equality checks to time out on
 deeply nested heap terms---a problem absent in Isabelle where
@@ -734,8 +734,7 @@ to write and repair proofs, and the AutoCorres refinement methodology
 creates a workflow where formal verification of C code becomes
 more accessible. The Lean community's size and AI
 compatibility suggest that Clift-style tools could lower the adoption
-barrier for formal verification significantly compared to the
-Isabelle/HOL ecosystem.
+barrier for formal verification compared to the Isabelle/HOL ecosystem.
 
 All code, proofs, and AI session transcripts are available in the Clift
 repository~\cite{clift2026} under a BSD license, reproducible via Nix flakes.
