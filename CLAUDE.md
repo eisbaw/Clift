@@ -643,12 +643,11 @@ Before running `lake build`, **always check for existing lean/lake processes**:
 if pgrep -f "lean|lake" >/dev/null 2>&1; then
   echo "ERROR: lean/lake already running — wait or abort"
   pgrep -af "lean|lake"
-  # Wait and re-check, do NOT proceed
 fi
 ```
-- Multiple concurrent `lake build` invocations will OOM the machine (each needs 5-10GB)
-- This applies to sub-agents too — if you launch multiple agents, only ONE may run `lake build` at a time
-- Do NOT `pkill` other agents' lean processes — wait for them to finish
+- Only ONE `lake build` at a time — concurrent builds cause OOM
+- This applies to sub-agents too — only one may build at a time
+- Do NOT kill other agents' lean processes — wait for them to finish
 
 ## GitHub CI
 

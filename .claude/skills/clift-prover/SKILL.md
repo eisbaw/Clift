@@ -183,8 +183,8 @@ private theorem step1_funext :
 
 ### The problem
 
-Each loop proof with 40-field step functions costs ~3-5GB elaboration RAM.
-A file with 5+ loop proofs exceeds 30GB → OOM.
+Each loop proof with 40-field step functions is RAM-heavy.
+Too many in one file causes OOM.
 
 ### The fix: One heavy proof per file
 
@@ -204,15 +204,9 @@ Rules:
 - Build individually: `lake build Examples.RBExtProofRbSwapFrontBack`
 - Use `lake build -j1` to avoid parallel OOM
 
-### Memory budget
+### Rule of thumb
 
-| Proof type | RAM per proof | Max per file |
-|-----------|--------------|-------------|
-| Simple accessor | ~0.5GB | 10+ |
-| Conditional | ~1GB | 5-8 |
-| Loop traversal | ~3-5GB | 2-3 |
-| Multi-step chain (8+) | ~5-8GB | 1-2 |
-| Loop + heap mutation | ~5-10GB | 1 |
+Simple accessor proofs are cheap. Loop and multi-step chain proofs are heavy — limit to 1-2 per file to avoid OOM.
 
 ---
 
@@ -346,18 +340,13 @@ Agent(
 - A template proof to follow (e.g., "read rb_count_above_validHoare as template")
 - The Locals field order (or where to find it)
 - All rules: no validHoare_weaken_trivial_post, no fused bodies, anonymous constructors
-- Build command: `pkill -f lean; sleep 2; lake build Examples.<File>`
-- RAM warning: ONE build at a time, check `free -h` first
+- Build command: check no lean processes running first, then `lake build Examples.<File>`
 
 **Why Opus:** These proofs require sustained multi-step reasoning (reading L1 bodies,
 defining step functions for 40 fields, writing projection lemmas, debugging build errors).
-Opus handles this better than faster models. Expect 15-60 min per proof.
-
-**Why background:** Builds take 5-15 min. Running in background lets you work on other
-tasks or launch agents on non-overlapping files.
 
 **One agent per file:** Never launch two agents on the same file — they'll conflict.
-Multiple agents on DIFFERENT files is fine (but watch RAM — each build needs 5-10GB).
+Only ONE agent may run `lake build` at a time (check `pgrep -f lean` before building).
 
 ### Fallback: /model-race (sequential)
 
@@ -370,8 +359,7 @@ TARGET_FILES: <file>
 VERIFY_CMD: lake build Examples.<Module> 2>&1 | tail -1 | grep -q "successfully"
 ```
 
-**Sequential mode only** (one model at a time, 15 min timeout). Each model's `lake build`
-needs 5-15GB RAM — parallel launches cause OOM.
+**Sequential mode only** (one model at a time). Parallel launches cause OOM.
 
 Model-race works for:
 - Pattern A (simple accessors) — ~80% success rate
@@ -403,4 +391,3 @@ Before committing a sub-agent's proof:
 - [ ] **Correct satisfiedBy target**: `grep satisfiedBy <file>` shows `Module.l1_<func>_body`
 - [ ] **No fused bodies**: `grep fused <file>` — should be empty
 - [ ] **Anonymous constructors used**: `grep "{ s with locals" <file>` — should be empty in step functions
-- [ ] **RAM check**: `free -h` — kill stale lean processes if <4GB free

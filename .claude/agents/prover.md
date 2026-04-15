@@ -125,27 +125,23 @@ If too weak → strengthen in `RBExtSpecs.lean` FIRST. Define `foo_spec_ext` if 
 
 ## Building
 
-**CRITICAL RAM CONSTRAINT:**
+**BEFORE every `lake build`:**
 ```bash
-# BEFORE every build, check for existing lean/lake processes:
+# Check no other lean/lake processes are running:
 if pgrep -f "lean|lake" >/dev/null 2>&1; then
   echo "ERROR: lean/lake processes already running. Wait or abort."
   pgrep -af "lean|lake"
-  # DO NOT proceed. Wait 30s and re-check, up to 3 times.
-  # If still running after 90s, ABORT — another agent is building.
+  # Wait 30s and re-check, up to 3 times. If still running, ABORT.
   exit 1
 fi
 
-free -h  # must have >5GB free
-
-# Build ONE file:
-$HOME/.elan/toolchains/leanprover--lean4---v4.30.0-rc1/bin/lake build Examples.<Module> 2>&1 | tail -5
+# Build ONE file at a time:
+lake build Examples.<Module> 2>&1 | tail -5
 ```
 
-- **BEFORE every `lake build`**: check `pgrep -f "lean|lake"` — if anything is running, WAIT or ABORT. Another agent may be building. Do NOT kill other agents' processes.
-- NEVER run parallel builds — each needs 5-10GB RAM
-- If YOUR build gets killed (exit 137 or 144), kill YOUR stale lean processes and retry
-- zram is enabled (10GB lz4) — effective memory ~40GB
+- NEVER run parallel builds — each needs several GB RAM
+- If build gets killed (exit 137 or 144), kill stale lean processes and retry
+- Do NOT kill other agents' lean processes — wait for them to finish
 
 ## What you MUST reject
 
