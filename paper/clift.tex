@@ -371,11 +371,9 @@ marking \texttt{hVal} and \texttt{heapUpdate} as
 \texttt{simp} lemmas---the same strategy used in Isabelle's
 \texttt{runs\_to} framework but adapted to Lean's reduction semantics.
 
-\input{figures/worked-example}
-
 \subsection{Worked Example: Ring Buffer Push}
 
-To illustrate the end-to-end flow (see also Figure~\ref{fig:worked}),
+To illustrate the end-to-end flow,
 consider a ring buffer \texttt{push} operation in C:
 
 \begin{lstlisting}[language=CSubset]
@@ -484,15 +482,12 @@ anti-cheating rules were baked into the prompt template, addressing
 discovered failure modes: trivial postconditions, fused body
 substitution, and axiom injection.
 
-\subsection{Discovery-Driven Knowledge Accumulation}
-
+\paragraph{Discovery-driven knowledge accumulation.}
 Hard problems were discovered through failure, then codified into
-reusable artifacts. Each discovery followed a pattern: fail $\to$
-diagnose root cause $\to$ codify workaround $\to$ update
-skill/persona/memory $\to$ never hit the same issue again.
-When specifications were too weak for proof, the human directed
-\emph{progressive spec strengthening} before re-attempting proofs.
-Blocked \texttt{sorry} were parked as backlog tasks for later resolution.
+reusable artifacts: fail $\to$ diagnose root cause $\to$ codify
+workaround $\to$ update skill/persona/memory. When specifications
+were too weak, the human directed \emph{progressive spec strengthening}
+before re-attempting proofs.
 
 \subsection{Quality Assurance}
 
@@ -521,8 +516,7 @@ providing a complete record of the human--AI collaboration.
 \subsection{Test Suite}
 
 We process 32 C programs through the lifting pipeline spanning
-multiple domains (Figure~\ref{fig:codebase} shows the overall
-composition). Of these, 21 have dedicated proof files with
+multiple domains. Of these, 21 have dedicated proof files with
 Hoare-logic or refinement proofs; the remaining 11 serve as
 parser and lifting regression tests:
 
@@ -543,8 +537,6 @@ Foundations      & max, gcd, swap, array bounds              & 828 \\
 \bottomrule
 \end{tabular}
 \end{center}
-
-\input{figures/codebase-composition}
 
 \subsection{Proof Metrics}
 
@@ -659,12 +651,9 @@ it could not. The model racing approach exploited this by running multiple
 convergence attempts in parallel.
 
 \paragraph{Reproducibility.}
-The entire project is deterministically reproducible via a Nix
-flake: \texttt{nix develop} provides the exact Lean toolchain,
-clang version, and Python environment. Proof checking requires
-only \texttt{lake build} inside the Nix shell. CI runs on GitHub
-Actions with per-module proof verification and \texttt{sorry}-count
-tracking.
+The project is deterministically reproducible via a Nix flake
+(\texttt{nix develop} + \texttt{lake build}). CI runs per-module
+proof verification with \texttt{sorry}-count tracking.
 
 % ─── 6. limitations ────────────────────────────────────────────────
 \section{Limitations and Future Work}
