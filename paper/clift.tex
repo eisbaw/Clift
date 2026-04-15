@@ -411,6 +411,10 @@ writes using disjointness lemmas, and discharging arithmetic goals
 with \texttt{omega}.
 
 % ─── 4. ai-driven development ──────────────────────────────────────
+
+Having described the pipeline architecture, we now turn to \emph{how}
+it was built: through a structured human--AI collaboration.
+
 \section{AI-Driven Development}
 
 \input{figures/delegation}
@@ -511,6 +515,9 @@ All Claude Code session transcripts are preserved as JSONL files,
 providing a complete record of the human--AI collaboration.
 
 % ─── 5. evaluation ─────────────────────────────────────────────────
+
+We now evaluate the pipeline's output quantitatively.
+
 \section{Evaluation}
 
 \subsection{Test Suite}
@@ -656,7 +663,7 @@ The project is deterministically reproducible via a Nix flake
 proof verification with \texttt{sorry}-count tracking.
 
 % ─── 6. limitations ────────────────────────────────────────────────
-\section{Limitations and Future Work}
+\section{Limitations}
 
 \paragraph{C subset.} Clift supports a StrictC-like subset: no
 floating point, no \texttt{goto}, no variadic functions, no VLAs, no
@@ -665,8 +672,7 @@ embedded C, but limits applicability to general-purpose C.
 
 \paragraph{CImporter trust.} The Python importer is unverified and in
 the TCB\@. Translation validation
-(as in~\cite{sewell2013translation}) would reduce this trust, but is
-future work.
+(as in~\cite{sewell2013translation}) would reduce this trust.
 
 \paragraph{Memory model.} Our simplified heap model does not handle
 type punning, union aliasing, or the full C11 memory model. Lifting to
@@ -685,6 +691,8 @@ inter-procedural verification remains untested.
 \paragraph{Maturity.} Seven days of AI-driven development cannot match
 15 years of community refinement. Clift demonstrates feasibility, not
 production readiness.
+
+\section{Future Work}
 
 \subsection{Architecture Pivot: \texttt{mvcgen} and \texttt{SpecM}}
 
@@ -729,12 +737,20 @@ a formal verification framework producing 1,698 theorems. Clift's
 were produced in approximately 7~days through human--AI collaboration,
 with Lean's kernel serving as an incorruptible verification oracle.
 
-The combination of Lean~4's modern proof infrastructure, AI's ability
-to write and repair proofs, and the AutoCorres refinement methodology
-creates a workflow where formal verification of C code becomes
-more accessible. The Lean community's size and AI
-compatibility suggest that Clift-style tools could lower the adoption
-barrier for formal verification compared to the Isabelle/HOL ecosystem.
+Three key insights emerge. First, Lean~4's dependent types enable
+encoding invariants (e.g., type-parameterized pointer validity) that
+require workarounds in Isabelle, but its aggressive kernel reduction
+creates new engineering challenges absent in Isabelle's opaque-term
+model. Second, AI is effective at routine Hoare-logic proofs (96\%
+success on straight-line programs) but struggles with novel heap
+reasoning (20\% success), making it a force multiplier for formal
+methods rather than a replacement for human expertise. Third, the
+proof checker eliminates the fundamental risk of AI confabulation:
+hallucinated proofs fail to type-check, providing a hard correctness
+guarantee that other AI-assisted software engineering lacks.
+
+These results suggest that Clift-style tools could lower the adoption
+barrier for formal verification of C code.
 
 All code, proofs, and AI session transcripts are available in the Clift
 repository~\cite{clift2026} under a BSD license, reproducible via Nix flakes.
