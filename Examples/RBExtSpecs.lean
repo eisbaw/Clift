@@ -182,10 +182,150 @@ def rb_pop_spec : FuncSpec ProgramState where
     -- The head has advanced to head->next, so the value was written to out_val
     heapPtrValid s.globals.rawHeap s.locals.out_val
 
+/-! # Linked list functional-correctness relations (Prop-level)
+
+    These inductive relations express the functional results of traversing
+    a linked list in the heap. They stay in `Prop` (unlike a `Type`-level
+    witness) so they can be constructed by induction on `LinkedListValid`.
+
+    Each relation connects a heap pointer to the UInt32 result that the
+    corresponding C function computes (with wrapping arithmetic). -/
+
+/-- `ListCountIs heap p n` means traversing from `p` and counting nodes gives `n`.
+    The count uses UInt32 wrapping arithmetic, matching the C implementation. -/
+inductive ListCountIs (heap : HeapRawState) : Ptr C_rb_node → UInt32 → Prop where
+  | null : ListCountIs heap Ptr.null 0
+  | cons (p : Ptr C_rb_node) (n : UInt32) (hp : p ≠ Ptr.null)
+         (hv : heapPtrValid heap p) (hn : ListCountIs heap (hVal heap p).next n) :
+    ListCountIs heap p (n + 1)
+
+/-- `ListSumIs heap p total` means summing all node values from `p` gives `total`. -/
+inductive ListSumIs (heap : HeapRawState) : Ptr C_rb_node → UInt32 → Prop where
+  | null : ListSumIs heap Ptr.null 0
+  | cons (p : Ptr C_rb_node) (rest : UInt32) (hp : p ≠ Ptr.null)
+         (hv : heapPtrValid heap p) (hn : ListSumIs heap (hVal heap p).next rest) :
+    ListSumIs heap p ((hVal heap p).value + rest)
+
+/-- `ListCountAboveIs heap p threshold n` means counting nodes with value > threshold
+    from `p` gives `n`. -/
+inductive ListCountAboveIs (heap : HeapRawState) : Ptr C_rb_node → UInt32 → UInt32 → Prop where
+  | null (threshold : UInt32) : ListCountAboveIs heap Ptr.null threshold 0
+  | cons_above (p : Ptr C_rb_node) (n : UInt32) (threshold : UInt32)
+         (hp : p ≠ Ptr.null) (hv : heapPtrValid heap p)
+         (h_above : (hVal heap p).value > threshold)
+         (hn : ListCountAboveIs heap (hVal heap p).next threshold n) :
+    ListCountAboveIs heap p threshold (n + 1)
+  | cons_not_above (p : Ptr C_rb_node) (n : UInt32) (threshold : UInt32)
+         (hp : p ≠ Ptr.null) (hv : heapPtrValid heap p)
+         (h_not : ¬((hVal heap p).value > threshold))
+         (hn : ListCountAboveIs heap (hVal heap p).next threshold n) :
+    ListCountAboveIs heap p threshold n
+
+/-- `ListCountAtOrBelowIs heap p threshold n` means counting nodes with
+    value <= threshold from `p` gives `n`. -/
+inductive ListCountAtOrBelowIs (heap : HeapRawState) :
+    Ptr C_rb_node → UInt32 → UInt32 → Prop where
+  | null (threshold : UInt32) : ListCountAtOrBelowIs heap Ptr.null threshold 0
+  | cons_at_or_below (p : Ptr C_rb_node) (n : UInt32) (threshold : UInt32)
+         (hp : p ≠ Ptr.null) (hv : heapPtrValid heap p)
+         (h_leq : (hVal heap p).value <= threshold)
+         (hn : ListCountAtOrBelowIs heap (hVal heap p).next threshold n) :
+    ListCountAtOrBelowIs heap p threshold (n + 1)
+  | cons_not_at_or_below (p : Ptr C_rb_node) (n : UInt32) (threshold : UInt32)
+         (hp : p ≠ Ptr.null) (hv : heapPtrValid heap p)
+         (h_not : ¬((hVal heap p).value <= threshold))
+         (hn : ListCountAtOrBelowIs heap (hVal heap p).next threshold n) :
+    ListCountAtOrBelowIs heap p threshold n
+
+/-- Every valid linked list has a count. -/
+theorem LinkedListValid.hasCount {heap : HeapRawState} {p : Ptr C_rb_node}
+    (h : LinkedListValid heap p) : ∃ n, ListCountIs heap p n := by
+  induction h with
+  | null => exact ⟨0, .null⟩
+  | cons p hp hv _ ih => obtain ⟨n, hn⟩ := ih; exact ⟨n + 1, .cons p n hp hv hn⟩
+
+/-- Every valid linked list has a sum. -/
+theorem LinkedListValid.hasSum {heap : HeapRawState} {p : Ptr C_rb_node}
+    (h : LinkedListValid heap p) : ∃ total, ListSumIs heap p total := by
+  induction h with
+  | null => exact ⟨0, .null⟩
+  | cons p hp hv _ ih =>
+    obtain ⟨rest, hn⟩ := ih
+    exact ⟨(hVal heap p).value + rest, .cons p rest hp hv hn⟩
+
+/-- Every valid linked list has a count-above for any threshold. -/
+theorem LinkedListValid.hasCountAbove {heap : HeapRawState} {p : Ptr C_rb_node}
+    (h : LinkedListValid heap p) (threshold : UInt32) :
+    ∃ n, ListCountAboveIs heap p threshold n := by
+  induction h with
+  | null => exact ⟨0, .null threshold⟩
+  | cons p hp hv _ ih =>
+    obtain ⟨n, hn⟩ := ih
+    by_cases h_above : (hVal heap p).value > threshold
+    · exact ⟨n + 1, .cons_above p n threshold hp hv h_above hn⟩
+    · exact ⟨n, .cons_not_above p n threshold hp hv h_above hn⟩
+
+/-- Every valid linked list has a count-at-or-below for any threshold. -/
+theorem LinkedListValid.hasCountAtOrBelow {heap : HeapRawState} {p : Ptr C_rb_node}
+    (h : LinkedListValid heap p) (threshold : UInt32) :
+    ∃ n, ListCountAtOrBelowIs heap p threshold n := by
+  induction h with
+  | null => exact ⟨0, .null threshold⟩
+  | cons p hp hv _ ih =>
+    obtain ⟨n, hn⟩ := ih
+    by_cases h_leq : (hVal heap p).value <= threshold
+    · exact ⟨n + 1, .cons_at_or_below p n threshold hp hv h_leq hn⟩
+    · exact ⟨n, .cons_not_at_or_below p n threshold hp hv h_leq hn⟩
+
+/-- ListCountIs at null gives 0. -/
+theorem ListCountIs.null_zero {heap : HeapRawState} {n : UInt32}
+    (h : ListCountIs heap Ptr.null n) : n = 0 := by
+  cases h with
+  | null => rfl
+  | cons _ _ hp => exact absurd rfl hp
+
+/-- ListSumIs at null gives 0. -/
+theorem ListSumIs.null_zero {heap : HeapRawState} {n : UInt32}
+    (h : ListSumIs heap Ptr.null n) : n = 0 := by
+  cases h with
+  | null => rfl
+  | cons _ _ hp => exact absurd rfl hp
+
+/-- ListCountIs implies LinkedListValid. -/
+theorem ListCountIs.toValid {heap : HeapRawState} {p : Ptr C_rb_node} {n : UInt32}
+    (h : ListCountIs heap p n) : LinkedListValid heap p := by
+  induction h with
+  | null => exact .null
+  | cons p _ hp hv _ ih => exact .cons p hp hv ih
+
+/-- ListSumIs implies LinkedListValid. -/
+theorem ListSumIs.toValid {heap : HeapRawState} {p : Ptr C_rb_node} {n : UInt32}
+    (h : ListSumIs heap p n) : LinkedListValid heap p := by
+  induction h with
+  | null => exact .null
+  | cons p _ hp hv _ ih => exact .cons p hp hv ih
+
+/-- ListCountIs at non-null can be decomposed. -/
+theorem ListCountIs.decompose {heap : HeapRawState} {p : Ptr C_rb_node} {n : UInt32}
+    (h : ListCountIs heap p n) (hp : p ≠ Ptr.null) :
+    ∃ m, n = m + 1 ∧ heapPtrValid heap p ∧ ListCountIs heap (hVal heap p).next m := by
+  cases h with
+  | null => exact absurd rfl hp
+  | cons _ m _ hv hn => exact ⟨m, rfl, hv, hn⟩
+
+/-- ListSumIs at non-null can be decomposed. -/
+theorem ListSumIs.decompose {heap : HeapRawState} {p : Ptr C_rb_node} {total : UInt32}
+    (h : ListSumIs heap p total) (hp : p ≠ Ptr.null) :
+    ∃ rest, total = (hVal heap p).value + rest ∧ heapPtrValid heap p ∧
+    ListSumIs heap (hVal heap p).next rest := by
+  cases h with
+  | null => exact absurd rfl hp
+  | cons _ rest _ hv hn => exact ⟨rest, rfl, hv, hn⟩
+
 /-! # New FuncSpecs: Traversal / loop functions -/
 
 /-- rb_count_nodes: counts nodes by traversing the linked list.
-    Task 0137: ret_val = actual node count (traversal count). State unchanged.
+    Task 0231: ret_val = linked list length (as UInt32, with wrapping).
     Precondition strengthened: linked list starting at head must be valid. -/
 def rb_count_nodes_spec : FuncSpec ProgramState where
   pre := fun s =>
@@ -193,10 +333,8 @@ def rb_count_nodes_spec : FuncSpec ProgramState where
     LinkedListValid s.globals.rawHeap (hVal s.globals.rawHeap s.locals.rb).head
   post := fun r s =>
     r = Except.ok () →
-    -- ret_val holds the traversal count; heap is unchanged (read-only traversal)
-    -- The traversal count equals the actual linked list length, but expressing
-    -- that requires a recursive list abstraction (toList). We state what we can:
-    s.locals.ret__val = s.locals.ret__val  -- placeholder: full spec needs toList.length
+    ∃ n, ListCountIs s.globals.rawHeap (hVal s.globals.rawHeap s.locals.rb).head n ∧
+         s.locals.ret__val = n
 
 /-- rb_contains: traverses looking for a value. Returns 1 if found, 0 otherwise.
     Task 0137: exact boolean result.
@@ -241,7 +379,7 @@ def rb_nth_spec : FuncSpec ProgramState where
     heapPtrValid s.globals.rawHeap s.locals.out_val
 
 /-- rb_sum: sums all node values.
-    Task 0137: ret_val = sum of all node values (mod 2^32). State unchanged.
+    Task 0231: ret_val = sum of all node values (as UInt32, with wrapping).
     Precondition strengthened: linked list starting at head must be valid. -/
 def rb_sum_spec : FuncSpec ProgramState where
   pre := fun s =>
@@ -249,9 +387,8 @@ def rb_sum_spec : FuncSpec ProgramState where
     LinkedListValid s.globals.rawHeap (hVal s.globals.rawHeap s.locals.rb).head
   post := fun r s =>
     r = Except.ok () →
-    -- Heap unchanged (read-only traversal)
-    (hVal s.globals.rawHeap s.locals.rb).count =
-      (hVal s.globals.rawHeap s.locals.rb).count
+    ∃ total, ListSumIs s.globals.rawHeap (hVal s.globals.rawHeap s.locals.rb).head total ∧
+             s.locals.ret__val = total
 
 /-- rb_increment_all: adds delta to every node's value.
     Task 0137: every node's value increased by delta. Count/capacity unchanged.
@@ -268,7 +405,7 @@ def rb_increment_all_spec : FuncSpec ProgramState where
     rb.count = rb.count ∧ rb.capacity = rb.capacity
 
 /-- rb_count_above: counts nodes with value > threshold.
-    Task 0137: ret_val = count of matching nodes. State unchanged.
+    Task 0231: ret_val = count of nodes with value > threshold (as UInt32).
     Precondition strengthened: linked list starting at head must be valid. -/
 def rb_count_above_spec : FuncSpec ProgramState where
   pre := fun s =>
@@ -276,13 +413,12 @@ def rb_count_above_spec : FuncSpec ProgramState where
     LinkedListValid s.globals.rawHeap (hVal s.globals.rawHeap s.locals.rb).head
   post := fun r s =>
     r = Except.ok () →
-    -- ret_val <= count (can't have more matches than nodes)
-    -- Heap unchanged (read-only traversal)
-    (hVal s.globals.rawHeap s.locals.rb).count =
-      (hVal s.globals.rawHeap s.locals.rb).count
+    ∃ n, ListCountAboveIs s.globals.rawHeap
+           (hVal s.globals.rawHeap s.locals.rb).head s.locals.threshold n ∧
+         s.locals.ret__val = n
 
 /-- rb_count_at_or_below: counts nodes with value <= threshold.
-    Task 0137: ret_val = count of matching nodes. State unchanged.
+    Task 0231: ret_val = count of nodes with value <= threshold (as UInt32).
     Precondition strengthened: linked list starting at head must be valid. -/
 def rb_count_at_or_below_spec : FuncSpec ProgramState where
   pre := fun s =>
@@ -290,9 +426,9 @@ def rb_count_at_or_below_spec : FuncSpec ProgramState where
     LinkedListValid s.globals.rawHeap (hVal s.globals.rawHeap s.locals.rb).head
   post := fun r s =>
     r = Except.ok () →
-    -- Heap unchanged (read-only traversal)
-    (hVal s.globals.rawHeap s.locals.rb).count =
-      (hVal s.globals.rawHeap s.locals.rb).count
+    ∃ n, ListCountAtOrBelowIs s.globals.rawHeap
+           (hVal s.globals.rawHeap s.locals.rb).head s.locals.threshold n ∧
+         s.locals.ret__val = n
 
 /-! # New FuncSpecs: Complex heap mutation -/
 
