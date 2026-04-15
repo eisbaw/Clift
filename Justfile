@@ -65,6 +65,15 @@ multi-import PROJECT *FILES:
     done
     python3 CImporter/multi_import.py --project {{PROJECT}} $json_args -o Generated/{{PROJECT}}
 
+# Generate projection simp lemmas for a Generated file
+gen-projections FILE *ARGS:
+    python3 -m CImporter.proof_engine.gen_projections {{FILE}} {{ARGS}}
+
+# Regenerate all projection files
+gen-projections-all:
+    python3 -m CImporter.proof_engine.gen_projections Generated/Swap.lean -o Generated/SwapProjections.lean
+    python3 -m CImporter.proof_engine.gen_projections Generated/RingBufferExt.lean -o Generated/RingBufferExtProjections.lean
+
 # Dump clang JSON AST for inspection
 clang-dump FILE:
     clang -Xclang -ast-dump=json -fsyntax-only {{FILE}} | jq .
@@ -104,6 +113,10 @@ test-fuzz:
 # Audit tool unit tests
 test-audit:
     python3 -m pytest tools/lint/tests/ -v
+
+# Lint: tautological postconditions + proof quality
+lint:
+    python3 tools/lint/tautological.py
 
 # --- CI (called by GitHub Actions and locally) ---
 
@@ -157,6 +170,31 @@ audit:
       exit 1
     fi
     echo "  OK: Core library sorry-free"
+    echo ""
+    echo "=== Axiom smuggling detection ==="
+    CSIMP=$(grep -rn '@\[csimp\]' Clift/ Examples/ --include="*.lean" 2>/dev/null | grep -c '@\[csimp\]' || true)
+    if [ "$CSIMP" -gt 0 ]; then
+      echo "  FAIL: Found $CSIMP @[csimp] usage(s) in proof-critical code"
+      grep -rn '@\[csimp\]' Clift/ Examples/ --include="*.lean"
+      exit 1
+    fi
+    echo "  OK: No @[csimp] axiom smuggling"
+    IMPL_BY=$(grep -rn '@\[implemented_by\]' Clift/ Examples/ --include="*.lean" 2>/dev/null | grep -c '@\[implemented_by\]' || true)
+    if [ "$IMPL_BY" -gt 0 ]; then
+      echo "  FAIL: Found $IMPL_BY @[implemented_by] usage(s) in proof-critical code"
+      grep -rn '@\[implemented_by\]' Clift/ Examples/ --include="*.lean"
+      exit 1
+    fi
+    echo "  OK: No @[implemented_by] axiom smuggling"
+    echo ""
+    echo "=== Vacuous precondition detection ==="
+    VACUOUS=$(grep -rEn 'fun\s+\w+\s*=>\s*False' Examples/ --include="*.lean" 2>/dev/null | grep -v '^\s*--' | grep -c 'False' || true)
+    if [ "$VACUOUS" -gt 0 ]; then
+      echo "  FAIL: Found $VACUOUS vacuous precondition(s) (fun _ => False)"
+      grep -rEn 'fun\s+\w+\s*=>\s*False' Examples/ --include="*.lean" | grep -v '^\s*--'
+      exit 1
+    fi
+    echo "  OK: No vacuous preconditions detected"
 
 # Count sorry in Examples/ (delegates to Python audit for accuracy)
 sorry-count:

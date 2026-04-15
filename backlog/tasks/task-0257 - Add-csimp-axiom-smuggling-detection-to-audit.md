@@ -1,9 +1,11 @@
 ---
 id: TASK-0257
 title: 'Add @[csimp] axiom smuggling detection to audit'
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-04-14 18:40'
+updated_date: '2026-04-15 05:56'
 labels:
   - credibility
   - audit
@@ -29,7 +31,13 @@ Reference: https://github.com/leanprover/lean4/issues/7463
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 @[csimp] detection added to just audit
-- [ ] #2 @[implemented_by] detection added to just audit
-- [ ] #3 Both pass clean (0 uses)
+- [x] #1 @[csimp] detection added to just audit
+- [x] #2 @[implemented_by] detection added to just audit
+- [x] #3 Both pass clean (0 uses)
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Added @[csimp] and @[implemented_by] detection to the just audit recipe as bash sanity checks. Both grep Clift/ and Examples/ .lean files. Both pass clean with 0 hits.
+<!-- SECTION:FINAL_SUMMARY:END -->
