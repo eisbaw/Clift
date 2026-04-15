@@ -346,25 +346,192 @@ private theorem uint32_pqueue_typeTag_ne :
 -- pq_swap: catch(guard+modify chain, skip)
 -- Non-failure when data[i] and data[j] are heap-valid.
 -- Result always ok (catch+skip pattern).
+--
+-- Step function decomposition for kernel depth safety.
+-- PriorityQueue.Locals has 16 fields — anonymous constructors avoid deep recursion.
+
+/-- Step 1 transform: tmp := data[i] (only locals.tmp changes) -/
+private noncomputable def pq_swap_f1 (s : ProgramState) : ProgramState :=
+  ⟨s.globals, ⟨s.locals.capacity, s.locals.data, s.locals.heap_size, s.locals.i,
+    s.locals.iters, s.locals.j, s.locals.left, s.locals.out, s.locals.parent,
+    s.locals.pq, s.locals.ret__val, s.locals.right, s.locals.root_idx, s.locals.smallest,
+    hVal s.globals.rawHeap (Ptr.elemOffset s.locals.data s.locals.i.toNat), s.locals.value⟩⟩
+
+/-- Step 2 transform: data[i] := data[j] (only globals.rawHeap changes) -/
+private noncomputable def pq_swap_f2 (s : ProgramState) : ProgramState :=
+  ⟨⟨heapUpdate s.globals.rawHeap (Ptr.elemOffset s.locals.data s.locals.i.toNat)
+    (hVal s.globals.rawHeap (Ptr.elemOffset s.locals.data s.locals.j.toNat))⟩, s.locals⟩
+
+/-- Step 3 transform: data[j] := tmp (only globals.rawHeap changes) -/
+private noncomputable def pq_swap_f3 (s : ProgramState) : ProgramState :=
+  ⟨⟨heapUpdate s.globals.rawHeap (Ptr.elemOffset s.locals.data s.locals.j.toNat)
+    s.locals.tmp⟩, s.locals⟩
+
+/-- Step 1 as L1 monad: guard(heapPtrValid data[i]) >> modify(pq_swap_f1) -/
+private noncomputable def pq_swap_l1_step1 : L1Monad ProgramState :=
+  L1.seq (L1.guard (fun s => heapPtrValid s.globals.rawHeap (Ptr.elemOffset s.locals.data s.locals.i.toNat)))
+    (L1.modify pq_swap_f1)
+
+/-- Step 2: guard(heapPtrValid data[i]) >> guard(heapPtrValid data[j]) >> modify(pq_swap_f2) -/
+private noncomputable def pq_swap_l1_step2 : L1Monad ProgramState :=
+  L1.seq (L1.guard (fun s => heapPtrValid s.globals.rawHeap (Ptr.elemOffset s.locals.data s.locals.i.toNat)))
+    (L1.seq (L1.guard (fun s => heapPtrValid s.globals.rawHeap (Ptr.elemOffset s.locals.data s.locals.j.toNat)))
+      (L1.modify pq_swap_f2))
+
+/-- Step 3: guard(heapPtrValid data[j]) >> modify(pq_swap_f3) -/
+private noncomputable def pq_swap_l1_step3 : L1Monad ProgramState :=
+  L1.seq (L1.guard (fun s => heapPtrValid s.globals.rawHeap (Ptr.elemOffset s.locals.data s.locals.j.toNat)))
+    (L1.modify pq_swap_f3)
+
+/-- The pq_swap body decomposed into named steps. -/
+private noncomputable abbrev pq_swap_body_decomposed : L1Monad ProgramState :=
+  L1.catch (L1.seq pq_swap_l1_step1 (L1.seq pq_swap_l1_step2 pq_swap_l1_step3)) L1.skip
+
+private theorem pq_swap_body_decomposed_eq :
+    pq_swap_body_decomposed = PriorityQueue.l1_pq_swap_body := by
+  unfold pq_swap_body_decomposed pq_swap_l1_step1 pq_swap_l1_step2 pq_swap_l1_step3
+    pq_swap_f1 pq_swap_f2 pq_swap_f3 PriorityQueue.l1_pq_swap_body
+  rfl
+
+-- Projection lemmas for step functions
+
+attribute [local irreducible] hVal in
+@[simp] private theorem pq_swap_f1_globals (s : ProgramState) :
+    (pq_swap_f1 s).globals = s.globals := by
+  show (⟨s.globals, ⟨s.locals.capacity, s.locals.data, s.locals.heap_size, s.locals.i,
+    s.locals.iters, s.locals.j, s.locals.left, s.locals.out, s.locals.parent,
+    s.locals.pq, s.locals.ret__val, s.locals.right, s.locals.root_idx, s.locals.smallest,
+    hVal s.globals.rawHeap (Ptr.elemOffset s.locals.data s.locals.i.toNat), s.locals.value⟩⟩ :
+    ProgramState).globals = _; rfl
+
+attribute [local irreducible] hVal in
+private theorem pq_swap_f1_locals_eq (s : ProgramState) :
+    (pq_swap_f1 s).locals = ⟨s.locals.capacity, s.locals.data, s.locals.heap_size, s.locals.i,
+      s.locals.iters, s.locals.j, s.locals.left, s.locals.out, s.locals.parent,
+      s.locals.pq, s.locals.ret__val, s.locals.right, s.locals.root_idx, s.locals.smallest,
+      hVal s.globals.rawHeap (Ptr.elemOffset s.locals.data s.locals.i.toNat), s.locals.value⟩ := by
+  show (⟨s.globals, ⟨s.locals.capacity, s.locals.data, s.locals.heap_size, s.locals.i,
+    s.locals.iters, s.locals.j, s.locals.left, s.locals.out, s.locals.parent,
+    s.locals.pq, s.locals.ret__val, s.locals.right, s.locals.root_idx, s.locals.smallest,
+    hVal s.globals.rawHeap (Ptr.elemOffset s.locals.data s.locals.i.toNat), s.locals.value⟩⟩ :
+    ProgramState).locals = _; rfl
+
+@[simp] private theorem pq_swap_f1_data (s : ProgramState) :
+    (pq_swap_f1 s).locals.data = s.locals.data := by rw [pq_swap_f1_locals_eq]
+@[simp] private theorem pq_swap_f1_i (s : ProgramState) :
+    (pq_swap_f1 s).locals.i = s.locals.i := by rw [pq_swap_f1_locals_eq]
+@[simp] private theorem pq_swap_f1_j (s : ProgramState) :
+    (pq_swap_f1 s).locals.j = s.locals.j := by rw [pq_swap_f1_locals_eq]
+
+attribute [local irreducible] hVal heapUpdate in
+@[simp] private theorem pq_swap_f2_globals_rawHeap (s : ProgramState) :
+    (pq_swap_f2 s).globals.rawHeap = heapUpdate s.globals.rawHeap
+      (Ptr.elemOffset s.locals.data s.locals.i.toNat)
+      (hVal s.globals.rawHeap (Ptr.elemOffset s.locals.data s.locals.j.toNat)) := by
+  show (⟨⟨heapUpdate s.globals.rawHeap (Ptr.elemOffset s.locals.data s.locals.i.toNat)
+    (hVal s.globals.rawHeap (Ptr.elemOffset s.locals.data s.locals.j.toNat))⟩, s.locals⟩ :
+    ProgramState).globals.rawHeap = _; rfl
+
+attribute [local irreducible] hVal heapUpdate in
+@[simp] private theorem pq_swap_f2_locals (s : ProgramState) :
+    (pq_swap_f2 s).locals = s.locals := by
+  show (⟨⟨heapUpdate s.globals.rawHeap (Ptr.elemOffset s.locals.data s.locals.i.toNat)
+    (hVal s.globals.rawHeap (Ptr.elemOffset s.locals.data s.locals.j.toNat))⟩, s.locals⟩ :
+    ProgramState).locals = _; rfl
+
+attribute [local irreducible] heapUpdate in
+@[simp] private theorem pq_swap_f3_locals (s : ProgramState) :
+    (pq_swap_f3 s).locals = s.locals := by
+  show (⟨⟨heapUpdate s.globals.rawHeap (Ptr.elemOffset s.locals.data s.locals.j.toNat)
+    s.locals.tmp⟩, s.locals⟩ : ProgramState).locals = _; rfl
+
+-- heapPtrValid preservation through step functions
+
+private theorem pq_swap_f1_preserves_hpv_di (s : ProgramState)
+    (h : heapPtrValid s.globals.rawHeap (Ptr.elemOffset s.locals.data s.locals.i.toNat)) :
+    heapPtrValid (pq_swap_f1 s).globals.rawHeap (Ptr.elemOffset (pq_swap_f1 s).locals.data (pq_swap_f1 s).locals.i.toNat) := by
+  simp only [pq_swap_f1_globals, pq_swap_f1_data, pq_swap_f1_i]; exact h
+
+private theorem pq_swap_f1_preserves_hpv_dj (s : ProgramState)
+    (h : heapPtrValid s.globals.rawHeap (Ptr.elemOffset s.locals.data s.locals.j.toNat)) :
+    heapPtrValid (pq_swap_f1 s).globals.rawHeap (Ptr.elemOffset (pq_swap_f1 s).locals.data (pq_swap_f1 s).locals.j.toNat) := by
+  simp only [pq_swap_f1_globals, pq_swap_f1_data, pq_swap_f1_j]; exact h
+
+private theorem pq_swap_f2_preserves_hpv_dj (s : ProgramState)
+    (h : heapPtrValid s.globals.rawHeap (Ptr.elemOffset s.locals.data s.locals.j.toNat)) :
+    heapPtrValid (pq_swap_f2 s).globals.rawHeap (Ptr.elemOffset (pq_swap_f2 s).locals.data (pq_swap_f2 s).locals.j.toNat) := by
+  simp only [pq_swap_f2_globals_rawHeap, pq_swap_f2_locals]
+  exact heapUpdate_preserves_heapPtrValid _ _ _ _ h
+
+-- Main non-failure proof for the decomposed body.
+private theorem pq_swap_body_nf (s : ProgramState)
+    (hdi : heapPtrValid s.globals.rawHeap (Ptr.elemOffset s.locals.data s.locals.i.toNat))
+    (hdj : heapPtrValid s.globals.rawHeap (Ptr.elemOffset s.locals.data s.locals.j.toNat)) :
+    ¬(pq_swap_body_decomposed s).failed ∧
+    ∀ (r : Except Unit Unit) (s' : ProgramState),
+      (r, s') ∈ (pq_swap_body_decomposed s).results → r = Except.ok () := by
+  -- Step 1: guard(heapPtrValid data[i]) >> modify(pq_swap_f1)
+  have h1 := L1_guard_modify_result
+    (fun s : ProgramState => heapPtrValid s.globals.rawHeap (Ptr.elemOffset s.locals.data s.locals.i.toNat))
+    pq_swap_f1 s hdi
+  have h_step1_res : (pq_swap_l1_step1 s).results = {(Except.ok (), pq_swap_f1 s)} := by
+    unfold pq_swap_l1_step1; exact h1.1
+  have h_step1_nf : ¬(pq_swap_l1_step1 s).failed := by unfold pq_swap_l1_step1; exact h1.2
+  -- Step 2: guard(di) >> guard(dj) >> modify(f2) at (pq_swap_f1 s)
+  have hdi1 := pq_swap_f1_preserves_hpv_di s hdi
+  have hdj1 := pq_swap_f1_preserves_hpv_dj s hdj
+  have h2 := L1_guard_guard_modify_result
+    (fun s : ProgramState => heapPtrValid s.globals.rawHeap (Ptr.elemOffset s.locals.data s.locals.i.toNat))
+    (fun s : ProgramState => heapPtrValid s.globals.rawHeap (Ptr.elemOffset s.locals.data s.locals.j.toNat))
+    pq_swap_f2 (pq_swap_f1 s) hdi1 hdj1
+  have h_step2_res : (pq_swap_l1_step2 (pq_swap_f1 s)).results =
+      {(Except.ok (), pq_swap_f2 (pq_swap_f1 s))} := by
+    unfold pq_swap_l1_step2; exact h2.1
+  have h_step2_nf : ¬(pq_swap_l1_step2 (pq_swap_f1 s)).failed := by
+    unfold pq_swap_l1_step2; exact h2.2
+  -- Step 3: guard(dj) >> modify(f3) at (pq_swap_f2 (pq_swap_f1 s))
+  have hdj2 := pq_swap_f2_preserves_hpv_dj (pq_swap_f1 s) hdj1
+  have h3 := L1_guard_modify_result
+    (fun s : ProgramState => heapPtrValid s.globals.rawHeap (Ptr.elemOffset s.locals.data s.locals.j.toNat))
+    pq_swap_f3 (pq_swap_f2 (pq_swap_f1 s)) hdj2
+  have h_step3_res : (pq_swap_l1_step3 (pq_swap_f2 (pq_swap_f1 s))).results =
+      {(Except.ok (), pq_swap_f3 (pq_swap_f2 (pq_swap_f1 s)))} := by
+    unfold pq_swap_l1_step3; exact h3.1
+  have h_step3_nf : ¬(pq_swap_l1_step3 (pq_swap_f2 (pq_swap_f1 s))).failed := by
+    unfold pq_swap_l1_step3; exact h3.2
+  -- Chain: seq step2 step3
+  have h_seq23 := L1_seq_singleton_ok h_step2_res h_step2_nf (m₂ := pq_swap_l1_step3)
+  have h_seq23_nf : ¬(L1.seq pq_swap_l1_step2 pq_swap_l1_step3 (pq_swap_f1 s)).failed :=
+    fun hf => h_step3_nf (h_seq23.2.mp hf)
+  have h_seq23_res : (L1.seq pq_swap_l1_step2 pq_swap_l1_step3 (pq_swap_f1 s)).results =
+      {(Except.ok (), pq_swap_f3 (pq_swap_f2 (pq_swap_f1 s)))} := by
+    rw [h_seq23.1, h_step3_res]
+  -- Chain: seq step1 (seq step2 step3)
+  have h_inner := L1_seq_singleton_ok h_step1_res h_step1_nf
+    (m₂ := L1.seq pq_swap_l1_step2 pq_swap_l1_step3)
+  have h_inner_res : (L1.seq pq_swap_l1_step1 (L1.seq pq_swap_l1_step2 pq_swap_l1_step3) s).results =
+      {(Except.ok (), pq_swap_f3 (pq_swap_f2 (pq_swap_f1 s)))} := by
+    rw [h_inner.1, h_seq23_res]
+  have h_inner_nf : ¬(L1.seq pq_swap_l1_step1 (L1.seq pq_swap_l1_step2 pq_swap_l1_step3) s).failed :=
+    fun hf => h_seq23_nf (h_inner.2.mp hf)
+  -- Outer catch: catch inner skip
+  have h_catch := L1_catch_singleton_ok h_inner_res h_inner_nf
+  unfold pq_swap_body_decomposed
+  exact ⟨h_catch.2, fun r s' h_mem => by
+    rw [h_catch.1] at h_mem
+    exact (Prod.mk.inj h_mem).1⟩
+
+attribute [local irreducible] hVal heapUpdate heapPtrValid in
 private theorem pq_swap_ok_hoare :
     validHoare
       (fun s => heapPtrValid s.globals.rawHeap (Ptr.elemOffset s.locals.data s.locals.i.toNat) ∧
                 heapPtrValid s.globals.rawHeap (Ptr.elemOffset s.locals.data s.locals.j.toNat))
       PriorityQueue.l1_pq_swap_body
       (fun r _ => r = Except.ok ()) := by
-  unfold PriorityQueue.l1_pq_swap_body
-  -- swap body = catch(seq(guard+modify(tmp:=data[i]),
-  --   seq(seq(guard+guard+modify(data[i]:=data[j])), guard+modify(data[j]:=tmp))), skip)
-  -- Use L1_hoare_catch: error results go to skip handler which returns ok.
-  apply L1_hoare_catch (R := fun _ => True)
-  · -- CATCH BODY: guard+modify chain with heapPtrValid preservation.
-    -- Non-failure: all guards satisfied from precondition + heapUpdate preservation.
-    -- Postcondition: any result maps to True (for errors) or r=ok (tautological).
-    sorry
-  · -- HANDLER (skip): from True, skip gives ok
-    intro s _
-    exact ⟨not_false, fun r s' h_mem => by
-      have ⟨hr, _⟩ := Prod.mk.inj h_mem; subst hr; rfl⟩
+  rw [← pq_swap_body_decomposed_eq]
+  intro s ⟨hdi, hdj⟩
+  have ⟨h_nf, h_ok⟩ := pq_swap_body_nf s hdi hdj
+  exact ⟨h_nf, fun r s' h_mem => h_ok r s' h_mem⟩
 
 -- pq_bubble_up: non-failure + ok-only result.
 -- Proof uses L1_hoare_while with invariant tracking dataArrayValid and i bounds.
