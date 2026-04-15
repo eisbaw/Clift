@@ -662,7 +662,7 @@ private theorem uint32_parent_toNat_eq (i : UInt32) (h : i.toNat > 0) :
   have h_bnd := i.toBitVec.isLt -- i.toNat < 2^32
   have h_sub : (i.toBitVec - 1).toNat = i.toBitVec.toNat - 1 := by
     rw [BitVec.toNat_sub]
-    have h1 : (1 : BitVec 32).toNat = 1 := by native_decide
+    have h1 : (1 : BitVec 32).toNat = 1 := by decide
     rw [h1]
     -- Goal: (2^32 - 1 + i.toBitVec.toNat) % 2^32 = i.toBitVec.toNat - 1
     -- Rewrite: 2^32 - 1 + x = (x - 1) + 2^32 for x ≥ 1
