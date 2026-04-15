@@ -209,14 +209,11 @@ Lean~4~\cite{demoura2021lean4} is a dependently typed programming
 language and theorem prover. Its \texttt{simp}, \texttt{omega}, and
 \texttt{grind} tactics provide strong automation, while dependent
 types allow encoding invariants that Isabelle's simple type theory
-cannot express directly. For example, Clift's pointer validity
-predicate is parameterized by the pointed-to type~\texttt{T}:
-\texttt{validPtr (T : Type) (addr : UInt64) (htd : HeapTypeDesc)},
-where the type descriptor carries proof-relevant size and alignment
-information indexed by~\texttt{T}. In Isabelle, this requires
-ad-hoc type-class encodings or \texttt{OFCLASS} constraints;
-in Lean~4, the dependent parameter is first-class and
-the kernel checks it during unification.
+cannot express directly. For example, Clift's pointer validity predicate is parameterized
+by the pointed-to type~\texttt{T}, carrying proof-relevant size
+and alignment information. In Isabelle, this requires ad-hoc
+type-class encodings; in Lean~4, the dependent parameter is
+first-class.
 Lean~4's metaprogramming framework enables
 programmatic construction of proof terms, which we use for the
 lifting stages.
@@ -282,9 +279,8 @@ original C semantics to the final clean functional model:
 
 \subsection{CImporter: The Trust Boundary}
 
-A Python script ($\sim$5,000 LOC) reads \texttt{clang
--Xclang -ast-dump=json} output and emits Lean~4 files containing
-\texttt{CSimpl} terms. This follows the same trust model as seL4's
+A Python script ($\sim$5,000 LOC) reads clang's JSON AST
+output and emits Lean~4 files containing \texttt{CSimpl} terms. This follows the same trust model as seL4's
 StrictC parser: the importer is in the Trusted Computing Base
 (TCB; see Figure~\ref{fig:trust}). If
 it mistranslates C to CSimpl, proofs apply to the wrong program.
@@ -343,11 +339,11 @@ loops with invariants, and heap operations.
 \subsection{Memory Model}
 \label{sec:memory}
 
-Following Tuch~\cite{tuch2009types}, our heap is a flat byte-addressed
-store with typed access functions. The state comprises a raw heap
-(\texttt{HeapRawState}: address $\to$ byte array), a heap type
-descriptor (\texttt{htd}: tracking which types are valid at each
-address), and user-defined global/local records:
+Following Tuch~\cite{tuch2009types}, our heap is a flat
+byte-addressed store with typed access functions. The state
+comprises a raw heap (address $\to$ byte array), a type
+descriptor tracking valid types at each address, and
+user-defined global/local records:
 
 \begin{lstlisting}[language=Lean]
 structure CState where
