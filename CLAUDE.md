@@ -636,6 +636,20 @@ Full help available: `backlog --help`
 
 ---
 
+## Lean/Lake Build Safety
+
+Before running `lake build`, **always check for existing lean/lake processes**:
+```bash
+if pgrep -f "lean|lake" >/dev/null 2>&1; then
+  echo "ERROR: lean/lake already running — wait or abort"
+  pgrep -af "lean|lake"
+  # Wait and re-check, do NOT proceed
+fi
+```
+- Multiple concurrent `lake build` invocations will OOM the machine (each needs 5-10GB)
+- This applies to sub-agents too — if you launch multiple agents, only ONE may run `lake build` at a time
+- Do NOT `pkill` other agents' lean processes — wait for them to finish
+
 ## GitHub CI
 
 - **No logic in CI workflow YAML.** GitHub Actions workflows must only call `nix develop` and `just` recipes.

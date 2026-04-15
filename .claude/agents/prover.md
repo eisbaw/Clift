@@ -127,23 +127,24 @@ If too weak → strengthen in `RBExtSpecs.lean` FIRST. Define `foo_spec_ext` if 
 
 **CRITICAL RAM CONSTRAINT:**
 ```bash
-# BEFORE every build, check no other builds are running:
-if pgrep -c lean > /dev/null 2>&1; then
-  echo "WARNING: lean processes already running, waiting..."
-  # Use flock to serialize:
-  nix develop --command just build-lock Examples.<Module>
-else
-  pkill -f lean 2>/dev/null
-  sleep 2
-  free -h  # must have >5GB free
-  nix develop --command just build-lock Examples.<Module>
+# BEFORE every build, check for existing lean/lake processes:
+if pgrep -f "lean|lake" >/dev/null 2>&1; then
+  echo "ERROR: lean/lake processes already running. Wait or abort."
+  pgrep -af "lean|lake"
+  # DO NOT proceed. Wait 30s and re-check, up to 3 times.
+  # If still running after 90s, ABORT — another agent is building.
+  exit 1
 fi
+
+free -h  # must have >5GB free
+
+# Build ONE file:
+$HOME/.elan/toolchains/leanprover--lean4---v4.30.0-rc1/bin/lake build Examples.<Module> 2>&1 | tail -5
 ```
 
-- ALWAYS use `just build-lock <Module>` instead of raw `lake build` — it uses flock to prevent concurrent builds
-- NEVER run parallel builds — another agent may be building
-- Each loop proof needs ~5-10GB RAM
-- If build gets killed (exit 137 or 144), kill stale lean processes and retry
+- **BEFORE every `lake build`**: check `pgrep -f "lean|lake"` — if anything is running, WAIT or ABORT. Another agent may be building. Do NOT kill other agents' processes.
+- NEVER run parallel builds — each needs 5-10GB RAM
+- If YOUR build gets killed (exit 137 or 144), kill YOUR stale lean processes and retry
 - zram is enabled (10GB lz4) — effective memory ~40GB
 
 ## What you MUST reject
