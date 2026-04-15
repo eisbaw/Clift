@@ -576,8 +576,9 @@ LOC verified      & 10,000+           & 4,443 \\
 \end{tabular}
 \end{center}
 
-Clift's memory model is simpler than AutoCorres2's full Tuch
-model~\cite{tuch2009types}: we use a flat byte-addressed heap with
+Figure~\ref{fig:radar} provides a qualitative comparison across
+six dimensions. Clift's memory model is simpler than AutoCorres2's
+full Tuch model~\cite{tuch2009types}: we use a flat byte-addressed heap with
 typed access functions rather than a fully mechanized separation
 algebra. This is a deliberate trade-off---the simplified model handles
 our test suite but would need strengthening for OS-kernel-level
@@ -592,7 +593,8 @@ verification with complex aliasing patterns.
 We tracked sorry elimination across proof files
 (Figure~\ref{fig:sorry-timeline}) using a combination of
 direct Claude Code proof writing and ``model racing'' (running multiple
-AI models in parallel on isolated git worktrees):
+AI models in parallel on isolated git worktrees), broken down by
+category in Figure~\ref{fig:ai-success}:
 
 \begin{center}
 \small
